@@ -154,12 +154,8 @@ impl PerpsApp {
             copy_trading_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &msg::contracts::copy_trading::InstantiateMsg {
-                factory: factory_addr.as_ref().into(),
                 leader: TEST_CONFIG.protocol_owner.clone().into(),
-                config: msg::contracts::copy_trading::ConfigUpdate {
-                    admin: Some(TEST_CONFIG.protocol_owner.clone().into()),
-                    ..msg::contracts::copy_trading::ConfigUpdate::default()
-                },
+                config: msg::contracts::copy_trading::ConfigUpdate::default(),
             },
             &[],
             "copy_trading",
