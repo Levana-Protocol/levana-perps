@@ -209,7 +209,7 @@ fn compute_lp_token_value(
 ) -> Result<Event> {
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
-        .context("Could not load LP_TOKEN_VALE")?;
+        .context("Could not load LP_TOKEN_VALUE")?;
     let token_value = match token_value {
         Some(token_value) => token_value,
         None => {

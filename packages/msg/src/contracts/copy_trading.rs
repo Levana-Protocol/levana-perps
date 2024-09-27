@@ -16,8 +16,6 @@ use shared::{
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct InstantiateMsg {
-    /// Factory contract that trading will be performed on
-    pub factory: RawAddr,
     /// Leader of the contract
     pub leader: RawAddr,
     /// Initial configuration values
@@ -29,7 +27,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 /// Updates to configuration values.
 pub struct Config {
-    /// Factory we will allow trading on
+    /// Factory we will allow trading on.
     pub factory: Addr,
     /// Administrator of the contract. Should be the factory contract
     /// which initializes this.
@@ -76,7 +74,6 @@ pub struct ConfigUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
     pub commission_rate: Option<Decimal256>,
-    pub admin: Option<RawAddr>,
 }
 
 /// Executions available on the copy trading contract.
