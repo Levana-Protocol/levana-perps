@@ -401,7 +401,7 @@ fn desired_action(
 }
 
 /// Deterimine target notional on the unpopoular side
-pub(crate) fn determine_target_notional(
+fn determine_target_notional(
     long_interest: Notional,
     short_interest: Notional,
     target_funding: Number,
@@ -464,7 +464,7 @@ pub(crate) fn determine_target_notional(
 }
 
 /// Returns the delta notional on the unpopular side.
-pub(crate) fn smart_search(
+fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
     target_funding: Number,

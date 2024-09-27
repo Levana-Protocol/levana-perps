@@ -840,7 +840,7 @@ fn balance_one_sided_market() {
 }
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
-    do_work_optional_collect(market, lp, true);
+    do_work_optional_collect(market, lp, true)
 }
 
 fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
