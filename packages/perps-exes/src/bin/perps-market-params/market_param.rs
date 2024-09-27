@@ -181,7 +181,7 @@ pub(crate) async fn dnf_sensitivity(
     let quote_asset = AssetName(market_id.get_quote());
 
     if quote_asset.is_usd_equiv() {
-        tracing::info!("Fetch exchanges");
+        tracing::debug!("Fetch exchanges");
         let exchanges = http_app.get_market_pair(base_asset).await?;
         tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
