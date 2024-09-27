@@ -85,9 +85,7 @@ pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> MaxL
     MaxLeverage::new(leverage)
 }
 
-#[derive(
-    Debug, PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default,
-)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default)]
 pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
@@ -111,7 +109,7 @@ impl DnfInNotional {
     }
 }
 
-#[derive(Debug, PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
 impl Display for DnfInUsd {
@@ -170,7 +168,6 @@ impl DnfInUsd {
         http_app: &HttpApp,
     ) -> anyhow::Result<f64> {
         let price = http_app.get_price_in_usd(asset).await?;
-        println!("Figuring out the DNF IN USD -- {price} -- {:}", self.0);
         Ok(self.0 / price)
     }
 }
@@ -192,7 +189,6 @@ pub(crate) async fn dnf_sensitivity(
             exchanges.len()
         );
         let dnf_result = compute_dnf_sensitivity(exchanges)?;
-
         let dnf_in_usd = dnf_result.dnf;
         let dnf_in_base = dnf_in_usd
             .to_asset_amount(NotionalAsset(base_asset.0), http_app)
@@ -338,7 +334,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
     }
 }
 
-#[derive(Debug, PartialOrd, PartialEq, Clone, serde::Serialize)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
 pub(crate) struct DnfResult {
     pub(crate) dnf: DnfInUsd,
     pub(crate) min_depth_liquidity: f64,
