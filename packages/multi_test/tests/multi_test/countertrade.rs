@@ -1352,8 +1352,8 @@ fn update_position_funding_rate_less_than_target_rate() {
     // 1. Open 1 long
     // 2. Open 2 shorts. Short is now popular side
     let long_position_1 = create_position(&market, "45", 7, DirectionToBase::Long);
-    let short_position_1 = create_position(&market, "30", 7, DirectionToBase::Short);
-    let short_position_2 = create_position(&market, "30", 7, DirectionToBase::Short);
+    let short_position_1 = create_position(&market, "43", 7, DirectionToBase::Short);
+    let short_position_2 = create_position(&market, "10", 7, DirectionToBase::Short);
     assert!(market
         .query_status()
         .unwrap()
@@ -1364,7 +1364,7 @@ fn update_position_funding_rate_less_than_target_rate() {
     do_work(&market, &lp);
     assert!(
         market.query_status().unwrap().short_funding.into_number()
-            < Number::from(Decimal256::from_ratio(42u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+            < Number::from(Decimal256::from_ratio(45u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
     );
 
     // 4. Close one of the short positions
@@ -1389,7 +1389,7 @@ fn update_position_funding_rate_less_than_target_rate() {
     do_work(&market, &lp);
     assert!(
         market.query_status().unwrap().long_funding.into_number()
-            < Number::from(Decimal256::from_ratio(42u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+            < Number::from(Decimal256::from_ratio(45u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
     );
 }
 
