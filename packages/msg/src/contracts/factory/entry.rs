@@ -126,6 +126,15 @@ pub struct MarketsResp {
     pub markets: Vec<MarketId>,
 }
 
+/// Response from [QueryMsg::Markets]
+///
+/// Use [QueryMsg::CopyTrading] for details on copy trading contract.
+#[cw_serde]
+pub struct CopyTradingResp {
+    /// Copy trading contracts maintained by this factory
+    pub copy_trading_addresses: Vec<Addr>,
+}
+
 /// Response from [QueryMsg::AddrIsContract]
 #[cw_serde]
 pub struct AddrIsContractResp {
@@ -146,10 +155,15 @@ pub enum ContractType {
     PositionToken,
     /// A market
     Market,
+    /// Copy trading contract
+    CopyTrading
 }
 
 /// Default limit for [QueryMsg::Markets]
 pub const MARKETS_QUERY_LIMIT_DEFAULT: u32 = 15;
+
+/// Default limit for queries.
+pub const QUERY_LIMIT_DEFAULT: u32 = 15;
 
 /// Queries available on the factory contract
 #[cw_serde]
@@ -237,6 +251,18 @@ pub enum QueryMsg {
         /// Take from [ListRefereeCountResp::next_start_after]
         start_after: Option<ListRefereeCountStartAfter>,
     },
+
+    /// Fetch copy trading contracts
+    ///
+    /// Returns [CopyTradingResp]
+    #[returns(CopyTradingResp)]
+    CopyTrading {
+        /// Last seen RawAddr in a [CopyTradingResp] for enumeration
+        start_after: Option<RawAddr>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
+
 }
 
 /// Information on owners and other protocol-wide special addresses

@@ -30,14 +30,16 @@ use anyhow::Result;
 use copy_trading::COPY_TRADING_CODE_ID;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
+use cosmwasm_std::{
+    to_json_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response,
+};
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     factory::{
         entry::{
-            AddrIsContractResp, ContractType, ExecuteMsg, FactoryOwnerResp, GetReferrerResp,
-            InstantiateMsg, ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg,
-            RefereeCount,
+            AddrIsContractResp, ContractType, CopyTradingResp, ExecuteMsg, FactoryOwnerResp,
+            GetReferrerResp, InstantiateMsg, ListRefereeCountStartAfter, MarketInfoResponse,
+            MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -354,6 +356,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 }
                 ReplyId::InstantiateCopyTrading => {
                     crate::state::copy_trading::COPY_TRADING_ADDRS.save(ctx.storage, &addr, &())?;
+                    ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CopyTrading)?;
                     ctx.response.add_event(
                         Event::new("instantiate-copy-trading")
                             .add_attribute("addr", addr.to_string()),
@@ -465,6 +468,30 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 })
                 .transpose()?;
             list_referee_count(store, limit, start_after)?.query_result()
+        }
+        QueryMsg::CopyTrading { start_after, limit } => {
+            let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
+            let start_after = match start_after {
+                Some(start_after) => {
+                    let addr = start_after.validate(state.api)?;
+                    Some(addr)
+                }
+                None => None,
+            };
+            let result = copy_trading::COPY_TRADING_ADDRS
+                .keys(
+                    store,
+                    start_after.as_ref().map(Bound::exclusive),
+                    None,
+                    cosmwasm_std::Order::Ascending,
+                )
+                .take(limit.try_into()?)
+                .collect::<Result<Vec<_>, _>>()?;
+            let result = CopyTradingResp {
+                copy_trading_addresses: result,
+            };
+            let result = to_json_binary(&result)?;
+            Ok(result)
         }
     }
 }
