@@ -167,20 +167,17 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 },
             )?;
             let label_suffix = get_label_suffix(ctx.storage)?;
-            let factory_contract = state.env.contract.address;
             ctx.response.add_instantiate_submessage(
                 ReplyId::InstantiateCopyTrading,
                 &migration_admin,
                 get_market_code_id(ctx.storage)?,
                 format!("Levana Perps Copy Trading - {label_suffix}"),
                 &msg::contracts::copy_trading::InstantiateMsg {
-                    factory: factory_contract.clone().into(),
                     leader,
                     config: msg::contracts::copy_trading::ConfigUpdate {
                         name: Some(name),
                         description: Some(description),
                         commission_rate: None,
-                        admin: Some(factory_contract.into()),
                     },
                 },
             )?;

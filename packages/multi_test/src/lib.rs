@@ -110,7 +110,7 @@ impl PerpsApp {
                 kill_switch: TEST_CONFIG.kill_switch.clone().into(),
                 wind_down: TEST_CONFIG.wind_down.clone().into(),
                 label_suffix: Some(" - MULTITEST".to_owned()),
-                copy_trading_code_id: copy_trading_code_id.clone().into(),
+                copy_trading_code_id: Some(copy_trading_code_id.to_string()),
             },
             &[],
             "factory",
