@@ -153,7 +153,12 @@ impl OneLpTokenValue {
                 .checked_div_dec(self.0.into_decimal256())?
                 .into_decimal256(),
         );
-        NonZero::new(new_shares).context("tokens is zero in add_collateral")
+        NonZero::new(new_shares).context("tokens is zero in collateral_to_shares")
+    }
+
+    pub(crate) fn shares_to_collateral(&self, shares: NonZero<LpToken>) -> Result<NonZero<Collateral>> {
+        let funds = self.0.checked_mul_dec(shares.into_decimal256())?;
+        NonZero::new(funds).context("funds is zero in shares_to_collateral")
     }
 }
 

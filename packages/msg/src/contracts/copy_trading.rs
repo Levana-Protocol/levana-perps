@@ -95,6 +95,8 @@ pub enum ExecuteMsg {
     Withdraw {
         /// The number of LP shares to remove
         amount: NonZero<LpToken>,
+        /// Token type in which amount should be withdrawn
+        token: Token
     },
     /// Appoint a new administrator
     AppointAdmin {
@@ -156,7 +158,7 @@ pub enum QueryMsg {
         /// How many values to return
         limit: Option<u32>,
     },
-    /// Does it has any pending work ?
+    /// Does it have any pending work ?
     ///
     /// Returns [WorkResp]
     HasWork {},
