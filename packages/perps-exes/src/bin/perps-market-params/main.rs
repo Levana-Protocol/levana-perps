@@ -121,10 +121,8 @@ async fn main_inner(opt: Opt) -> Result<()> {
         cli::SubCommand::Dnf { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let dnf = dnf_sensitivity(&http_app, &market_id).await?;
-            println!("DNF -- : {:#?}", dnf);
             let market_config = http_app.fetch_market_status(&markets).await?;
             let configured_dnf = market_config.get_chain_dnf(&market_id);
-            println!("Configured DNF: {:#?}", configured_dnf);
             let configured_dnf = match configured_dnf {
                 Ok(configured_dnf) => {
                     tracing::info!("Configured DNF sensitivity: {}", configured_dnf);
