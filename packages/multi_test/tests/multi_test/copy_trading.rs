@@ -106,7 +106,13 @@ fn do_actual_deposit() {
 
     // Should not find any work now
     let work = market.query_copy_trading_work().unwrap();
-    assert_eq!(work, WorkResp::NoWork)
+    assert_eq!(work, WorkResp::NoWork);
+
+    let balance = market.query_copy_trading_balance(&trader).unwrap();
+    assert_eq!(balance.balance.len(), 1);
+    assert_eq!(balance.balance[0].shares, "100".parse().unwrap());
+    let token = market.get_copytrading_token().unwrap();
+    assert_eq!(balance.balance[0].token, token);
 }
 
 #[test]
