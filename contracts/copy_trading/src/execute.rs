@@ -121,6 +121,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             let funds = funds.require_some(&market_info)?;
             deposit(storage, sender, funds, token)
         }
+        ExecuteMsg::Withdraw { .. } => {
+            todo!()
+        }
         ExecuteMsg::DoWork {} => {
             funds.require_none()?;
             do_work(state, storage, &env)

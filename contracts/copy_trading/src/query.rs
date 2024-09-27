@@ -5,7 +5,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
     let (state, storage) = crate::types::State::load(deps, env)?;
     match msg {
         QueryMsg::Config {} => to_json_binary(&state.config),
-        QueryMsg::Balance { address: _ } => todo!(),
+        QueryMsg::Balance {
+            address,
+            start_after,
+            limit,
+        } => {
+            let wallet = address.validate(state.api)?;
+            let balance = balance(storage, wallet, start_after, limit)?;
+            to_json_binary(&balance)
+        }
         QueryMsg::Status {
             start_after: _,
             limit: _,
@@ -28,6 +36,38 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
 }
 
 const DEFAULT_QUERY_LIMIT: u32 = 10;
+
+fn balance(
+    storage: &dyn Storage,
+    wallet: Addr,
+    start_after: Option<Token>,
+    limit: Option<u32>,
+) -> Result<BalanceResp> {
+    let limit = usize::try_from(
+        limit
+            .unwrap_or(DEFAULT_QUERY_LIMIT)
+            .min(DEFAULT_QUERY_LIMIT),
+    )?;
+    let wallets = crate::state::SHARES
+        .prefix(wallet)
+        .range(
+            storage,
+            None,
+            start_after.map(Bound::exclusive),
+            Order::Descending,
+        )
+        .take(limit);
+    let mut response = vec![];
+    for wallet in wallets {
+        let (token, shares) = wallet?;
+        response.push(BalanceRespItem { shares, token })
+    }
+    let start_after = response.last().map(|item| item.token.clone());
+    Ok(BalanceResp {
+        balance: response,
+        start_after,
+    })
+}
 
 fn queue_status(
     storage: &dyn Storage,

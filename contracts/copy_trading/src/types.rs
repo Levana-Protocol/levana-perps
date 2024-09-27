@@ -243,14 +243,14 @@ pub(crate) struct WalletInfo {
 }
 
 impl<'a> PrimaryKey<'a> for WalletInfo {
-    type Prefix = Token;
+    type Prefix = Addr;
     type SubPrefix = ();
-    type Suffix = Addr;
+    type Suffix = Token;
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        let mut keys = self.token.key();
-        keys.extend(self.wallet.key());
+        let mut keys = self.wallet.key();
+        keys.extend(self.token.key());
         keys
     }
 }
@@ -268,8 +268,11 @@ impl KeyDeserialize for WalletInfo {
                 "WalletInfo keys len is not three",
             ));
         }
-        let token_type = &keys[0];
-        let token = keys[1].as_ref();
+        let wallet = keys[0].as_ref();
+        let wallet = Addr::from_slice(wallet)?;
+
+        let token_type = &keys[1];
+        let token = keys[2].as_ref();
         let token_type = match token_type {
             Key::Val8([token_type]) => token_type,
             _ => return Err(StdError::serialize_err("WalletInfo", "Invalid token type")),
@@ -290,8 +293,7 @@ impl KeyDeserialize for WalletInfo {
                 ))
             }
         };
-        let wallet = keys[3].as_ref();
-        let wallet = Addr::from_slice(wallet)?;
+
         Ok(WalletInfo { token, wallet })
     }
 }

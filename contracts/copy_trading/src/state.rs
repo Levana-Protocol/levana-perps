@@ -36,5 +36,3 @@ pub(crate) const MARKET_WORK_INFO: Map<&MarketId, MarketWorkInfo> = Map::new("ma
 
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
-
-// todo:Probably deposit leaders shares separately since it's always going to be accessed whenever someone deposit

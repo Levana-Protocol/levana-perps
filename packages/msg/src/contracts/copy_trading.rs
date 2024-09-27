@@ -130,7 +130,7 @@ pub enum QueryMsg {
     QueueStatus {
         /// Address of the wallet
         address: RawAddr,
-        /// Value from []
+        /// Value from [QueueResp]
         start_after: Option<QueuePositionId>,
         /// How many values to return
         limit: Option<u32>,
@@ -141,6 +141,10 @@ pub enum QueryMsg {
     Balance {
         /// Address of the token holder
         address: RawAddr,
+        /// Value from [BalanceResp]
+        start_after: Option<Token>,
+        /// How many values to return
+        limit: Option<u32>,
     },
     /// Check the status of the copy trading contract for all the
     /// markets that it's trading on
@@ -240,7 +244,19 @@ pub struct StatusResp {
 #[serde(rename_all = "snake_case")]
 pub struct BalanceResp {
     /// Shares of the pool held by the wallet
+    pub balance: Vec<BalanceRespItem>,
+    /// Start after that should be passed for next iteration
+    pub start_after: Option<Token>
+}
+
+/// Individual market response inside [BalanceResp]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct BalanceRespItem {
+    /// Shares of the pool held by the wallet
     pub shares: NonZero<LpToken>,
+    /// Token type
+    pub token: Token,
 }
 
 /// Token accepted by the contract
