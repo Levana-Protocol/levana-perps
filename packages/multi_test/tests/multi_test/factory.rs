@@ -3,7 +3,10 @@ use levana_perpswap_multi_test::{
     config::TEST_CONFIG, market_wrapper::PerpsMarket, time::TimeJump, PerpsApp,
 };
 use msg::{
-    contracts::market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
+    contracts::{
+        factory::entry::CopyTradingResp,
+        market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
+    },
     prelude::FactoryExecuteMsg,
     shared::{namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
 };
@@ -93,4 +96,50 @@ fn non_admin_add_copy_trading_contract() {
         .unwrap();
     let resp = market.query_factory_copy_contracts().unwrap();
     assert!(resp.copy_trading_addresses.len() == 2);
+}
+
+#[test]
+fn test_copy_trading_pagination() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let name = "some_name".to_owned();
+    let desc = "some_description".to_owned();
+    let trader = market.clone_trader(0).unwrap();
+
+    // We start from one because the test framework already has one copy
+    let mut total = 1usize;
+    for _ in 0..=20 {
+        total += 1;
+        market
+            .exec_factory_as(
+                &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()),
+                &FactoryExecuteMsg::AddCopyTrading {
+                    new_copy_trading: NewCopyTradingParams {
+                        leader: trader.clone().into(),
+                        name: name.clone(),
+                        description: desc.clone(),
+                    },
+                },
+            )
+            .unwrap();
+    }
+    let old_resp = market.query_factory_copy_contracts().unwrap();
+    // Can fetch max of 15 only
+    assert!(old_resp.copy_trading_addresses.len() == 15);
+    let start_after = old_resp.copy_trading_addresses.last().cloned();
+    let resp: CopyTradingResp = market
+        .query_factory(&msg::prelude::FactoryQueryMsg::CopyTrading {
+            start_after: start_after.clone().map(|addr| addr.into()),
+            limit: None,
+        })
+        .unwrap();
+    let start_after = start_after.unwrap();
+    assert!(!resp.copy_trading_addresses.contains(&start_after));
+    assert!(!old_resp
+        .copy_trading_addresses
+        .iter()
+        .any(|item| resp.copy_trading_addresses.contains(item)));
+    assert_eq!(
+        resp.copy_trading_addresses.len() + old_resp.copy_trading_addresses.len(),
+        total
+    );
 }

@@ -2141,7 +2141,7 @@ impl PerpsMarket {
         Ok(resp.balance)
     }
 
-    pub(crate) fn query_factory<T: DeserializeOwned>(&self, msg: &FactoryQueryMsg) -> Result<T> {
+    pub fn query_factory<T: DeserializeOwned>(&self, msg: &FactoryQueryMsg) -> Result<T> {
         let contract_addr = self.app().factory_addr.clone();
         self.app()
             .wrap()
