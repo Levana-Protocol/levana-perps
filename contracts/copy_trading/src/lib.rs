@@ -22,26 +22,23 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     InstantiateMsg {
-        factory,
         leader,
         config:
             ConfigUpdate {
                 name,
                 description,
                 commission_rate,
-                admin,
             },
     }: InstantiateMsg,
 ) -> Result<Response> {
-    let admin = admin.context("Admin not provided")?;
+    // Sender is the factory contract
+    let factory = info.sender;
     let config = Config {
-        admin: admin.validate(deps.api).context("Invalid admin provided")?,
+        admin: factory.clone(),
         pending_admin: None,
-        factory: factory
-            .validate(deps.api)
-            .context("Invalid factory provided")?,
+        factory,
         leader: leader
             .validate(deps.api)
             .context("Invalid leader provided")?,
