@@ -121,9 +121,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             let funds = funds.require_some(&market_token)?;
             deposit(storage, sender, funds, token)
         }
-        ExecuteMsg::Withdraw { amount, token } => {
+        ExecuteMsg::Withdraw { shares, token } => {
             funds.require_none()?;
-            withdraw(storage, sender, amount, token)
+            withdraw(storage, sender, shares, token)
         }
         ExecuteMsg::DoWork {} => {
             funds.require_none()?;
@@ -221,12 +221,12 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         wallet: queue_item.wallet,
                     };
                     let actual_shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
-                    let shares = match actual_shares {
+                    let actual_shares = match actual_shares {
                         Some(actual_shares) => {
                             if shares > actual_shares && shares != actual_shares {
                                 bail!("Requesting more withdrawal than balance")
                             }
-                            shares
+                            actual_shares
                         }
                         None => bail!("No shares found"),
                     };
@@ -238,6 +238,15 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         .context(
                         "Collateral amount would be less than the chain's minimum representation",
                     )?;
+                    let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;
+                    if remaining_shares.is_zero() {
+                        crate::state::SHARES.remove(storage, &wallet_info);
+                    } else {
+                        let remaining_shares =
+                            NonZero::new(remaining_shares).context("remaining_shares is zero")?;
+                        crate::state::SHARES.save(storage, &wallet_info, &remaining_shares)?;
+                    }
+                    crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &id)?;
                     let event = Event::new("withdraw")
                         .add_attribute("wallet", wallet_info.wallet.to_string())
                         .add_attribute("burned-shares", shares.to_string());

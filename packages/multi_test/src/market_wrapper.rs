@@ -2525,6 +2525,19 @@ impl PerpsMarket {
         self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {})
     }
 
+    pub fn exec_copytrading_withdrawal(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {
+        let amount = amount.parse()?;
+        let amount = NonZero::new(amount).context("amount is zero")?;
+        let token = self.get_copytrading_token()?;
+        self.exec_copytrading(
+            sender,
+            &CopyTradingExecuteMsg::Withdraw {
+                shares: amount,
+                token,
+            },
+        )
+    }
+
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {
         self.exec_countertrade(
             sender,

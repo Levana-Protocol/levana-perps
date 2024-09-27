@@ -155,3 +155,55 @@ fn does_not_compute_lp_token_work() {
     // Process queue item: Do actual deposit
     market.exec_copytrading_do_work(&trader).unwrap();
 }
+
+#[test]
+fn do_withdraw() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let initial_balance = market.query_copy_trading_balance(&trader).unwrap();
+    assert_eq!(initial_balance.balance[0].shares, "100".parse().unwrap());
+
+    market
+        .exec_copytrading_withdrawal(&trader, "101")
+        .unwrap_err();
+    market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
+                id: QueuePositionId::new(1)
+            }
+        }
+    );
+    // Process queue item: do the actual withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let new_balance = market.query_copy_trading_balance(&trader).unwrap();
+    assert_eq!(new_balance.balance[0].shares, "50".parse().unwrap());
+
+    market
+        .exec_copytrading_withdrawal(&trader, "51")
+        .unwrap_err();
+    market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    // Process queue item: do the actual withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market
+        .exec_copytrading_withdrawal(&trader, "1")
+        .unwrap_err();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+}
