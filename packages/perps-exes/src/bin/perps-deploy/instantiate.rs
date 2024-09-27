@@ -240,6 +240,7 @@ pub(crate) async fn instantiate(
                 kill_switch: wallet.get_address_string().into(),
                 wind_down: wallet.get_address_string().into(),
                 label_suffix: Some(label_suffix),
+                copy_trading_code_id: None,
             },
             ContractAdmin::Sender,
         )
