@@ -16,6 +16,8 @@ pub struct InstantiateMsg {
     pub position_token_code_id: String,
     /// The code id for the liquidity_token contract
     pub liquidity_token_code_id: String,
+    /// The code id for the copy trading contract
+    pub copy_trading_code_id: Option<String>,
     /// Migration admin, needed for instantiating/migrating sub-contracts
     pub migration_admin: RawAddr,
     /// Perpetual swap admin address

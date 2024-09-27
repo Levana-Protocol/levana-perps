@@ -69,6 +69,7 @@ pub fn instantiate(
         kill_switch,
         wind_down,
         label_suffix,
+        copy_trading_code_id,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -82,6 +83,10 @@ pub fn instantiate(
     set_kill_switch(deps.storage, &kill_switch.validate(deps.api)?)?;
     set_wind_down(deps.storage, &wind_down.validate(deps.api)?)?;
     set_label_suffix(deps.storage, label_suffix.as_deref().unwrap_or_default())?;
+    if let Some(copy_trading_code_id) = copy_trading_code_id {
+        let code_id: u64 = copy_trading_code_id.parse()?;
+        crate::state::copy_trading::COPY_TRADING_CODE_ID.save(deps.storage, &code_id)?;
+    }
 
     ALL_CONTRACTS.save(deps.storage, &env.contract.address, &ContractType::Factory)?;
 
