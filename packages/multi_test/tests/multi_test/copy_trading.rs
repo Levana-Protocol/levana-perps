@@ -15,7 +15,6 @@ fn query_config() {
 }
 
 #[test]
-#[ignore]
 fn deposit() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let token = market.get_copytrading_token().unwrap();
@@ -51,7 +50,6 @@ fn initial_no_work() {
 }
 
 #[test]
-#[ignore]
 fn detect_process_queue_item_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
@@ -88,7 +86,6 @@ fn detect_process_queue_item_work() {
 }
 
 #[test]
-#[ignore]
 fn do_actual_deposit() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
@@ -113,7 +110,6 @@ fn do_actual_deposit() {
 }
 
 #[test]
-#[ignore]
 fn does_not_compute_lp_token_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
