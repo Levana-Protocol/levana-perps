@@ -41,8 +41,9 @@ use msg::contracts::{
         events::{InstantiateEvent, NewContractKind},
     },
     liquidity_token::LiquidityTokenKind,
-    market::entry::{ExecuteMsg as MarketExecuteMsg, NewMarketParams},
+    market::entry::{ExecuteMsg as MarketExecuteMsg, NewCopyTradingParams, NewMarketParams},
 };
+use reply::{InstantiateCopyTrading, INSTANTIATE_COPY_TRADING};
 use semver::Version;
 use shared::prelude::*;
 
@@ -138,6 +139,41 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     initial_borrow_fee_rate,
                     spot_price,
                     initial_price,
+                },
+            )?;
+        }
+
+        ExecuteMsg::AddCopyTrading {
+            new_copy_trading:
+                NewCopyTradingParams {
+                    leader,
+                    name,
+                    description,
+                },
+        } => {
+            let migration_admin: Addr = get_admin_migration(ctx.storage)?;
+            INSTANTIATE_COPY_TRADING.save(
+                ctx.storage,
+                &InstantiateCopyTrading {
+                    migration_admin: migration_admin.clone(),
+                },
+            )?;
+            let label_suffix = get_label_suffix(ctx.storage)?;
+            let factory_contract = state.env.contract.address;
+            ctx.response.add_instantiate_submessage(
+                ReplyId::InstantiateCopyTrading,
+                &migration_admin,
+                get_market_code_id(ctx.storage)?,
+                format!("Levana Perps Copy Trading - {label_suffix}"),
+                &msg::contracts::copy_trading::InstantiateMsg {
+                    factory: factory_contract.clone().into(),
+                    leader,
+                    config: msg::contracts::copy_trading::ConfigUpdate {
+                        name: Some(name),
+                        description: Some(description),
+                        commission_rate: None,
+                        admin: Some(factory_contract.into()),
+                    },
                 },
             )?;
         }
@@ -309,6 +345,13 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                         market_id,
                         addr,
                     });
+                }
+                ReplyId::InstantiateCopyTrading => {
+                    crate::state::copy_trading::COPY_TRADING_ADDRS.save(ctx.storage, &addr, &())?;
+                    ctx.response.add_event(
+                        Event::new("instantiate-copy-trading")
+                            .add_attribute("addr", addr.to_string()),
+                    );
                 }
             }
         }

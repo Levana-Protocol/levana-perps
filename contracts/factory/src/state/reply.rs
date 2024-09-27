@@ -6,9 +6,17 @@ use std::convert::TryFrom;
 
 const INSTANTIATE_MARKET: Item<InstantiateMarket> = Item::new(namespace::REPLY_INSTANTIATE_MARKET);
 
+pub(crate) const INSTANTIATE_COPY_TRADING: Item<InstantiateCopyTrading> =
+    Item::new(namespace::REPLY_INSTANTIATE_COPY_TRADING);
+
 #[derive(Serialize, Deserialize)]
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
+    pub(crate) migration_admin: Addr,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct InstantiateCopyTrading {
     pub(crate) migration_admin: Addr,
 }
 
@@ -33,6 +41,7 @@ pub(crate) enum ReplyId {
     InstantiatePositionToken = 1,
     InstantiateLiquidityTokenLp = 2,
     InstantiateLiquidityTokenXlp = 3,
+    InstantiateCopyTrading = 4,
 }
 
 impl TryFrom<u64> for ReplyId {
@@ -44,6 +53,7 @@ impl TryFrom<u64> for ReplyId {
             1 => Ok(ReplyId::InstantiatePositionToken),
             2 => Ok(ReplyId::InstantiateLiquidityTokenLp),
             3 => Ok(ReplyId::InstantiateLiquidityTokenXlp),
+            4 => Ok(ReplyId::InstantiateCopyTrading),
             _ => Err(PerpError {
                 id: ErrorId::InternalReply,
                 domain: ErrorDomain::Factory,
@@ -61,6 +71,7 @@ impl From<ReplyId> for u64 {
             ReplyId::InstantiatePositionToken => 1,
             ReplyId::InstantiateLiquidityTokenLp => 2,
             ReplyId::InstantiateLiquidityTokenXlp => 3,
+            ReplyId::InstantiateCopyTrading => 4,
         }
     }
 }

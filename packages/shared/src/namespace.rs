@@ -160,3 +160,6 @@ pub const REFEREES_REVERSE_MAP: &str = "fa";
 pub const REFEREE_COUNT_REVERSE_MAP: &str = "fb";
 pub const REFERRAL_STATS_MAP: &str = "fc";
 pub const FACTORY_MARKET_LAST_ADDED: &str = "fd";
+pub const REPLY_INSTANTIATE_COPY_TRADING: &str = "fe";
+pub const COPY_TRADING_CODE_ID: &str = "ff";
+pub const COPY_TRADING_ADDRS: &str = "fg";

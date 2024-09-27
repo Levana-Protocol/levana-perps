@@ -69,6 +69,20 @@ pub struct NewMarketParams {
     pub initial_price: Option<InitialPrice>,
 }
 
+/// Parameter for the copy trading parameter
+#[cw_serde]
+pub struct NewCopyTradingParams {
+    /// Leader of the contract
+    pub leader: RawAddr,
+
+    /// Name of the copy trading pool
+    pub name: String,
+
+    /// Description of the copy_trading pool. Not more than 128
+    /// characters.
+    pub description: String,
+}
+
 /// There are two sources of slippage in the protocol:
 /// - Change in the oracle price from creation of the message to execution of the message.
 /// - Change in delta neutrality fee from creation of the message to execution of the message.

@@ -1,6 +1,6 @@
 //! Entrypoint messages for the factory
 use crate::{
-    contracts::market::entry::NewMarketParams,
+    contracts::market::entry::{NewCopyTradingParams, NewMarketParams},
     shutdown::{ShutdownEffect, ShutdownImpact},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -61,7 +61,7 @@ pub enum ExecuteMsg {
         owner: RawAddr,
     },
 
-    /// Change the migrationadmin
+    /// Change the migration admin
     SetMigrationAdmin {
         /// New migration admin
         migration_admin: RawAddr,
@@ -104,6 +104,11 @@ pub enum ExecuteMsg {
     RegisterReferrer {
         /// The wallet address of the referrer
         addr: RawAddr,
+    },
+    /// Add new copy trading contract
+    AddCopyTrading {
+        /// Parameters for the contract
+        new_copy_trading: NewCopyTradingParams,
     },
 }
 
@@ -285,6 +290,7 @@ impl ExecuteMsg {
             ExecuteMsg::RegisterReferrer { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
+            ExecuteMsg::AddCopyTrading { .. } => true,
         }
     }
 }
