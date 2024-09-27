@@ -3,7 +3,7 @@ use levana_perpswap_multi_test::{
     config::TEST_CONFIG, market_wrapper::PerpsMarket, time::TimeJump, PerpsApp,
 };
 use msg::{
-    contracts::market::entry::{InitialPrice, NewMarketParams},
+    contracts::market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
     prelude::FactoryExecuteMsg,
     shared::{namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
 };
@@ -54,4 +54,39 @@ fn factory_has_copy_trading_contract() {
 
     let resp = market.query_factory_copy_contracts().unwrap();
     assert!(resp.copy_trading_addresses.len() == 1);
+    assert_eq!(market.copy_trading_addr, resp.copy_trading_addresses[0]);
+}
+
+#[test]
+fn non_admin_add_copy_trading_contract() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let name = "some_name".to_owned();
+    let desc = "some_description".to_owned();
+
+    let trader = market.clone_trader(0).unwrap();
+    market.exec_factory_as(
+        &trader,
+        &FactoryExecuteMsg::AddCopyTrading {
+            new_copy_trading: NewCopyTradingParams {
+                leader: trader.clone().into(),
+                name: name.clone(),
+                description: desc.clone(),
+            },
+        },
+    ).unwrap_err();
+
+    // But should be able to add new copy trading contract as protocol
+    // owner
+    market.exec_factory_as(
+        &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()) ,
+        &FactoryExecuteMsg::AddCopyTrading {
+            new_copy_trading: NewCopyTradingParams {
+                leader: trader.clone().into(),
+                name: name.clone(),
+                description: desc.clone(),
+            },
+        },
+    ).unwrap();
+    let resp = market.query_factory_copy_contracts().unwrap();
+    assert!(resp.copy_trading_addresses.len() == 2);
 }
