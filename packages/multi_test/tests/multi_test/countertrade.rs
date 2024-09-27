@@ -8,12 +8,11 @@ use levana_perpswap_multi_test::{
 use msg::{
     contracts::{
         countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
-        market::position::{PositionId, PositionQueryResponse},
+        market::position::PositionId,
     },
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
     shared::number::{Collateral, NonZero},
 };
-use serde_json::Result;
 
 fn make_countertrade_market() -> anyhow::Result<PerpsMarket> {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
@@ -842,7 +841,7 @@ fn balance_one_sided_market() {
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
     do_work_optional_collect(market, lp, true);
-    log_status("=== Ran a CT update", &market);
+    log_status("=== Ran a CT update", market);
 }
 
 fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
@@ -1351,9 +1350,9 @@ fn update_position_funding_rate_less_than_target_rate() {
     // This scenario will similate the following
     // 1. Open 1 long
     // 2. Open 2 shorts. Short is now popular side
-    let long_position_1 = create_position(&market, "45", 7, DirectionToBase::Long);
+    let _ = create_position(&market, "45", 7, DirectionToBase::Long);
     let short_position_1 = create_position(&market, "43", 7, DirectionToBase::Short);
-    let short_position_2 = create_position(&market, "10", 7, DirectionToBase::Short);
+    let _ = create_position(&market, "10", 7, DirectionToBase::Short);
     assert!(market
         .query_status()
         .unwrap()
@@ -1464,5 +1463,4 @@ fn log_status(header: &str, market: &PerpsMarket) {
         }
         None => println!("- CT Notional: 0"),
     };
-    println!("");
 }
