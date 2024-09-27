@@ -71,7 +71,6 @@ impl MarketsConfig {
 
 pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> MaxLeverage {
     let dnf_sensitivity = dnf_sensitivity.0;
-    println!("{dnf_sensitivity}");
     let million = 1000000.0;
     let leverage = if dnf_sensitivity < (20.0 * million) {
         4.0
@@ -154,7 +153,7 @@ impl PartialOrd for MinDepthLiquidity {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
 pub(crate) struct Dnf {
     pub(crate) dnf_in_notional: DnfInNotional,
     pub(crate) dnf_in_usd: DnfInUsd,
@@ -184,7 +183,7 @@ pub(crate) async fn dnf_sensitivity(
     if quote_asset.is_usd_equiv() {
         tracing::info!("Fetch exchanges");
         let exchanges = http_app.get_market_pair(base_asset).await?;
-        tracing::info!(
+        tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
             exchanges.len()
         );
