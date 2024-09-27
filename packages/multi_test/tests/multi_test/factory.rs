@@ -64,29 +64,33 @@ fn non_admin_add_copy_trading_contract() {
     let desc = "some_description".to_owned();
 
     let trader = market.clone_trader(0).unwrap();
-    market.exec_factory_as(
-        &trader,
-        &FactoryExecuteMsg::AddCopyTrading {
-            new_copy_trading: NewCopyTradingParams {
-                leader: trader.clone().into(),
-                name: name.clone(),
-                description: desc.clone(),
+    market
+        .exec_factory_as(
+            &trader,
+            &FactoryExecuteMsg::AddCopyTrading {
+                new_copy_trading: NewCopyTradingParams {
+                    leader: trader.clone().into(),
+                    name: name.clone(),
+                    description: desc.clone(),
+                },
             },
-        },
-    ).unwrap_err();
+        )
+        .unwrap_err();
 
     // But should be able to add new copy trading contract as protocol
     // owner
-    market.exec_factory_as(
-        &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()) ,
-        &FactoryExecuteMsg::AddCopyTrading {
-            new_copy_trading: NewCopyTradingParams {
-                leader: trader.clone().into(),
-                name: name.clone(),
-                description: desc.clone(),
+    market
+        .exec_factory_as(
+            &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()),
+            &FactoryExecuteMsg::AddCopyTrading {
+                new_copy_trading: NewCopyTradingParams {
+                    leader: trader.clone().into(),
+                    name: name.clone(),
+                    description: desc.clone(),
+                },
             },
-        },
-    ).unwrap();
+        )
+        .unwrap();
     let resp = market.query_factory_copy_contracts().unwrap();
     assert!(resp.copy_trading_addresses.len() == 2);
 }

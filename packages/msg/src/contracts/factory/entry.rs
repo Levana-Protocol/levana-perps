@@ -158,7 +158,7 @@ pub enum ContractType {
     /// A market
     Market,
     /// Copy trading contract
-    CopyTrading
+    CopyTrading,
 }
 
 /// Default limit for [QueryMsg::Markets]
@@ -264,7 +264,6 @@ pub enum QueryMsg {
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
-
 }
 
 /// Information on owners and other protocol-wide special addresses
