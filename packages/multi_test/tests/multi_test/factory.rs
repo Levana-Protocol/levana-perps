@@ -47,3 +47,11 @@ fn test_factory_add_market() {
     let new_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
     assert!(old_time < new_time)
 }
+
+#[test]
+fn factory_has_copy_trading_contract() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let resp = market.query_factory_copy_contracts().unwrap();
+    assert!(resp.copy_trading_addresses.len() == 1);
+}

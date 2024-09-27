@@ -167,10 +167,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 },
             )?;
             let label_suffix = get_label_suffix(ctx.storage)?;
+            let copy_trading_code_id = crate::state::copy_trading::COPY_TRADING_CODE_ID
+                .may_load(ctx.storage)?
+                .context("copy_trading code id is not stored yet")?;
             ctx.response.add_instantiate_submessage(
                 ReplyId::InstantiateCopyTrading,
                 &migration_admin,
-                get_market_code_id(ctx.storage)?,
+                copy_trading_code_id,
                 format!("Levana Perps Copy Trading - {label_suffix}"),
                 &msg::contracts::copy_trading::InstantiateMsg {
                     leader,
