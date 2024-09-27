@@ -113,6 +113,10 @@ fn do_actual_deposit() {
     assert_eq!(balance.balance[0].shares, "100".parse().unwrap());
     let token = market.get_copytrading_token().unwrap();
     assert_eq!(balance.balance[0].token, token);
+
+    let another_trader = market.clone_trader(1).unwrap();
+    let balance = market.query_copy_trading_balance(&another_trader).unwrap();
+    assert!(balance.balance.is_empty());
 }
 
 #[test]
