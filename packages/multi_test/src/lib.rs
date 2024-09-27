@@ -152,7 +152,7 @@ impl PerpsApp {
 
         let copy_trading_addr = app.instantiate_contract(
             copy_trading_code_id,
-            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            factory_addr.clone(),
             &msg::contracts::copy_trading::InstantiateMsg {
                 leader: TEST_CONFIG.protocol_owner.clone().into(),
                 config: msg::contracts::copy_trading::ConfigUpdate::default(),
