@@ -305,7 +305,5 @@ push-perps-deploy-image:
 	docker push ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
 
 # A dev command to help run tests related to quant methods
-quant_ct_scenario:
-  nodemon -e rs --exec "cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::counter_trade_scenario_regression_test --exact --show-output -- --nocapture"
 quant:
   nodemon -e rs --exec "cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::update_position_funding_rate_less_than_target_rate --exact --show-output -- --nocapture"
