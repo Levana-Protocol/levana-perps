@@ -27,6 +27,7 @@ use crate::state::{
 
 use super::state::*;
 use anyhow::Result;
+use copy_trading::COPY_TRADING_CODE_ID;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
@@ -186,6 +187,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
         ExecuteMsg::SetLiquidityTokenCodeId { code_id } => {
             set_liquidity_token_code_id(ctx.storage, code_id.parse()?)?;
+        }
+
+        ExecuteMsg::SetCopyTradingCodeId { code_id } => {
+            let code_id: u64 = code_id.parse()?;
+            COPY_TRADING_CODE_ID.save(ctx.storage, &code_id)?;
         }
 
         ExecuteMsg::SetOwner { owner } => {

@@ -110,6 +110,11 @@ pub enum ExecuteMsg {
         /// Parameters for the contract
         new_copy_trading: NewCopyTradingParams,
     },
+    /// Set the copy trading code id, i.e. if it's been migrated
+    SetCopyTradingCodeId {
+        /// Code ID to use for future copy trading contracts
+        code_id: String,
+    },
 }
 
 /// Response from [QueryMsg::Markets]
