@@ -1350,98 +1350,46 @@ fn update_position_funding_rate_less_than_target_rate() {
     // This scenario will similate the following
     // 1. Open 1 long
     // 2. Open 2 shorts. Short is now popular side
+    let long_position_1 = create_position(&market, "68", 7, DirectionToBase::Long);
+    let short_position_1 = create_position(&market, "35", 7, DirectionToBase::Short);
+    let short_position_2 = create_position(&market, "35", 7, DirectionToBase::Short);
+    assert!(market
+        .query_status()
+        .unwrap()
+        .short_funding
+        .is_strictly_positive());
+
     // 3. Open CT long to rebalance
-    // 4. Close the small short trade
-    // 5. Rebalance CT: It should close it's long, then open a short
-    let long_position_1 = create_position(&market, "5", 7, DirectionToBase::Long);
-    let short_position_1 = create_position(&market, "4", 7, DirectionToBase::Short);
-    let short_position_2 = create_position(&market, "1.5", 7, DirectionToBase::Short);
-
     do_work(&market, &lp);
-    log_status("=== 3. Make short popular side", &market);
+    assert!(
+        market.query_status().unwrap().short_funding.into_number()
+            < Number::from(Decimal256::from_ratio(42u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+    );
+
+    // 4. Close one of the short positions
     close_position(&market, short_position_1.0);
+    assert!(market
+        .query_status()
+        .unwrap()
+        .long_funding
+        .is_strictly_positive());
+
+    // 5.a Rebalance CT: It should close it's long
+    let work = market.query_countertrade_has_work().unwrap();
+    assert!(matches!(
+        work,
+        HasWorkResp::Work {
+            desc: WorkDescription::ClosePosition { .. }
+        }
+    ));
     do_work(&market, &lp);
+
+    // 5.b Now, it should open a short
     do_work(&market, &lp);
-
-    // // // This flip the popular side from Long to Short
-    // create_position(&market, "51", 2, DirectionToBase::Short, "0.9");
-    // log_status("=== 3. Make short popular side", &market);
-
-    // do_work(&market, &lp);
-    // log_status("=== 4. We expect CT position to close", &market);
-
-    // do_work(&market, &lp);
-    // log_status("=== 5. We open the long CT position", &market);
-    // market
-    //     .exec_open_position_take_profit(
-    //         &trader,
-    //         "51",
-    //         // Deal with off-by-one leverage to ensure we have a balanced market
-    //         match market_type {
-    //             msg::prelude::MarketType::CollateralIsQuote => "2",
-    //             msg::prelude::MarketType::CollateralIsBase => "1",
-    //         },
-    //         DirectionToBase::Short,
-    //         None,
-    //         None,
-    //         msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
-    //     )
-    //     .unwrap();
-
-    // market.exec_crank_till_finished(&lp).unwrap();
-    // let status = market.query_status().unwrap();
-
-    // // Short position is the popular one
-    // assert!(status.short_funding.is_strictly_positive());
-    // // Current popular funding rate is less than target rate
-    // // assert!(status.short_funding.into_number() < config.target_funding.into_number());
-
-    // // let work = market.query_countertrade_has_work().unwrap();
-    // // println!("Work: {work:?}");
-    // // match work {
-    // //     HasWorkResp::NoWork {} => panic!("impossible: expected work"),
-    // //     HasWorkResp::Work { ref desc } => match desc {
-    // //         // WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, .. } => {
-    // //         //     assert_eq!(countertrade_position.id, pos_id.clone());
-    // //         // }
-    // //         //
-    // //         WorkDescription::ClosePosition { .. } => (true, true),
-    // //         desc => panic!("Got invalid work: {desc}"),
-    // //     },
-    // // };
-    // do_work(&market, &lp);
-    // let status = market.query_status().unwrap();
-
-    // let _market = market
-    //     .query_countertrade_market_id(status.market_id)
-    //     .unwrap();
-    // let has_position = match _market.position {
-    //     Some(_) => true, // If position is `Some`, return `true`
-    //     None => false,   // If position is `None`, return `false`
-    // };
-    // assert!(!has_position);
-
-    // log_status("=== 4. We closed the CT position", &market);
-
-    // // println!("\n\n");
-    // // println!("===============");
-    // let work = market.query_countertrade_has_work().unwrap();
-
-    // match work {
-    //     HasWorkResp::NoWork {} => {
-    //         println!("Work: {work:?}");
-    //         log_status("=== 5. There is NO work to do", &market);
-    //     }
-    //     HasWorkResp::Work { desc } => {
-    //         do_work(&market, &lp);
-    //         log_status("=== 5. We opened the long position on CT", &market);
-
-    //         // Collateral has reduced for the countertrade position
-    //         // assert!(updated_position.deposit_collateral < countertrade_position.deposit_collateral);
-    //         // Popular side has switched again
-    //         // assert!(status.long_funding.is_strictly_positive());
-    //     }
-    // };
+    assert!(
+        market.query_status().unwrap().long_funding.into_number()
+            < Number::from(Decimal256::from_ratio(42u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+    );
 }
 
 fn create_position(
