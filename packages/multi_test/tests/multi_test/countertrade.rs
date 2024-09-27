@@ -848,6 +848,7 @@ fn do_work(market: &PerpsMarket, lp: &Addr) {
 fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
     let work = market.query_countertrade_has_work().unwrap();
 
+    println!("Work: {work:?}");
     let (has_deferred_exec, is_close) = match work {
         HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
         HasWorkResp::Work { desc } => match desc {
@@ -1351,8 +1352,8 @@ fn update_position_funding_rate_less_than_target_rate() {
     // 1. Open 1 long
     // 2. Open 2 shorts. Short is now popular side
     let long_position_1 = create_position(&market, "68", 7, DirectionToBase::Long);
-    let short_position_1 = create_position(&market, "35", 7, DirectionToBase::Short);
-    let short_position_2 = create_position(&market, "35", 7, DirectionToBase::Short);
+    let short_position_1 = create_position(&market, "65", 7, DirectionToBase::Short);
+    let short_position_2 = create_position(&market, "5", 7, DirectionToBase::Short);
     assert!(market
         .query_status()
         .unwrap()
