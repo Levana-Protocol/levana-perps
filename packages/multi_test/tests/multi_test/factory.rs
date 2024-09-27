@@ -105,7 +105,8 @@ fn test_copy_trading_pagination() {
     let desc = "some_description".to_owned();
     let trader = market.clone_trader(0).unwrap();
 
-    // We start from one because the test framework already has one copy
+    // We start from one because the test framework already has one
+    // copy trading contract
     let mut total = 1usize;
     for _ in 0..=20 {
         total += 1;
