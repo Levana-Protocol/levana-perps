@@ -1436,3 +1436,157 @@ fn update_position_funding_rate_less_than_target_rate() {
     // Popular side has switched again
     assert!(status.long_funding.is_strictly_positive());
 }
+
+fn do_work_ct(market: &PerpsMarket, lp: &Addr) {
+    do_work_optional_collect(market, lp, true);
+    log_status("=== Ran a CT update", market);
+}
+
+#[test]
+fn counter_trade_scenario_regression_test() {
+    let market = make_countertrade_market().unwrap();
+    // Bump up the iteration limit
+    market
+        .exec_countertrade_update_config(ConfigUpdate {
+            iterations: Some(150),
+            ..Default::default()
+        })
+        .unwrap();
+
+    // Set minimum_deposit_usd so that countertrade countract tries to
+    // reduce the collateral instead of closing the position.
+    market
+        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("1".parse().unwrap()),
+            crank_fee_surcharge: Some("1".parse().unwrap()),
+            crank_fee_charged: Some("0.1".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "200")
+        .unwrap();
+
+    // This scenario will similate the following
+    // 1. Open 1 long
+    // 2. Open 2 shorts. Short is now popular side
+    let _ = create_position(&market, "45", 7, DirectionToBase::Long);
+    let short_position_1 = create_position(&market, "43", 7, DirectionToBase::Short);
+    let _ = create_position(&market, "10", 7, DirectionToBase::Short);
+    assert!(market
+        .query_status()
+        .unwrap()
+        .short_funding
+        .is_strictly_positive());
+
+    // 3. Open CT long to rebalance
+    do_work_ct(&market, &lp);
+    assert!(
+        market.query_status().unwrap().short_funding.into_number()
+            < Number::from(Decimal256::from_ratio(45u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+    );
+
+    // 4. Close one of the short positions
+    close_position(&market, short_position_1.0);
+    assert!(market
+        .query_status()
+        .unwrap()
+        .long_funding
+        .is_strictly_positive());
+
+    // 5.a Rebalance CT: It should close it's long
+    let work = market.query_countertrade_has_work().unwrap();
+    assert!(matches!(
+        work,
+        HasWorkResp::Work {
+            desc: WorkDescription::ClosePosition { .. }
+        }
+    ));
+    do_work_ct(&market, &lp);
+
+    // 5.b Now, it should open a short
+    do_work_ct(&market, &lp);
+    assert!(
+        market.query_status().unwrap().long_funding.into_number()
+            < Number::from(Decimal256::from_ratio(45u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+    );
+}
+
+fn create_position(
+    market: &PerpsMarket,
+    collateral: &str,
+    leverage: u16,
+    direction: DirectionToBase,
+) -> (PositionId, DeferResponse) {
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+    let trader = market.clone_trader(0).unwrap();
+    let quote_leverage = (leverage).to_string();
+    let base_leverage = (leverage - 1).to_string();
+    let tp = match direction {
+        DirectionToBase::Long => "1.1",
+        DirectionToBase::Short => "0.9",
+    };
+    let result = market
+        .exec_open_position_take_profit(
+            &trader,
+            collateral,
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => quote_leverage.as_str(),
+                msg::prelude::MarketType::CollateralIsBase => base_leverage.as_str(),
+            },
+            direction,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite(tp.parse().unwrap()),
+        )
+        .unwrap();
+
+    market.exec_crank_till_finished(&lp).unwrap();
+    log_status(
+        &format!(
+            "=== Opened {:?} position with {:?} collateral",
+            direction, collateral
+        ),
+        market,
+    );
+    result
+}
+
+fn close_position(market: &PerpsMarket, position_id: PositionId) {
+    let trader = market.clone_trader(0).unwrap();
+    log_status(&format!("=== Closing position {:?}", position_id), market);
+    market
+        .exec_close_position(&trader, position_id, None)
+        .unwrap();
+}
+fn log_status(header: &str, market: &PerpsMarket) {
+    let status = market.query_status().unwrap();
+    println!("\n{}", header);
+    println!("> Long Funding: {}", status.long_funding);
+    println!("> Short Funding: {}", status.short_funding);
+    println!("= Long Notional: {}", status.long_notional);
+    println!("= Short Notional: {}", status.short_notional);
+
+    let ct_trade = market
+        .query_countertrade_market_id(status.market_id)
+        .unwrap();
+
+    match ct_trade.position {
+        Some(_) => {
+            let countertrade_position = ct_trade.position.unwrap();
+            println!(
+                "- CT Direction: {:?}",
+                countertrade_position.direction_to_base
+            );
+            println!("- CT Notional: {}", countertrade_position.notional_size);
+        }
+        None => println!("- CT Notional: 0"),
+    };
+}
