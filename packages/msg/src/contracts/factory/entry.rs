@@ -427,29 +427,24 @@ pub struct LeaderAddr(pub Addr);
 /// Leader address
 pub struct CopyTradingAddr(pub Addr);
 
-
-
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
 /// Copy trading contract information
 pub struct CopyTradingInfo {
     /// Leader of the contract
     pub leader: LeaderAddr,
     /// Address of the copy trading contract
-    pub contract: Addr,
+    pub contract: CopyTradingAddr,
 }
 
 impl<'a> PrimaryKey<'a> for CopyTradingInfo {
     type Prefix = Addr;
-
     type SubPrefix = ();
-
     type Suffix = Addr;
-
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<cw_storage_plus::Key> {
         let mut keys = self.leader.0.key();
-        keys.extend(self.contract.key());
+        keys.extend(self.contract.0.key());
         keys
     }
 }
@@ -471,7 +466,7 @@ impl KeyDeserialize for CopyTradingInfo {
         let leader = Addr::from_slice(leader)?;
         let contract = keys[1].as_ref();
         let contract = Addr::from_slice(contract)?;
-        Ok(CopyTradingInfo { leader: LeaderAddr(leader), contract })
+        Ok(CopyTradingInfo { leader: LeaderAddr(leader), contract: CopyTradingAddr(contract) })
     }
 }
 

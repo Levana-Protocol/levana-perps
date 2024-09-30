@@ -56,8 +56,8 @@ fn factory_has_copy_trading_contract() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     let resp = market.query_factory_copy_contracts().unwrap();
-    assert!(resp.copy_trading_addresses.len() == 1);
-    assert_eq!(market.copy_trading_addr, resp.copy_trading_addresses[0]);
+    assert!(resp.addresses.len() == 1);
+    assert_eq!(market.copy_trading_addr, resp.addresses[0].contract.0);
 }
 
 #[test]
@@ -72,7 +72,6 @@ fn non_admin_add_copy_trading_contract() {
             &trader,
             &FactoryExecuteMsg::AddCopyTrading {
                 new_copy_trading: NewCopyTradingParams {
-                    leader: trader.clone().into(),
                     name: name.clone(),
                     description: desc.clone(),
                 },
@@ -87,7 +86,6 @@ fn non_admin_add_copy_trading_contract() {
             &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()),
             &FactoryExecuteMsg::AddCopyTrading {
                 new_copy_trading: NewCopyTradingParams {
-                    leader: trader.clone().into(),
                     name: name.clone(),
                     description: desc.clone(),
                 },
@@ -95,7 +93,7 @@ fn non_admin_add_copy_trading_contract() {
         )
         .unwrap();
     let resp = market.query_factory_copy_contracts().unwrap();
-    assert!(resp.copy_trading_addresses.len() == 2);
+    assert!(resp.addresses.len() == 2);
 }
 
 #[test]
@@ -115,7 +113,6 @@ fn test_copy_trading_pagination() {
                 &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()),
                 &FactoryExecuteMsg::AddCopyTrading {
                     new_copy_trading: NewCopyTradingParams {
-                        leader: trader.clone().into(),
                         name: name.clone(),
                         description: desc.clone(),
                     },
@@ -125,8 +122,8 @@ fn test_copy_trading_pagination() {
     }
     let old_resp = market.query_factory_copy_contracts().unwrap();
     // Can fetch max of 15 only
-    assert!(old_resp.copy_trading_addresses.len() == 15);
-    let start_after = old_resp.copy_trading_addresses.last().cloned();
+    assert!(old_resp.addresses.len() == 15);
+    let start_after = old_resp.addresses.last().cloned();
     let resp: CopyTradingResp = market
         .query_factory(&msg::prelude::FactoryQueryMsg::CopyTrading {
             start_after: start_after.clone().map(|addr| addr.into()),
@@ -134,13 +131,13 @@ fn test_copy_trading_pagination() {
         })
         .unwrap();
     let start_after = start_after.unwrap();
-    assert!(!resp.copy_trading_addresses.contains(&start_after));
+    assert!(!resp.addresses.contains(&start_after));
     assert!(!old_resp
-        .copy_trading_addresses
+        .addresses
         .iter()
-        .any(|item| resp.copy_trading_addresses.contains(item)));
+        .any(|item| resp.addresses.contains(item)));
     assert_eq!(
-        resp.copy_trading_addresses.len() + old_resp.copy_trading_addresses.len(),
+        resp.addresses.len() + old_resp.addresses.len(),
         total
     );
 }

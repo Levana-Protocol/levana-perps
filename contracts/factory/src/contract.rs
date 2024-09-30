@@ -37,7 +37,10 @@ use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     factory::{
         entry::{
-            AddrIsContractResp, ContractType, CopyTradingInfo, CopyTradingResp, ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg, LeaderAddr, ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT
+            AddrIsContractResp, ContractType, CopyTradingAddr, CopyTradingInfo, CopyTradingResp,
+            ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg, LeaderAddr,
+            ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount,
+            QUERY_LIMIT_DEFAULT,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -361,7 +364,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                         .leader;
                     let copy_trading_key = CopyTradingInfo {
                         leader: LeaderAddr(leader),
-                        contract: addr.clone(),
+                        contract: CopyTradingAddr(addr.clone()),
                     };
                     crate::state::copy_trading::COPY_TRADING_ADDRS.save(
                         ctx.storage,
@@ -516,7 +519,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     let start_after = start_after.validate(state.api)?;
                     let start_after = Some(CopyTradingInfo {
                         leader: LeaderAddr(leader),
-                        contract: start_after,
+                        contract: CopyTradingAddr(start_after),
                     });
                     let result = copy_trading::COPY_TRADING_ADDRS
                         .keys(
@@ -538,7 +541,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         .map(|item| {
                             item.map(|contract| CopyTradingInfo {
                                 leader: LeaderAddr(leader.clone()),
-                                contract,
+                                contract: CopyTradingAddr(contract),
                             })
                         })
                         .collect::<Result<Vec<_>, _>>()?;
