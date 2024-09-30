@@ -427,6 +427,7 @@ async fn instantiate_factory(
                 kill_switch: kill_switch.unwrap_or(owner).get_address_string().into(),
                 wind_down: wind_down.unwrap_or(owner).get_address_string().into(),
                 label_suffix,
+                copy_trading_code_id: None,
             },
             ContractAdmin::Addr(migration_admin),
         )

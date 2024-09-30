@@ -1,10 +1,12 @@
 //! Entrypoint messages for the factory
 use crate::{
-    contracts::market::entry::NewMarketParams,
+    contracts::market::entry::{NewCopyTradingParams, NewMarketParams},
     shutdown::{ShutdownEffect, ShutdownImpact},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
+use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
+use schemars::JsonSchema;
 use shared::prelude::*;
 
 /// Instantiate a new factory contract.
@@ -16,6 +18,8 @@ pub struct InstantiateMsg {
     pub position_token_code_id: String,
     /// The code id for the liquidity_token contract
     pub liquidity_token_code_id: String,
+    /// The code id for the copy trading contract
+    pub copy_trading_code_id: Option<String>,
     /// Migration admin, needed for instantiating/migrating sub-contracts
     pub migration_admin: RawAddr,
     /// Perpetual swap admin address
@@ -61,7 +65,7 @@ pub enum ExecuteMsg {
         owner: RawAddr,
     },
 
-    /// Change the migrationadmin
+    /// Change the migration admin
     SetMigrationAdmin {
         /// New migration admin
         migration_admin: RawAddr,
@@ -105,6 +109,16 @@ pub enum ExecuteMsg {
         /// The wallet address of the referrer
         addr: RawAddr,
     },
+    /// Add new copy trading contract
+    AddCopyTrading {
+        /// Parameters for the contract
+        new_copy_trading: NewCopyTradingParams,
+    },
+    /// Set the copy trading code id, i.e. if it's been migrated
+    SetCopyTradingCodeId {
+        /// Code ID to use for future copy trading contracts
+        code_id: String,
+    },
 }
 
 /// Response from [QueryMsg::Markets]
@@ -114,6 +128,15 @@ pub enum ExecuteMsg {
 pub struct MarketsResp {
     /// Markets maintained by this factory
     pub markets: Vec<MarketId>,
+}
+
+/// Response from [QueryMsg::Markets]
+///
+/// Use [QueryMsg::CopyTrading] for details on copy trading contract.
+#[cw_serde]
+pub struct CopyTradingResp {
+    /// Copy trading contracts maintained by this factory
+    pub addresses: Vec<CopyTradingInfo>,
 }
 
 /// Response from [QueryMsg::AddrIsContract]
@@ -136,10 +159,15 @@ pub enum ContractType {
     PositionToken,
     /// A market
     Market,
+    /// Copy trading contract
+    CopyTrading,
 }
 
 /// Default limit for [QueryMsg::Markets]
 pub const MARKETS_QUERY_LIMIT_DEFAULT: u32 = 15;
+
+/// Default limit for queries.
+pub const QUERY_LIMIT_DEFAULT: u32 = 15;
 
 /// Queries available on the factory contract
 #[cw_serde]
@@ -227,6 +255,29 @@ pub enum QueryMsg {
         /// Take from [ListRefereeCountResp::next_start_after]
         start_after: Option<ListRefereeCountStartAfter>,
     },
+
+    /// Fetch copy trading contracts
+    ///
+    /// Returns [CopyTradingResp]
+    #[returns(CopyTradingResp)]
+    CopyTrading {
+        /// Last seen [CopyTradingInfo] in a [CopyTradingResp] for enumeration
+        start_after: Option<CopyTradingInfoRaw>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
+    /// Fetch copy trading contract belonging to a specfic leader
+    ///
+    /// Returns [CopyTradingResp]
+    #[returns(CopyTradingResp)]
+    CopyTradingForLeader {
+        /// Leader of the contract
+        leader: RawAddr,
+        /// Last seen copy trading contract address for enumeration
+        start_after: Option<RawAddr>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -285,6 +336,8 @@ impl ExecuteMsg {
             ExecuteMsg::RegisterReferrer { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
+            ExecuteMsg::AddCopyTrading { .. } => false,
+            ExecuteMsg::SetCopyTradingCodeId { .. } => true,
         }
     }
 }
@@ -364,4 +417,84 @@ pub struct ListRefereeCountStartAfter {
     pub referrer: RawAddr,
     /// Last count seen.
     pub count: u32,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Leader address
+pub struct LeaderAddr(pub Addr);
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Leader address
+pub struct CopyTradingAddr(pub Addr);
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Copy trading contract information
+pub struct CopyTradingInfo {
+    /// Leader of the contract
+    pub leader: LeaderAddr,
+    /// Address of the copy trading contract
+    pub contract: CopyTradingAddr,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Same as [CopyTradingInfo], but has raw addresses
+pub struct CopyTradingInfoRaw {
+    /// Leader of the contract
+    pub leader: RawAddr,
+    /// Address of the copy trading contract
+    pub contract: RawAddr,
+}
+
+impl KeyDeserialize for LeaderAddr {
+    type Output = LeaderAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(LeaderAddr)
+    }
+}
+
+impl<'a> Prefixer<'a> for LeaderAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for LeaderAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
+    }
+}
+
+impl KeyDeserialize for CopyTradingAddr {
+    type Output = CopyTradingAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(CopyTradingAddr)
+    }
+}
+
+impl<'a> Prefixer<'a> for CopyTradingAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for CopyTradingAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
+    }
 }
