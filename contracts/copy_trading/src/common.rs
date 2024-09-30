@@ -154,7 +154,7 @@ impl<'a> State<'a> {
         Ok(market)
     }
 
-    pub(crate) fn get_full_token_info(
+    pub(crate) fn get_first_full_token_info(
         &self,
         storage: &mut dyn Storage,
         token: &Token,

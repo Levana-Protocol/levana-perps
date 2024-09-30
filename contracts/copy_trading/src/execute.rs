@@ -116,7 +116,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit {} => {
             let token = funds.require_token()?;
-            let market_token = state.get_full_token_info(storage, token)?;
+            let market_token = state.get_first_full_token_info(storage, token)?;
             let token = token.clone();
             let funds = funds.require_some(&market_token)?;
             deposit(storage, sender, funds, token)
@@ -232,7 +232,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                     };
                     let token_value = state.load_lp_token_value(storage, &wallet_info.token)?;
                     let funds = token_value.shares_to_collateral(shares)?;
-                    let token = state.get_full_token_info(storage, &wallet_info.token)?;
+                    let token = state.get_first_full_token_info(storage, &wallet_info.token)?;
                     let withdraw_msg = token
                         .into_transfer_msg(&wallet_info.wallet, funds)?
                         .context(
