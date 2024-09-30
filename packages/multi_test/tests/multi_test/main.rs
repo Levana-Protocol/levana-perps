@@ -1,3 +1,4 @@
+mod copy_trading;
 mod counterleverage;
 mod countertrade;
 mod crank_fee;

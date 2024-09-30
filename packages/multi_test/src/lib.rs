@@ -48,6 +48,7 @@ pub struct PerpsApp {
     pub simple_oracle_addr: Addr,
     pub simple_oracle_usd_addr: Addr,
     pub countertrade_addr: Addr,
+    pub copy_trading_addr: Addr,
 }
 
 impl Deref for PerpsApp {
@@ -75,6 +76,7 @@ pub(crate) enum PerpsContract {
     Cw20,
     SimpleOracle,
     Countertrade,
+    CopyTrading,
 }
 
 impl PerpsApp {
@@ -93,6 +95,7 @@ impl PerpsApp {
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
         let simple_oracle_code_id = app.store_code(contract_simple_oracle());
         let countertrade_code_id = app.store_code(contract_countertrade());
+        let copy_trading_code_id = app.store_code(contract_copy_trading());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -147,6 +150,18 @@ impl PerpsApp {
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
+        let copy_trading_addr = app.instantiate_contract(
+            copy_trading_code_id,
+            factory_addr.clone(),
+            &msg::contracts::copy_trading::InstantiateMsg {
+                leader: TEST_CONFIG.protocol_owner.clone().into(),
+                config: msg::contracts::copy_trading::ConfigUpdate::default(),
+            },
+            &[],
+            "copy_trading",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
+
         let mut _self = PerpsApp {
             code_ids: [
                 (PerpsContract::Factory, factory_code_id),
@@ -156,6 +171,7 @@ impl PerpsApp {
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
                 (PerpsContract::SimpleOracle, simple_oracle_code_id),
                 (PerpsContract::Countertrade, countertrade_code_id),
+                (PerpsContract::CopyTrading, copy_trading_code_id),
             ]
             .into(),
             app,
@@ -167,6 +183,7 @@ impl PerpsApp {
             simple_oracle_addr,
             simple_oracle_usd_addr,
             countertrade_addr,
+            copy_trading_addr,
         };
 
         Ok(_self)
@@ -363,6 +380,14 @@ pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
         )
         .with_reply(countertrade::reply),
     )
+}
+
+pub(crate) fn contract_copy_trading() -> Box<dyn Contract<Empty>> {
+    Box::new(LocalContractWrapper::new(
+        copy_trading::instantiate,
+        copy_trading::execute,
+        copy_trading::query,
+    ))
 }
 
 // struct to satisfy the `Contract` trait

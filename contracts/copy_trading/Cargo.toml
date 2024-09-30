@@ -1,0 +1,18 @@
+[package]
+name = "levana_perpswap_copy_trading"
+version = "0.1.0"
+authors = ["Levana Team"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
+shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
+cosmwasm-std = { workspace = true, features = ["abort"] }
+cw2 = "2.0.0"
+semver = "1.0.15"
+anyhow = "1.0.82"
+cw-storage-plus = "2.0.0"
+serde = { version = "1.0.199", default-features = false, features = ["derive"] }

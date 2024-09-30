@@ -21,6 +21,10 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
+use msg::contracts::copy_trading::{
+    Config as CopyTradingConfig, ExecuteMsg as CopyTradingExecuteMsg,
+    QueryMsg as CopyTradingQueryMsg,
+};
 use msg::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
@@ -2295,6 +2299,38 @@ impl PerpsMarket {
             .map_err(|err| err.into())
     }
 
+    pub(crate) fn query_copy_trading<T: DeserializeOwned>(
+        &self,
+        msg: &CopyTradingQueryMsg,
+    ) -> Result<T> {
+        let contract_addr = self.app().copy_trading_addr.clone();
+        self.app()
+            .wrap()
+            .query_wasm_smart(contract_addr, &msg)
+            .map_err(|err| err.into())
+    }
+
+    pub fn query_copy_trading_queue_status(
+        &self,
+        wallet: RawAddr,
+        start_after: Option<msg::contracts::copy_trading::QueuePositionId>,
+        limit: Option<u32>,
+    ) -> Result<msg::contracts::copy_trading::QueueResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::QueueStatus {
+            address: wallet,
+            start_after,
+            limit,
+        })
+    }
+
+    pub fn query_copy_trading_work(&self) -> Result<msg::contracts::copy_trading::WorkResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::HasWork {})
+    }
+
+    pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
+        self.query_copy_trading(&CopyTradingQueryMsg::Config {})
+    }
+
     pub fn query_countertrade_config(&self) -> Result<CountertradeConfig> {
         self.query_countertrade(&CountertradeQueryMsg::Config {})
     }
@@ -2358,6 +2394,32 @@ impl PerpsMarket {
         res.context("Market id {market_id} not found")
     }
 
+    pub fn get_copytrading_token(&self) -> Result<msg::contracts::copy_trading::Token> {
+        let token = self.token.clone();
+        match token {
+            Token::Cw20 { addr, .. } => {
+                let cw20 = addr.validate(self.app().api())?;
+                Ok(msg::contracts::copy_trading::Token::Cw20(cw20))
+            }
+            Token::Native { denom, .. } => Ok(msg::contracts::copy_trading::Token::Native(denom)),
+        }
+    }
+
+    pub fn exec_copytrading_mint_and_deposit(
+        &self,
+        sender: &Addr,
+        amount: &str,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(sender, amount.into_number())?;
+        let wasm_msg = self.make_msg_with_funds(
+            &CopyTradingExecuteMsg::Deposit {},
+            amount.into_number(),
+            &self.app().copy_trading_addr,
+        )?;
+        self.exec_wasm_msg(sender, wasm_msg)
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,
@@ -2386,6 +2448,23 @@ impl PerpsMarket {
             .execute_contract(sender.clone(), contract_addr, msg, &[])?;
 
         Ok(res)
+    }
+
+    pub fn exec_copytrading(
+        &self,
+        sender: &Addr,
+        msg: &CopyTradingExecuteMsg,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().copy_trading_addr.clone();
+        let res = self
+            .app()
+            .execute_contract(sender.clone(), contract_addr, msg, &[])?;
+
+        Ok(res)
+    }
+
+    pub fn exec_copytrading_do_work(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {})
     }
 
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {
