@@ -358,17 +358,16 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     });
                 }
                 ReplyId::InstantiateCopyTrading => {
-                    let leader = INSTANTIATE_COPY_TRADING
-                        .may_load(ctx.storage)?
-                        .context("No data in INSTANTIATE_COPY_TRADING")?
-                        .leader;
-                    let copy_trading_key = CopyTradingInfo {
-                        leader: LeaderAddr(leader),
-                        contract: CopyTradingAddr(addr.clone()),
-                    };
+                    let leader = LeaderAddr(
+                        INSTANTIATE_COPY_TRADING
+                            .may_load(ctx.storage)?
+                            .context("No data in INSTANTIATE_COPY_TRADING")?
+                            .leader,
+                    );
+                    let contract = CopyTradingAddr(addr.clone());
                     crate::state::copy_trading::COPY_TRADING_ADDRS.save(
                         ctx.storage,
-                        &copy_trading_key,
+                        (leader, contract),
                         &(),
                     )?;
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CopyTrading)?;
@@ -487,7 +486,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::CopyTrading { start_after, limit } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {
-                Some(start_after) => Some(start_after),
+                Some(start_after) => Some((start_after.leader, start_after.contract)),
                 None => None,
             };
             let result = copy_trading::COPY_TRADING_ADDRS
@@ -498,6 +497,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     cosmwasm_std::Order::Ascending,
                 )
                 .take(limit.try_into()?)
+                .map(|res| res.map(|(leader, contract)| CopyTradingInfo { leader, contract }))
                 .collect::<Result<Vec<_>, _>>()?;
             let result = CopyTradingResp { addresses: result };
             let result = to_json_binary(&result)?;
@@ -513,12 +513,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 Some(start_after) => Some(start_after),
                 None => None,
             };
-            let leader = leader.validate(state.api)?;
+            let leader = LeaderAddr(leader.validate(state.api)?);
             let addresses = match start_after {
                 Some(start_after) => {
                     let start_after = start_after.validate(state.api)?;
                     let start_after = Some(CopyTradingInfo {
-                        leader: LeaderAddr(leader),
+                        leader,
                         contract: CopyTradingAddr(start_after),
                     });
                     let result = copy_trading::COPY_TRADING_ADDRS
@@ -538,12 +538,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         .prefix(leader.clone())
                         .keys(store, None, None, cosmwasm_std::Order::Ascending)
                         .take(limit.try_into()?)
-                        .map(|item| {
-                            item.map(|contract| CopyTradingInfo {
-                                leader: LeaderAddr(leader.clone()),
-                                contract: CopyTradingAddr(contract),
-                            })
-                        })
+                        .map(|item| item.map(|contract| CopyTradingInfo { leader, contract }))
                         .collect::<Result<Vec<_>, _>>()?;
                     result
                 }

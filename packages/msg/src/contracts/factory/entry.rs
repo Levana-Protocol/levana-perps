@@ -4,8 +4,8 @@ use crate::{
     shutdown::{ShutdownEffect, ShutdownImpact},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, StdError};
-use cw_storage_plus::{KeyDeserialize, PrimaryKey};
+use cosmwasm_std::Addr;
+use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
 use schemars::JsonSchema;
 use shared::prelude::*;
 
@@ -436,46 +436,56 @@ pub struct CopyTradingInfo {
     pub contract: CopyTradingAddr,
 }
 
-impl<'a> PrimaryKey<'a> for (LeaderAddr, CopyTradingAddr) {
-    type Prefix = Addr;
-    type SubPrefix = ();
-    type Suffix = Addr;
-    type SuperSuffix = Self;
+impl KeyDeserialize for LeaderAddr {
+    type Output = LeaderAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(LeaderAddr)
+    }
+}
+
+impl<'a> Prefixer<'a> for LeaderAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for LeaderAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
 
     fn key(&self) -> Vec<cw_storage_plus::Key> {
-        let mut keys = self.0 .0.key();
-        keys.extend(self.1 .0.key());
-        keys
+        self.0.key()
     }
 }
 
-impl KeyDeserialize for (LeaderAddr, CopyTradingAddr) {
-    type Output = (LeaderAddr, CopyTradingAddr);
+impl KeyDeserialize for CopyTradingAddr {
+    type Output = CopyTradingAddr;
 
-    const KEY_ELEMS: u16 = 2;
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
 
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
-        let keys = value.key();
-        if keys.len() != 2 {
-            return Err(StdError::serialize_err(
-                "CopyTradingKey",
-                "CopyTradingKey keys len is not two",
-            ));
-        }
-        let leader = keys[0].as_ref();
-        let leader = Addr::from_slice(leader)?;
-        let contract = keys[1].as_ref();
-        let contract = Addr::from_slice(contract)?;
-        Ok((LeaderAddr(leader), CopyTradingAddr(contract)))
+        Addr::from_vec(value).map(CopyTradingAddr)
     }
 }
 
-impl KeyDeserialize for &(LeaderAddr, CopyTradingAddr) {
-    type Output = (LeaderAddr, CopyTradingAddr);
+impl<'a> Prefixer<'a> for CopyTradingAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
 
-    const KEY_ELEMS: u16 = 2;
+impl<'a> PrimaryKey<'a> for CopyTradingAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
 
-    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
-        <(LeaderAddr, CopyTradingAddr)>::from_vec(value)
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
     }
 }
