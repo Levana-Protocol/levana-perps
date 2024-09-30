@@ -96,7 +96,7 @@ pub enum ExecuteMsg {
         /// The number of LP shares to remove
         shares: NonZero<LpToken>,
         /// Token type in which amount should be withdrawn
-        token: Token
+        token: Token,
     },
     /// Appoint a new administrator
     AppointAdmin {
@@ -248,7 +248,7 @@ pub struct BalanceResp {
     /// Shares of the pool held by the wallet
     pub balance: Vec<BalanceRespItem>,
     /// Start after that should be passed for next iteration
-    pub start_after: Option<Token>
+    pub start_after: Option<Token>,
 }
 
 /// Individual market response inside [BalanceResp]
