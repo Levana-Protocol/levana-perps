@@ -515,7 +515,11 @@ pub(crate) fn smart_search(
             .into_signed()
             .checked_sub(target_funding)?
             .abs_unsigned();
-        if difference < epsilon {
+        if desired_unpopular < unpopular_notional {
+            println!("Desired unpopular is less than the unpopular notional, so we return 0");
+            break Ok(Notional::zero());
+        } else if difference < epsilon {
+            let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
             break Ok(delta_unpopular);
         } else if iteration >= allowed_iterations {
             break Err(anyhow!("Iteration limit reached without converging"));
