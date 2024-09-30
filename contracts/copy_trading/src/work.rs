@@ -1,6 +1,45 @@
-use crate::{prelude::*, types::State};
+use anyhow::bail;
 
-pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp> {
+use crate::{common::SIX_HOURS_IN_SECONDS, prelude::*, types::State};
+
+pub(crate) fn get_work(state: &State, storage: &dyn Storage, env: &Env) -> Result<WorkResp> {
+    let market_status = crate::state::MARKET_LOADER_STATUS.may_load(storage)?;
+    match market_status {
+        Some(market_status) => match market_status {
+            crate::types::MarketLoaderStatus::NotStarted => {
+                return Ok(WorkResp::HasWork {
+                    work_description: WorkDescription::LoadMarket {},
+                })
+            }
+            crate::types::MarketLoaderStatus::OnGoing { .. } => {
+                return Ok(WorkResp::HasWork {
+                    work_description: WorkDescription::LoadMarket {},
+                })
+            }
+            crate::types::MarketLoaderStatus::Finished { .. } => {
+                let now = env.block.time;
+                let last_seen = crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
+                match last_seen {
+                    Some(last_seen) => {
+                        if last_seen.plus_seconds(SIX_HOURS_IN_SECONDS) > now.into() {
+                            return Ok(WorkResp::HasWork {
+                                work_description: WorkDescription::LoadMarket {},
+                            });
+                        }
+                    }
+                    None => bail!(
+                        "Impossible: LAST_MARKET_ADD_CHECK unitialized during Finished status"
+                    ),
+                }
+            }
+        },
+        None => {
+            return Ok(WorkResp::HasWork {
+                work_description: WorkDescription::LoadMarket {},
+            })
+        }
+    }
+
     let queue = crate::state::LAST_PROCESSED_QUEUE_ID.may_load(storage)?;
     let next_queue_position = match queue {
         Some(queue_position) => queue_position.next(),

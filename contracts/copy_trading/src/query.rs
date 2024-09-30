@@ -2,7 +2,7 @@ use crate::{prelude::*, work::get_work};
 
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
-    let (state, storage) = crate::types::State::load(deps, env)?;
+    let (state, storage) = crate::types::State::load(deps, env.clone())?;
     match msg {
         QueryMsg::Config {} => to_json_binary(&state.config),
         QueryMsg::Balance {
@@ -19,7 +19,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             limit: _,
         } => todo!(),
         QueryMsg::HasWork {} => {
-            let work = get_work(&state, storage)?;
+            let work = get_work(&state, storage, &env)?;
             to_json_binary(&work)
         }
         QueryMsg::QueueStatus {

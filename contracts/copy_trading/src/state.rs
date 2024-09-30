@@ -1,6 +1,8 @@
+use shared::time::Timestamp;
+
 use crate::{
     prelude::*,
-    types::{LpTokenValue, MarketInfo, MarketWorkInfo, QueuePosition, Totals, WalletInfo},
+    types::{LpTokenValue, MarketInfo, MarketLoaderStatus, MarketWorkInfo, QueuePosition, Totals, WalletInfo},
 };
 
 /// Overall config
@@ -36,3 +38,12 @@ pub(crate) const MARKET_WORK_INFO: Map<&MarketId, MarketWorkInfo> = Map::new("ma
 
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
+
+/// Local cache of markets information
+pub(crate) const MARKETS_TOKEN: Map<(Token, MarketId), MarketInfo> = Map::new("markets-token");
+
+/// When did the factory was queried last time to check if new market was added ?
+pub(crate) const LAST_MARKET_ADD_CHECK: Item<Timestamp> = Item::new("last-market-add-check");
+
+/// Status of the market loader
+pub(crate) const MARKET_LOADER_STATUS: Item<MarketLoaderStatus> = Item::new("market-loader-status");

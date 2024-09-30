@@ -417,6 +417,8 @@ pub enum WorkResp {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkDescription {
+    /// Load Market
+    LoadMarket {},
     /// Calculate LP token value
     ComputeLpTokenValue {
         /// Token
