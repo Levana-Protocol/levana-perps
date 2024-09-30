@@ -4,7 +4,9 @@ use crate::{
     shutdown::{ShutdownEffect, ShutdownImpact},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, StdError};
+use cw_storage_plus::{KeyDeserialize, PrimaryKey};
+use schemars::JsonSchema;
 use shared::prelude::*;
 
 /// Instantiate a new factory contract.
@@ -134,7 +136,7 @@ pub struct MarketsResp {
 #[cw_serde]
 pub struct CopyTradingResp {
     /// Copy trading contracts maintained by this factory
-    pub copy_trading_addresses: Vec<Addr>,
+    pub addresses: Vec<CopyTradingInfo>,
 }
 
 /// Response from [QueryMsg::AddrIsContract]
@@ -259,7 +261,19 @@ pub enum QueryMsg {
     /// Returns [CopyTradingResp]
     #[returns(CopyTradingResp)]
     CopyTrading {
-        /// Last seen RawAddr in a [CopyTradingResp] for enumeration
+        /// Last seen [CopyTradingInfo] in a [CopyTradingResp] for enumeration
+        start_after: Option<CopyTradingInfo>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
+    /// Fetch copy trading contract belonging to a specfic leader
+    ///
+    /// Returns [CopyTradingResp]
+    #[returns(CopyTradingResp)]
+    CopyTradingForLeader {
+        /// Leader of the contract
+        leader: RawAddr,
+        /// Last seen copy trading contract address for enumeration
         start_after: Option<RawAddr>,
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
@@ -322,7 +336,7 @@ impl ExecuteMsg {
             ExecuteMsg::RegisterReferrer { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
-            ExecuteMsg::AddCopyTrading { .. } => true,
+            ExecuteMsg::AddCopyTrading { .. } => false,
             ExecuteMsg::SetCopyTradingCodeId { .. } => true,
         }
     }
@@ -403,4 +417,70 @@ pub struct ListRefereeCountStartAfter {
     pub referrer: RawAddr,
     /// Last count seen.
     pub count: u32,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Leader address
+pub struct LeaderAddr(pub Addr);
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Leader address
+pub struct CopyTradingAddr(pub Addr);
+
+
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Copy trading contract information
+pub struct CopyTradingInfo {
+    /// Leader of the contract
+    pub leader: LeaderAddr,
+    /// Address of the copy trading contract
+    pub contract: Addr,
+}
+
+impl<'a> PrimaryKey<'a> for CopyTradingInfo {
+    type Prefix = Addr;
+
+    type SubPrefix = ();
+
+    type Suffix = Addr;
+
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        let mut keys = self.leader.0.key();
+        keys.extend(self.contract.key());
+        keys
+    }
+}
+
+impl KeyDeserialize for CopyTradingInfo {
+    type Output = CopyTradingInfo;
+
+    const KEY_ELEMS: u16 = 2;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        let keys = value.key();
+        if keys.len() != 2 {
+            return Err(StdError::serialize_err(
+                "CopyTradingKey",
+                "CopyTradingKey keys len is not two",
+            ));
+        }
+        let leader = keys[0].as_ref();
+        let leader = Addr::from_slice(leader)?;
+        let contract = keys[1].as_ref();
+        let contract = Addr::from_slice(contract)?;
+        Ok(CopyTradingInfo { leader: LeaderAddr(leader), contract })
+    }
+}
+
+impl KeyDeserialize for &CopyTradingInfo {
+    type Output = CopyTradingInfo;
+
+    const KEY_ELEMS: u16 = 2;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        CopyTradingInfo::from_vec(value)
+    }
 }

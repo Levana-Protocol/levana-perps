@@ -37,9 +37,7 @@ use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     factory::{
         entry::{
-            AddrIsContractResp, ContractType, CopyTradingResp, ExecuteMsg, FactoryOwnerResp,
-            GetReferrerResp, InstantiateMsg, ListRefereeCountStartAfter, MarketInfoResponse,
-            MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT,
+            AddrIsContractResp, ContractType, CopyTradingInfo, CopyTradingResp, ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg, LeaderAddr, ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -152,18 +150,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
 
         ExecuteMsg::AddCopyTrading {
-            new_copy_trading:
-                NewCopyTradingParams {
-                    leader,
-                    name,
-                    description,
-                },
+            new_copy_trading: NewCopyTradingParams { name, description },
         } => {
+            let leader = info.sender;
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COPY_TRADING.save(
                 ctx.storage,
                 &InstantiateCopyTrading {
                     migration_admin: migration_admin.clone(),
+                    leader: leader.clone(),
                 },
             )?;
             let label_suffix = get_label_suffix(ctx.storage)?;
@@ -176,7 +171,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 copy_trading_code_id,
                 format!("Levana Perps Copy Trading - {label_suffix}"),
                 &msg::contracts::copy_trading::InstantiateMsg {
-                    leader,
+                    leader: leader.into(),
                     config: msg::contracts::copy_trading::ConfigUpdate {
                         name: Some(name),
                         description: Some(description),
@@ -360,7 +355,19 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     });
                 }
                 ReplyId::InstantiateCopyTrading => {
-                    crate::state::copy_trading::COPY_TRADING_ADDRS.save(ctx.storage, &addr, &())?;
+                    let leader = INSTANTIATE_COPY_TRADING
+                        .may_load(ctx.storage)?
+                        .context("No data in INSTANTIATE_COPY_TRADING")?
+                        .leader;
+                    let copy_trading_key = CopyTradingInfo {
+                        leader: LeaderAddr(leader),
+                        contract: addr.clone(),
+                    };
+                    crate::state::copy_trading::COPY_TRADING_ADDRS.save(
+                        ctx.storage,
+                        &copy_trading_key,
+                        &(),
+                    )?;
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CopyTrading)?;
                     ctx.response.add_event(
                         Event::new("instantiate-copy-trading")
@@ -477,10 +484,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::CopyTrading { start_after, limit } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {
-                Some(start_after) => {
-                    let addr = start_after.validate(state.api)?;
-                    Some(addr)
-                }
+                Some(start_after) => Some(start_after),
                 None => None,
             };
             let result = copy_trading::COPY_TRADING_ADDRS
@@ -492,9 +496,56 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 )
                 .take(limit.try_into()?)
                 .collect::<Result<Vec<_>, _>>()?;
-            let result = CopyTradingResp {
-                copy_trading_addresses: result,
+            let result = CopyTradingResp { addresses: result };
+            let result = to_json_binary(&result)?;
+            Ok(result)
+        }
+        QueryMsg::CopyTradingForLeader {
+            leader,
+            start_after,
+            limit,
+        } => {
+            let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
+            let start_after = match start_after {
+                Some(start_after) => Some(start_after),
+                None => None,
             };
+            let leader = leader.validate(state.api)?;
+            let addresses = match start_after {
+                Some(start_after) => {
+                    let start_after = start_after.validate(state.api)?;
+                    let start_after = Some(CopyTradingInfo {
+                        leader: LeaderAddr(leader),
+                        contract: start_after,
+                    });
+                    let result = copy_trading::COPY_TRADING_ADDRS
+                        .keys(
+                            store,
+                            start_after.as_ref().map(Bound::exclusive),
+                            None,
+                            cosmwasm_std::Order::Ascending,
+                        )
+                        .take(limit.try_into()?)
+                        .collect::<Result<Vec<_>, _>>()?;
+                    result
+                }
+
+                None => {
+                    let result = copy_trading::COPY_TRADING_ADDRS
+                        .prefix(leader.clone())
+                        .keys(store, None, None, cosmwasm_std::Order::Ascending)
+                        .take(limit.try_into()?)
+                        .map(|item| {
+                            item.map(|contract| CopyTradingInfo {
+                                leader: LeaderAddr(leader.clone()),
+                                contract,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    result
+                }
+            };
+            let result = CopyTradingResp { addresses };
             let result = to_json_binary(&result)?;
             Ok(result)
         }

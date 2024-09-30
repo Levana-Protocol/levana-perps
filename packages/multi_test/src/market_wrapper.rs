@@ -209,7 +209,6 @@ impl PerpsMarket {
 
         let copy_trading_msg = msg::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams {
-                leader: TEST_CONFIG.protocol_owner.as_str().into(),
                 name: "Multi test copy trading pool #1".to_owned(),
                 description: "Multi test copy trading description".to_owned(),
             },
