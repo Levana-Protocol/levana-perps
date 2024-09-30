@@ -57,12 +57,12 @@ fn balance(
             Order::Descending,
         )
         .take(limit);
-    let mut response = vec![];
-    for wallet in wallets {
-        let (token, shares) = wallet?;
-        response.push(BalanceRespItem { shares, token })
-    }
-    let start_after = response.last().map(|item| item.token.clone());
+    let response = wallets
+        .map(|item| item.map(|(token, shares)| BalanceRespItem { shares, token }))
+        .collect::<cosmwasm_std::StdResult<Vec<_>>>()?;
+    let start_after = response
+        .last()
+        .map(|item: &BalanceRespItem| item.token.clone());
     Ok(BalanceResp {
         balance: response,
         start_after,
