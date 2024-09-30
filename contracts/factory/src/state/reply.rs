@@ -18,7 +18,7 @@ pub(crate) struct InstantiateMarket {
 #[derive(Serialize, Deserialize)]
 pub(crate) struct InstantiateCopyTrading {
     pub(crate) migration_admin: Addr,
-    pub(crate) leader: Addr
+    pub(crate) leader: Addr,
 }
 
 pub(crate) fn reply_get_instantiate_market(store: &dyn Storage) -> Result<InstantiateMarket> {
