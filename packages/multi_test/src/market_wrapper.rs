@@ -209,7 +209,6 @@ impl PerpsMarket {
 
         let copy_trading_msg = msg::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams {
-                leader: TEST_CONFIG.protocol_owner.as_str().into(),
                 name: "Multi test copy trading pool #1".to_owned(),
                 description: "Multi test copy trading description".to_owned(),
             },
@@ -1779,6 +1778,15 @@ impl PerpsMarket {
         Ok(res)
     }
 
+    pub fn query_factory_copy_contracts_leader(&self, leader: &Addr) -> Result<CopyTradingResp> {
+        let res: CopyTradingResp = self.query_factory(&FactoryQueryMsg::CopyTradingForLeader {
+            leader: leader.into(),
+            start_after: None,
+            limit: None,
+        })?;
+        Ok(res)
+    }
+
     pub fn query_position_token_owner(&self, token_id: &str) -> Result<Addr> {
         let contract_addr = self.query_position_token_addr()?;
         let resp: OwnerOfResponse = self.app().cw721_query(
@@ -2141,7 +2149,7 @@ impl PerpsMarket {
         Ok(resp.balance)
     }
 
-    pub(crate) fn query_factory<T: DeserializeOwned>(&self, msg: &FactoryQueryMsg) -> Result<T> {
+    pub fn query_factory<T: DeserializeOwned>(&self, msg: &FactoryQueryMsg) -> Result<T> {
         let contract_addr = self.app().factory_addr.clone();
         self.app()
             .wrap()

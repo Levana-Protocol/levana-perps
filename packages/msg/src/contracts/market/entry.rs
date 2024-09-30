@@ -72,9 +72,6 @@ pub struct NewMarketParams {
 /// Parameter for the copy trading parameter
 #[cw_serde]
 pub struct NewCopyTradingParams {
-    /// Leader of the contract
-    pub leader: RawAddr,
-
     /// Name of the copy trading pool
     pub name: String,
 
