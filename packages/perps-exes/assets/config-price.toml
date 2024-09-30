@@ -77,6 +77,18 @@ inverted = false
 key = "ATOM_USD"
 inverted = false
 
+[[networks.osmosis-mainnet.amATOM_USD.feeds]]
+
+[networks.osmosis-mainnet.amATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.amATOM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.amATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
 [[networks.osmosis-mainnet.AVAX_USDC.feeds]]
 
 [networks.osmosis-mainnet.AVAX_USDC.feeds.pyth]
@@ -1263,6 +1275,18 @@ age_tolerance = 604800
 [[networks.osmosis-testnet.stATOM_USD.feeds-usd]]
 
 [networks.osmosis-testnet.stATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.amATOM_USD.feeds]]
+
+[networks.osmosis-testnet.amATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.amATOM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.amATOM_USD.feeds-usd.pyth]
 key = "ATOM_USD"
 inverted = false
 
