@@ -15,6 +15,7 @@ use msg::contracts::{
         position::{PositionId, PositionsResp},
     },
 };
+use shared::{namespace::FACTORY_MARKET_LAST_ADDED, time::Timestamp};
 
 impl<'a> State<'a> {
     pub(crate) fn to_token(&self, token: &msg::token::Token) -> Result<Token> {
@@ -152,6 +153,19 @@ impl<'a> State<'a> {
                 .context("Could not save cached markets info")?;
         }
         Ok(market)
+    }
+
+    pub(crate) fn raw_query_last_market_added(&self) -> Result<Option<Timestamp>> {
+        let contract = &self.config.factory;
+        let key = FACTORY_MARKET_LAST_ADDED.as_bytes().to_vec();
+        let result = self.querier.query_wasm_raw(contract, key)?;
+        match result {
+            Some(result) => {
+                let time = cosmwasm_std::from_json(result.as_slice())?;
+                Ok(Some(time))
+            }
+            None => Ok(None),
+        }
     }
 
     pub(crate) fn get_first_full_token_info(
