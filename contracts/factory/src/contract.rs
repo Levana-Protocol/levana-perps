@@ -367,13 +367,14 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     let contract = CopyTradingAddr(addr.clone());
                     crate::state::copy_trading::COPY_TRADING_ADDRS.save(
                         ctx.storage,
-                        (leader, contract),
+                        (leader.clone(), contract),
                         &(),
                     )?;
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CopyTrading)?;
                     ctx.response.add_event(
                         Event::new("instantiate-copy-trading")
-                            .add_attribute("addr", addr.to_string()),
+                            .add_attribute("leader", leader.0.to_string())
+                            .add_attribute("contract", addr.to_string()),
                     );
                 }
             }
