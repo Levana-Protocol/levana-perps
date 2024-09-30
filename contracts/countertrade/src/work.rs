@@ -502,7 +502,6 @@ pub(crate) fn smart_search(
                 .checked_mul(popular_notional.into_decimal256())?
                 .checked_div(Decimal256::one().checked_sub(target_ratio)?)?,
         );
-        let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
 
         assert!(popular_notional >= desired_unpopular);
         let new_funding_rate = derive_popular_funding_rate_annual(
