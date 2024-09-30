@@ -7,7 +7,7 @@ use crate::{
     },
     work::get_work,
 };
-use anyhow::bail;
+use anyhow::{bail, Ok};
 use msg::contracts::copy_trading;
 use shared::time::Timestamp;
 
@@ -221,6 +221,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         wallet: queue_item.wallet,
                     };
                     let actual_shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
+                    // This is a sanity check. This should never happen.
                     let actual_shares = match actual_shares {
                         Some(actual_shares) => {
                             if shares > actual_shares && shares != actual_shares {
@@ -233,24 +234,45 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                     let token_value = state.load_lp_token_value(storage, &wallet_info.token)?;
                     let funds = token_value.shares_to_collateral(shares)?;
                     let token = state.get_full_token_info(storage, &wallet_info.token)?;
-                    let withdraw_msg = token
-                        .into_transfer_msg(&wallet_info.wallet, funds)?
-                        .context(
-                        "Collateral amount would be less than the chain's minimum representation",
-                    )?;
+                    let withdraw_msg = token.into_transfer_msg(&wallet_info.wallet, funds)?;
+
                     let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;
-                    if remaining_shares.is_zero() {
-                        crate::state::SHARES.remove(storage, &wallet_info);
-                    } else {
-                        let remaining_shares =
-                            NonZero::new(remaining_shares).context("remaining_shares is zero")?;
-                        crate::state::SHARES.save(storage, &wallet_info, &remaining_shares)?;
-                    }
                     crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &id)?;
+                    let contract_token = state.to_token(&token)?;
+                    let mut totals = crate::state::TOTALS
+                        .may_load(storage, &contract_token)?
+                        .context("TOTALS is empty")?;
+                    if funds.raw() > totals.collateral {
+                        bail!("Not enough collateral")
+                    } else {
+                        totals.collateral = totals.collateral.checked_sub(funds.raw())?;
+                    };
+                    let mut pending_store_update = || {
+                        if remaining_shares.is_zero() {
+                            crate::state::SHARES.remove(storage, &wallet_info);
+                        } else {
+                            let remaining_shares = NonZero::new(remaining_shares)
+                                .context("remaining_shares is zero")?;
+                            crate::state::SHARES.save(storage, &wallet_info, &remaining_shares)?;
+                        }
+                        crate::state::TOTALS.save(storage, &contract_token, &totals)?;
+                        Ok(())
+                    };
                     let event = Event::new("withdraw")
                         .add_attribute("wallet", wallet_info.wallet.to_string())
                         .add_attribute("burned-shares", shares.to_string());
-                    (event, Some(withdraw_msg))
+                    let withdraw_msg = match withdraw_msg {
+                        Some(withdraw_msg) => {
+                            pending_store_update()?;
+                            Some(withdraw_msg)
+                        }
+                        None => {
+                            // Collateral amount is less than chain's minimum representation.
+                            // So, we do nothing. We just move on to the next item in the queue.
+                            None
+                        }
+                    };
+                    (event, withdraw_msg)
                 }
                 QueueItem::OpenPosition {} => todo!(),
             }
