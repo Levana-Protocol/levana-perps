@@ -151,7 +151,10 @@ fn test_copy_trading_leader_pagination() {
     let old_resp = market.query_factory_copy_contracts_leader(&trader).unwrap();
     // Can fetch max of 15 only
     assert!(old_resp.addresses.len() == 15);
-    assert!(!old_resp.addresses.iter().any(|item| item.leader.0 != trader.clone()));
+    assert!(!old_resp
+        .addresses
+        .iter()
+        .any(|item| item.leader.0 != trader.clone()));
     let start_after = old_resp.addresses.last().cloned();
     let resp: CopyTradingResp = market
         .query_factory(&msg::prelude::FactoryQueryMsg::CopyTradingForLeader {
@@ -167,6 +170,14 @@ fn test_copy_trading_leader_pagination() {
         .addresses
         .iter()
         .any(|item| resp.addresses.clone().contains(item)));
-    assert!(!resp.addresses.iter().any(|item| item.leader.0 != trader.clone()));
+    assert!(!resp
+        .addresses
+        .iter()
+        .any(|item| item.leader.0 != trader.clone()));
     assert_eq!(resp.addresses.len() + old_resp.addresses.len(), total);
+
+    let resp = market
+        .query_factory_copy_contracts_leader(&Addr::unchecked(TEST_CONFIG.protocol_owner.clone()))
+        .unwrap();
+    assert_eq!(resp.addresses.len(), 1);
 }
