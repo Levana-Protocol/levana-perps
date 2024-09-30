@@ -1,15 +1,9 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Decimal256};
-use levana_perpswap_multi_test::{
-    market_wrapper::{DeferResponse, PerpsMarket},
-    PerpsApp,
-};
+use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::{
-        countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
-        market::position::PositionId,
-    },
+    contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
     shared::number::{Collateral, NonZero},
 };
