@@ -249,10 +249,8 @@ mod tests {
         time::Timestamp,
     };
 
-    use crate::{
-        work::{determine_target_notional, smart_search},
-        PositionsInfo, Totals,
-    };
+    use crate::work::determine_target_notional;
+    use crate::{PositionsInfo, Totals};
 
     #[test]
     fn regression_perp_4062() {
