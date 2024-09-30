@@ -436,21 +436,21 @@ pub struct CopyTradingInfo {
     pub contract: CopyTradingAddr,
 }
 
-impl<'a> PrimaryKey<'a> for CopyTradingInfo {
+impl<'a> PrimaryKey<'a> for (LeaderAddr, CopyTradingAddr) {
     type Prefix = Addr;
     type SubPrefix = ();
     type Suffix = Addr;
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<cw_storage_plus::Key> {
-        let mut keys = self.leader.0.key();
-        keys.extend(self.contract.0.key());
+        let mut keys = self.0 .0.key();
+        keys.extend(self.1 .0.key());
         keys
     }
 }
 
-impl KeyDeserialize for CopyTradingInfo {
-    type Output = CopyTradingInfo;
+impl KeyDeserialize for (LeaderAddr, CopyTradingAddr) {
+    type Output = (LeaderAddr, CopyTradingAddr);
 
     const KEY_ELEMS: u16 = 2;
 
@@ -466,16 +466,16 @@ impl KeyDeserialize for CopyTradingInfo {
         let leader = Addr::from_slice(leader)?;
         let contract = keys[1].as_ref();
         let contract = Addr::from_slice(contract)?;
-        Ok(CopyTradingInfo { leader: LeaderAddr(leader), contract: CopyTradingAddr(contract) })
+        Ok((LeaderAddr(leader), CopyTradingAddr(contract)))
     }
 }
 
-impl KeyDeserialize for &CopyTradingInfo {
-    type Output = CopyTradingInfo;
+impl KeyDeserialize for &(LeaderAddr, CopyTradingAddr) {
+    type Output = (LeaderAddr, CopyTradingAddr);
 
     const KEY_ELEMS: u16 = 2;
 
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
-        CopyTradingInfo::from_vec(value)
+        <(LeaderAddr, CopyTradingAddr)>::from_vec(value)
     }
 }
