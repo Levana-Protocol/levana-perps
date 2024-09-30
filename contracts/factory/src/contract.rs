@@ -486,13 +486,17 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::CopyTrading { start_after, limit } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {
-                Some(start_after) => Some((start_after.leader, start_after.contract)),
+                Some(start_after) => {
+                    let leader = start_after.leader.validate(state.api)?;
+                    let contract = start_after.contract.validate(state.api)?;
+                    Some((LeaderAddr(leader), CopyTradingAddr(contract)))
+                }
                 None => None,
             };
             let result = copy_trading::COPY_TRADING_ADDRS
                 .keys(
                     store,
-                    start_after.as_ref().map(Bound::exclusive),
+                    start_after.map(Bound::exclusive),
                     None,
                     cosmwasm_std::Order::Ascending,
                 )
@@ -510,39 +514,29 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {
-                Some(start_after) => Some(start_after),
+                Some(start_after) => {
+                    let start_after = start_after.validate(state.api)?;
+                    Some(CopyTradingAddr(start_after))
+                }
                 None => None,
             };
             let leader = LeaderAddr(leader.validate(state.api)?);
-            let addresses = match start_after {
-                Some(start_after) => {
-                    let start_after = start_after.validate(state.api)?;
-                    let start_after = Some(CopyTradingInfo {
-                        leader,
-                        contract: CopyTradingAddr(start_after),
-                    });
-                    let result = copy_trading::COPY_TRADING_ADDRS
-                        .keys(
-                            store,
-                            start_after.as_ref().map(Bound::exclusive),
-                            None,
-                            cosmwasm_std::Order::Ascending,
-                        )
-                        .take(limit.try_into()?)
-                        .collect::<Result<Vec<_>, _>>()?;
-                    result
-                }
-
-                None => {
-                    let result = copy_trading::COPY_TRADING_ADDRS
-                        .prefix(leader.clone())
-                        .keys(store, None, None, cosmwasm_std::Order::Ascending)
-                        .take(limit.try_into()?)
-                        .map(|item| item.map(|contract| CopyTradingInfo { leader, contract }))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    result
-                }
-            };
+            let addresses = copy_trading::COPY_TRADING_ADDRS
+                .prefix(leader.clone())
+                .keys(
+                    store,
+                    start_after.map(Bound::exclusive),
+                    None,
+                    cosmwasm_std::Order::Ascending,
+                )
+                .map(|item| {
+                    item.map(|contract| CopyTradingInfo {
+                        leader: leader.clone(),
+                        contract,
+                    })
+                })
+                .take(limit.try_into()?)
+                .collect::<Result<Vec<_>, _>>()?;
             let result = CopyTradingResp { addresses };
             let result = to_json_binary(&result)?;
             Ok(result)

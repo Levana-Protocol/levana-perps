@@ -262,7 +262,7 @@ pub enum QueryMsg {
     #[returns(CopyTradingResp)]
     CopyTrading {
         /// Last seen [CopyTradingInfo] in a [CopyTradingResp] for enumeration
-        start_after: Option<CopyTradingInfo>,
+        start_after: Option<CopyTradingInfoRaw>,
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
@@ -434,6 +434,15 @@ pub struct CopyTradingInfo {
     pub leader: LeaderAddr,
     /// Address of the copy trading contract
     pub contract: CopyTradingAddr,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Same as [CopyTradingInfo], but has raw addresses
+pub struct CopyTradingInfoRaw {
+    /// Leader of the contract
+    pub leader: RawAddr,
+    /// Address of the copy trading contract
+    pub contract: RawAddr,
 }
 
 impl KeyDeserialize for LeaderAddr {

@@ -1778,6 +1778,15 @@ impl PerpsMarket {
         Ok(res)
     }
 
+    pub fn query_factory_copy_contracts_leader(&self, leader: &Addr) -> Result<CopyTradingResp> {
+        let res: CopyTradingResp = self.query_factory(&FactoryQueryMsg::CopyTradingForLeader {
+            leader: leader.into(),
+            start_after: None,
+            limit: None,
+        })?;
+        Ok(res)
+    }
+
     pub fn query_position_token_owner(&self, token_id: &str) -> Result<Addr> {
         let contract_addr = self.query_position_token_addr()?;
         let resp: OwnerOfResponse = self.app().cw721_query(
