@@ -258,8 +258,9 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         crate::state::TOTALS.save(storage, &contract_token, &totals)?;
                         Ok(())
                     };
-                    let event = Event::new("withdraw")
+                    let mut event = Event::new("withdraw")
                         .add_attribute("wallet", wallet_info.wallet.to_string())
+                        .add_attribute("funds", funds.to_string())
                         .add_attribute("burned-shares", shares.to_string());
                     let withdraw_msg = match withdraw_msg {
                         Some(withdraw_msg) => {
@@ -269,6 +270,8 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         None => {
                             // Collateral amount is less than chain's minimum representation.
                             // So, we do nothing. We just move on to the next item in the queue.
+                            event = event
+                                .add_attribute("funds-less-min-chain", true.to_string());
                             None
                         }
                     };
