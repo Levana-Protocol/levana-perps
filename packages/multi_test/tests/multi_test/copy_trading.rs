@@ -3,7 +3,9 @@ use std::str::FromStr;
 use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{IncQueueItem, IncQueuePositionId, WorkResp},
+    contracts::copy_trading::{
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId, WorkResp
+    },
     shared::number::{Collateral, NonZero},
 };
 
@@ -29,16 +31,19 @@ fn deposit() {
         .query_copy_trading_queue_status(trader.into(), None, None)
         .unwrap();
     assert_eq!(response.items.len(), 1);
-    let item = &response.items[0].item;
+    let item = &response.items[0];
 
     assert_eq!(
         item,
-        &IncQueueItem::Deposit {
-            funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
-            token
+        &QueueItem::IncCollaleteral {
+            item: IncQueueItem::Deposit {
+                funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
+                token,
+            },
+            id: IncQueuePositionId::new(0)
         }
     );
-    assert!(response.processed_till.is_none())
+    assert!(response.inc_processed_till.is_none())
 }
 
 #[test]
@@ -79,7 +84,7 @@ fn detect_process_queue_item_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: IncQueuePositionId::new(0)
+                id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(0))
             }
         }
     );
@@ -148,7 +153,7 @@ fn does_not_compute_lp_token_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: IncQueuePositionId::new(1)
+                id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(1))
             }
         }
     );
@@ -182,7 +187,7 @@ fn do_withdraw() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: IncQueuePositionId::new(1)
+                id: QueuePositionId::DecQueuePositionId(DecQueuePositionId::new(0))
             }
         }
     );
