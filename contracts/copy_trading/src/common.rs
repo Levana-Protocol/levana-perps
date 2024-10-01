@@ -402,14 +402,26 @@ impl Totals {
     }
 }
 
-pub(crate) fn get_next_queue_id(storage: &mut dyn Storage) -> Result<QueuePositionId> {
-    let queue_id = crate::state::LAST_INSERTED_QUEUE_ID
+pub(crate) fn get_next_inc_queue_id(storage: &mut dyn Storage) -> Result<IncQueuePositionId> {
+    let queue_id = crate::state::LAST_INSERTED_INC_QUEUE_ID
         .may_load(storage)
-        .context("Could not load LAST_PROCESSED_QUEUE_ID")?;
+        .context("Could not load LAST_INSERTED_INC_QUEUE_ID")?;
     let queue_id = match queue_id {
         Some(queue_id) => queue_id.next(),
-        None => QueuePositionId::new(0),
+        None => IncQueuePositionId::new(0),
     };
-    crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id)?;
+    crate::state::LAST_INSERTED_INC_QUEUE_ID.save(storage, &queue_id)?;
+    Ok(queue_id)
+}
+
+pub(crate) fn get_next_dec_queue_id(storage: &mut dyn Storage) -> Result<DecQueuePositionId> {
+    let queue_id = crate::state::LAST_INSERTED_DEC_QUEUE_ID
+        .may_load(storage)
+        .context("Could not load LAST_INSERTED_DEC_QUEUE_ID")?;
+    let queue_id = match queue_id {
+        Some(queue_id) => queue_id.next(),
+        None => DecQueuePositionId::new(0),
+    };
+    crate::state::LAST_INSERTED_DEC_QUEUE_ID.save(storage, &queue_id)?;
     Ok(queue_id)
 }

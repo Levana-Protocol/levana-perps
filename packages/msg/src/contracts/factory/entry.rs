@@ -481,7 +481,6 @@ impl KeyDeserialize for CopyTradingAddr {
         Addr::from_vec(value).map(CopyTradingAddr)
     }
 }
-
 impl<'a> Prefixer<'a> for CopyTradingAddr {
     fn prefix(&self) -> Vec<cw_storage_plus::Key> {
         self.0.prefix()
