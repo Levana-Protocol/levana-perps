@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::{bail, Ok};
 use msg::contracts::copy_trading;
+use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use shared::time::Timestamp;
 
 #[must_use]
@@ -129,7 +130,98 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             do_work(state, storage, &env)
         }
+        ExecuteMsg::LeaderMsg { market_id, message } => {
+            todo!()
+        }
         _ => panic!("Not implemented yet"),
+    }
+}
+
+fn execute_leader_msg(
+    storage: &mut dyn Storage,
+    state: &State,
+    market_id: MarketId,
+    message: Box<MarketExecuteMsg>,
+    funds: &Funds,
+) -> Result<Response> {
+    let not_supported_response = |message: &str| {
+        let response = Response::new().add_event(
+            Event::new("execute-leader-msg")
+                .add_attribute("message", message.to_string())
+                .add_attribute("unsupported", true.to_string()),
+        );
+        Ok(response)
+    };
+    match *message {
+        MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
+        MarketExecuteMsg::Receive { .. } => not_supported_response("receive"),
+        MarketExecuteMsg::OpenPosition {
+            slippage_assert,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit,
+        } => todo!(),
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => todo!(),
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
+            id,
+            slippage_assert,
+        } => todo!(),
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => todo!(),
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+            id,
+            amount,
+            slippage_assert,
+        } => todo!(),
+        MarketExecuteMsg::UpdatePositionLeverage {
+            id,
+            leverage,
+            slippage_assert,
+        } => todo!(),
+        MarketExecuteMsg::UpdatePositionMaxGains { id, max_gains } => todo!(),
+        MarketExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => todo!(),
+        MarketExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => todo!(),
+        MarketExecuteMsg::SetTriggerOrder {
+            id,
+            stop_loss_override,
+            take_profit,
+        } => todo!(),
+        MarketExecuteMsg::PlaceLimitOrder {
+            trigger_price,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit,
+        } => todo!(),
+        MarketExecuteMsg::CancelLimitOrder { order_id } => todo!(),
+        MarketExecuteMsg::ClosePosition {
+            id,
+            slippage_assert,
+        } => todo!(),
+        MarketExecuteMsg::DepositLiquidity { stake_to_xlp } => todo!(),
+        MarketExecuteMsg::ReinvestYield {
+            stake_to_xlp,
+            amount,
+        } => todo!(),
+        MarketExecuteMsg::WithdrawLiquidity { lp_amount } => todo!(),
+        MarketExecuteMsg::ClaimYield {} => todo!(),
+        MarketExecuteMsg::StakeLp { amount } => todo!(),
+        MarketExecuteMsg::UnstakeXlp { amount } => todo!(),
+        MarketExecuteMsg::StopUnstakingXlp {} => todo!(),
+        MarketExecuteMsg::CollectUnstakedLp {} => todo!(),
+        MarketExecuteMsg::Crank { execs, rewards } => todo!(),
+        MarketExecuteMsg::NftProxy { sender, msg } => todo!(),
+        MarketExecuteMsg::LiquidityTokenProxy { sender, kind, msg } => todo!(),
+        MarketExecuteMsg::TransferDaoFees {} => todo!(),
+        MarketExecuteMsg::CloseAllPositions {} => todo!(),
+        MarketExecuteMsg::ProvideCrankFunds {} => todo!(),
+        MarketExecuteMsg::SetManualPrice { price, price_usd } => todo!(),
+        MarketExecuteMsg::PerformDeferredExec {
+            id,
+            price_point_timestamp,
+        } => todo!(),
     }
 }
 
