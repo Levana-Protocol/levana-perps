@@ -19,7 +19,6 @@ crate-type = ["cdylib", "rlib"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 sanity = []
-sei = ["sei-cosmwasm"]
 
 
 [dependencies]
@@ -35,7 +34,6 @@ cw-utils = "2.0.0"
 once_cell = "1"
 indoc = "1.0.8"
 pyth-sdk-cw = { workspace = true}
-sei-cosmwasm = { git = "https://github.com/lvn-hasky-dragon/sei-cosmwasm.git", rev = "8d2e75bd8ec967515f4666113153de37d7e08375", optional = true }
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
