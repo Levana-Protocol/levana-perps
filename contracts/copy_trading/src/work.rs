@@ -191,7 +191,7 @@ pub(crate) fn process_queue_item(
             let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
                 .may_load(storage, &id)?
                 .context("PENDING_QUEUE_ITEMS load failed")?;
-            let resp = match queue_item.item {
+            match queue_item.item {
                 IncQueueItem::Deposit { funds, token } => {
                     let mut totals = crate::state::TOTALS
                         .may_load(storage, &token)
@@ -216,8 +216,7 @@ pub(crate) fn process_queue_item(
                         .add_attribute("shares", new_shares.to_string());
                     Ok((event, None))
                 }
-            };
-            return resp;
+            }
         }
         QueuePositionId::DecQueuePositionId(id) => {
             let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
