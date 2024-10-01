@@ -1519,7 +1519,7 @@ fn smart_search_bug_perp_4098() {
         let ct_trade = market
             .query_countertrade_market_id(status.market_id)
             .unwrap();
-        assert!(ct_trade.position == Option::is_none());
+        assert!(ct_trade.position.is_none());
     }
 }
 fn create_position(
