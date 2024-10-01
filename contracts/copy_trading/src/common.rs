@@ -40,7 +40,8 @@ impl<'a> State<'a> {
                 config,
                 api: deps.api,
                 querier: deps.querier,
-                my_addr: env.contract.address,
+                my_addr: env.contract.address.clone(),
+                env,
             },
             deps.storage,
         ))
@@ -56,6 +57,7 @@ impl<'a> State<'a> {
                 api: deps.api,
                 querier: deps.querier,
                 my_addr: env.contract.address.clone(),
+                env: env.clone(),
             },
             deps.storage,
         ))
@@ -76,7 +78,6 @@ impl<'a> State<'a> {
     pub(crate) fn batched_stored_market_info(
         &self,
         storage: &mut dyn Storage,
-        env: &Env,
     ) -> Result<()> {
         let status = crate::state::MARKET_LOADER_STATUS
             .may_load(storage)?
@@ -108,9 +109,9 @@ impl<'a> State<'a> {
         let markets = self.load_market_ids(start_after.clone())?;
         if markets.is_empty() {
             crate::state::LAST_MARKET_ADD_CHECK
-                .save(storage, &Timestamp::into(env.block.time.into()))?;
+                .save(storage, &Timestamp::into(self.env.block.time.into()))?;
             if let Some(last_seen) = start_after {
-                crate::state::LAST_MARKET_ADD_CHECK.save(storage, &env.block.time.into())?;
+                crate::state::LAST_MARKET_ADD_CHECK.save(storage, &self.env.block.time.into())?;
                 crate::state::MARKET_LOADER_STATUS
                     .save(storage, &MarketLoaderStatus::Finished { last_seen })?;
             }
@@ -126,7 +127,7 @@ impl<'a> State<'a> {
                 .save(storage, &MarketLoaderStatus::OnGoing { last_seen })?;
         }
         crate::state::LAST_MARKET_ADD_CHECK
-            .save(storage, &Timestamp::into(env.block.time.into()))?;
+            .save(storage, &Timestamp::into(self.env.block.time.into()))?;
         Ok(())
     }
 
