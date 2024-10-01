@@ -306,4 +306,4 @@ push-perps-deploy-image:
 
 # A dev command to help run tests related to quant methods
 quant:
-  nodemon -e rs --exec "cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::update_position_funding_rate_less_than_target_rate --exact --show-output -- --nocapture"
+  nodemon -e rs --exec "cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::smart_search_bug_perp_4098 --exact --show-output -- --nocapture"
