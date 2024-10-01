@@ -28,7 +28,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage, env: &Env) -> Resul
                         }
                     }
                     None => bail!(
-                        "Impossible: LAST_MARKET_ADD_CHECK unitialized during Finished status"
+                        "Impossible: LAST_MARKET_ADD_CHECK uninitialized during Finished status"
                     ),
                 }
             }

@@ -84,13 +84,33 @@ impl<'a> State<'a> {
         let start_after = match status {
             MarketLoaderStatus::NotStarted => None,
             MarketLoaderStatus::OnGoing { last_seen } => Some(last_seen),
-            MarketLoaderStatus::Finished { last_seen } => Some(last_seen),
+            MarketLoaderStatus::Finished { last_seen } => {
+                let factory_market_last_added = self.raw_query_last_market_added()?;
+                let last_seen = match factory_market_last_added {
+                    Some(factory_market_last_added) => {
+                        let market_added_at =
+                            crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
+                        if let Some(market_added_at) = market_added_at {
+                            if market_added_at < factory_market_last_added {
+                                last_seen
+                            } else {
+                                return Ok(());
+                            }
+                        } else {
+                            bail!("Impossible case: LAST_MARKET_ADD_CHECK is not loaded in finished step")
+                        }
+                    }
+                    None => return Ok(()),
+                };
+                Some(last_seen)
+            }
         };
         let markets = self.load_market_ids(start_after.clone())?;
         if markets.is_empty() {
             crate::state::LAST_MARKET_ADD_CHECK
                 .save(storage, &Timestamp::into(env.block.time.into()))?;
             if let Some(last_seen) = start_after {
+                crate::state::LAST_MARKET_ADD_CHECK.save(storage, &env.block.time.into())?;
                 crate::state::MARKET_LOADER_STATUS
                     .save(storage, &MarketLoaderStatus::Finished { last_seen })?;
             }
