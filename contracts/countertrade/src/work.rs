@@ -501,7 +501,6 @@ fn smart_search(
                 .checked_mul(popular_notional.into_decimal256())?
                 .checked_div(Decimal256::one().checked_sub(target_ratio)?)?,
         );
-        let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
 
         assert!(popular_notional >= desired_unpopular);
         let new_funding_rate = derive_popular_funding_rate_annual(
@@ -515,7 +514,11 @@ fn smart_search(
             .checked_sub(target_funding)?
             .abs_unsigned();
         let epsilon = Decimal256::from_str("0.00001").unwrap();
-        if difference < epsilon {
+        if desired_unpopular < unpopular_notional {
+            println!("Desired unpopular is less than the unpopular notional, so we return 0");
+            break Ok(Notional::zero());
+        } else if difference < epsilon {
+            let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
             break Ok(delta_unpopular);
         } else if iteration >= allowed_iterations {
             break Err(anyhow!("Iteration limit reached without converging"));
