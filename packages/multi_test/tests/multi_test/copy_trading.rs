@@ -246,3 +246,34 @@ fn do_withdraw() {
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
 }
+
+#[test]
+fn load_market_after_six_hours() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    load_markets(&market);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let six_hours = 6 * 60 * 60;
+    market
+        .set_time(levana_perpswap_multi_test::time::TimeJump::Seconds(
+            six_hours - 1,
+        ))
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    market
+        .set_time(levana_perpswap_multi_test::time::TimeJump::Seconds(2))
+        .unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: WorkDescription::LoadMarket {}
+        }
+    );
+}
