@@ -107,7 +107,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage, env: &Env) -> Resul
                 let last_seen = crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
                 match last_seen {
                     Some(last_seen) => {
-                        if last_seen.plus_seconds(SIX_HOURS_IN_SECONDS) > now.into() {
+                        if last_seen.plus_seconds(SIX_HOURS_IN_SECONDS) < now.into() {
                             return Ok(WorkResp::HasWork {
                                 work_description: WorkDescription::LoadMarket {},
                             });

@@ -4,7 +4,8 @@ use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::copy_trading::{
-        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId, WorkResp,
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId,
+        WorkDescription, WorkResp,
     },
     shared::number::{Collateral, NonZero},
 };
@@ -20,6 +21,8 @@ fn query_config() {
 fn deposit() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let token = market.get_copytrading_token().unwrap();
+
+    load_markets(&market);
 
     let trader = market.clone_trader(0).unwrap();
 
@@ -46,9 +49,32 @@ fn deposit() {
     assert!(response.inc_processed_till.is_none())
 }
 
+fn load_markets(market: &PerpsMarket) {
+    let trader = market.clone_trader(0).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: WorkDescription::LoadMarket {}
+        }
+    );
+
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: WorkDescription::LoadMarket {}
+        }
+    );
+    market.exec_copytrading_do_work(&trader).unwrap();
+}
+
 #[test]
 fn initial_no_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    load_markets(&market);
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork)
@@ -59,6 +85,8 @@ fn detect_process_queue_item_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let token = market.get_copytrading_token().unwrap();
+
+    load_markets(&market);
 
     market
         .exec_copytrading_mint_and_deposit(&trader, "100")
@@ -95,6 +123,8 @@ fn do_actual_deposit() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
+    load_markets(&market);
+
     market
         .exec_copytrading_mint_and_deposit(&trader, "100")
         .unwrap();
@@ -128,6 +158,8 @@ fn do_actual_deposit() {
 fn does_not_compute_lp_token_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
 
     market
         .exec_copytrading_mint_and_deposit(&trader, "100")
@@ -165,6 +197,8 @@ fn does_not_compute_lp_token_work() {
 fn do_withdraw() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
 
     market
         .exec_copytrading_mint_and_deposit(&trader, "100")

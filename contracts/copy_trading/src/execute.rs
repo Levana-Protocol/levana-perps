@@ -172,7 +172,7 @@ fn withdraw(
 }
 
 fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Response> {
-    let work = get_work(&state, storage, &env)?;
+    let work = get_work(&state, storage, env)?;
     let desc = match work {
         WorkResp::NoWork => bail!("No work items available"),
         WorkResp::HasWork { work_description } => work_description,
@@ -182,7 +182,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
 
     let (event, msg) = match desc {
         WorkDescription::LoadMarket {} => {
-            state.batched_stored_market_info(storage, &env)?;
+            state.batched_stored_market_info(storage, env)?;
             let status = crate::state::MARKET_LOADER_STATUS
                 .may_load(storage)?
                 .unwrap_or_default();
