@@ -1,8 +1,8 @@
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo,
-        MarketWorkInfo, Totals, WalletInfo,
+        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo, Totals,
+        WalletInfo,
     },
 };
 
