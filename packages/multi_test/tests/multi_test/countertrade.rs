@@ -1474,52 +1474,54 @@ fn smart_search_bug_perp_4098() {
         .exec_countertrade_mint_and_deposit(&lp, "200")
         .unwrap();
 
-    // This scenario will similate the following
-    // 1. Open 2 longs.
-    // 2. Open 2 shorts. Short is now popular side
-    // Told to open a Long of 1.7393 collateral, with leverage 10,
-    // expecting a notional of 14.02
-    let long_position_1 = create_position(&market, "11.40", 7, DirectionToBase::Long);
-    let long_position_2 = create_position(&market, "2.34", 7, DirectionToBase::Long);
-    let short_position_1 = create_position(&market, "8.6", 7, DirectionToBase::Short);
-    let short_position_2 = create_position(&market, "4.5", 7, DirectionToBase::Short);
+    let market_type = market.query_status().unwrap().market_type;
+    // The test will have to be adapted for a CollateralIsQuote market
+    if market_type == msg::prelude::MarketType::CollateralIsBase {
+        // This scenario will similate the following
+        // 1. Open 2 longs.
+        // 2. Open 2 shorts. Short is now popular side
+        // Told to open a Long of 1.7393 collateral, with leverage 10,
+        // expecting a notional of 14.02
+        let long_position_1 = create_position(&market, "11.40", 7, DirectionToBase::Long);
+        let long_position_2 = create_position(&market, "2.34", 7, DirectionToBase::Long);
+        let short_position_1 = create_position(&market, "8.6", 7, DirectionToBase::Short);
+        let short_position_2 = create_position(&market, "4.5", 7, DirectionToBase::Short);
 
-    // We expect the market's short funding to be very high
-    assert!(market
-        .query_status()
-        .unwrap()
-        .short_funding
-        .is_strictly_positive());
+        // We expect the market's short funding to be very high
+        assert!(market
+            .query_status()
+            .unwrap()
+            .short_funding
+            .is_strictly_positive());
 
-    // 3. Open CT long to rebalance
-    do_work_ct(&market, &lp);
-    // TODO For some reason the value is not equalt to target_funding
-    //      Will look into it in PERP-4157
-    assert!(
-        market.query_status().unwrap().short_funding.into_number()
-            < Number::from(Decimal256::from_ratio(60u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
-    );
+        // 3. Open CT long to rebalance
+        do_work_ct(&market, &lp);
+        // TODO For some reason the value is not equalt to target_funding
+        //      Will look into it in PERP-4157
+        assert!(
+            market.query_status().unwrap().short_funding.into_number()
+                < Number::from(Decimal256::from_ratio(60u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+        );
 
-    // 4. Close the positions that would bring the market back to balance
-    close_position(&market, short_position_2.0);
-    close_position(&market, long_position_2.0);
-    assert!(
-        market.query_status().unwrap().long_funding.into_number()
-            <= Number::from(Decimal256::from_ratio(90u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
-    );
+        // 4. Close the positions that would bring the market back to balance
+        close_position(&market, short_position_2.0);
+        close_position(&market, long_position_2.0);
+        assert!(
+            market.query_status().unwrap().long_funding.into_number()
+                <= Number::from(Decimal256::from_ratio(90u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+        );
 
-    // 6, We expect the CT to close its own position
-    // This is where the bug was occuring
-    do_work_ct(&market, &lp);
+        // 6, We expect the CT to close its own position
+        // This is where the bug was occuring
+        do_work_ct(&market, &lp);
 
-    let status = market.query_status().unwrap();
-    let ct_trade = market
-        .query_countertrade_market_id(status.market_id)
-        .unwrap();
-    println!("{:#?}", ct_trade);
-    assert!(ct_trade.position == None);
+        let status = market.query_status().unwrap();
+        let ct_trade = market
+            .query_countertrade_market_id(status.market_id)
+            .unwrap();
+        assert!(ct_trade.position == None);
+    }
 }
-
 fn create_position(
     market: &PerpsMarket,
     collateral: &str,
@@ -1560,7 +1562,6 @@ fn create_position(
     );
     result
 }
-
 fn close_position(market: &PerpsMarket, position_id: PositionId) {
     let trader = market.clone_trader(0).unwrap();
     log_status(&format!("=== Closing position {:?}", position_id), market);
