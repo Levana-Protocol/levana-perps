@@ -6,19 +6,108 @@ use crate::{
     types::{State, WalletInfo},
 };
 
+fn get_work_from_dec_queue(
+    queue_id: DecQueuePositionId,
+    storage: &dyn Storage,
+    state: &State,
+) -> Result<WorkResp> {
+    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
+        .key(&queue_id)
+        .may_load(storage)?;
+    let queue_item = match queue_item {
+        Some(queue_item) => queue_item.item,
+        None => return Ok(WorkResp::NoWork),
+    };
+    let requires_token = queue_item.requires_token();
+    match requires_token {
+        RequiresToken::Token { token } => {
+            let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
+            match lp_token_value {
+                Some(lp_token_value) => {
+                    if lp_token_value.status.valid() {
+                        return Ok(WorkResp::HasWork {
+                            work_description: WorkDescription::ProcessQueueItem {
+                                id: QueuePositionId::DecQueuePositionId(queue_id),
+                            },
+                        });
+                    }
+                }
+                None => {
+                    // For this token, the value was never in the store.
+                    return Ok(WorkResp::HasWork {
+                        work_description: WorkDescription::ComputeLpTokenValue { token },
+                    });
+                }
+            }
+            let market_works =
+                crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
+            for market_work in market_works {
+                let (market_id, work) = market_work?;
+
+                let market_info = crate::state::MARKETS.key(&market_id).load(storage)?;
+                let market_token = state.to_token(&market_info.token)?;
+                if market_token != token {
+                    continue;
+                }
+
+                let deferred_execs = state.load_deferred_execs(&market_info.addr, None, Some(1))?;
+
+                let is_pending = deferred_execs
+                    .items
+                    .iter()
+                    .any(|item| item.status.is_pending());
+                if is_pending {
+                    return Ok(WorkResp::NoWork);
+                }
+
+                if work.processing_status.reset_required() {
+                    return Ok(WorkResp::HasWork {
+                        work_description: WorkDescription::ResetStats {},
+                    });
+                }
+                if !work.processing_status.is_validated() {
+                    return Ok(WorkResp::HasWork {
+                        work_description: WorkDescription::ComputeLpTokenValue { token },
+                    });
+                }
+            }
+            // We have gone through all the markets here and looks
+            // like all the market has been validated. The only part
+            // remaining to be done here is computation of lp token
+            // value.
+            Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ComputeLpTokenValue { token },
+            })
+        }
+        RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
+            work_description: WorkDescription::ProcessQueueItem {
+                id: QueuePositionId::DecQueuePositionId(queue_id),
+            },
+        }),
+    }
+}
+
 pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp> {
-    let queue = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
-    let next_queue_position = match queue {
+    let inc_queue = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
+    let dec_queue = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
+    let next_inc_queue_position = match inc_queue {
         Some(queue_position) => queue_position.next(),
         None => IncQueuePositionId::new(0),
     };
+    let next_dec_queue_position = match dec_queue {
+        Some(queue_position) => queue_position.next(),
+        None => DecQueuePositionId::new(0),
+    };
     let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
-        .key(&next_queue_position)
+        .key(&next_inc_queue_position)
         .may_load(storage)?;
 
     let queue_item = match queue_item {
         Some(queue_item) => queue_item.item,
-        None => return Ok(WorkResp::NoWork),
+        None => {
+            let work = get_work_from_dec_queue(next_dec_queue_position, storage, state)?;
+            return Ok(work);
+        }
     };
 
     let requires_token = queue_item.requires_token();
@@ -31,7 +120,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     if lp_token_value.status.valid() {
                         return Ok(WorkResp::HasWork {
                             work_description: WorkDescription::ProcessQueueItem {
-                                id: QueuePositionId::IncQueuePositionId(next_queue_position),
+                                id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
                             },
                         });
                     }
@@ -86,7 +175,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
         }
         RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
             work_description: WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::IncQueuePositionId(next_queue_position),
+                id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
             },
         }),
     }
