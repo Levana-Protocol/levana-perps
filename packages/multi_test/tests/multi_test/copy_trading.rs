@@ -4,7 +4,7 @@ use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::copy_trading::{
-        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId, WorkResp
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId, WorkResp,
     },
     shared::number::{Collateral, NonZero},
 };
