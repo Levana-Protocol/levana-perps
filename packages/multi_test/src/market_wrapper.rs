@@ -21,6 +21,10 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
+use msg::contracts::copy_trading::{
+    Config as CopyTradingConfig, ExecuteMsg as CopyTradingExecuteMsg,
+    QueryMsg as CopyTradingQueryMsg,
+};
 use msg::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
@@ -29,8 +33,9 @@ use msg::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
 };
 use msg::contracts::factory::entry::{
-    ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereeCountResp, ListRefereesResp,
-    MarketInfoResponse, QueryMsg as FactoryQueryMsg, RefereeCount, ShutdownStatus,
+    CopyTradingResp, ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereeCountResp,
+    ListRefereesResp, MarketInfoResponse, QueryMsg as FactoryQueryMsg, RefereeCount,
+    ShutdownStatus,
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
@@ -41,9 +46,10 @@ use msg::contracts::market::deferred_execution::{
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
-    LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach,
-    PriceForQuery, PriceWouldTriggerResp, QueryMsg, ReferralStatsResp, SlippageAssert,
-    SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary, TraderActionHistoryResp,
+    LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, PositionActionHistoryResp,
+    PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp, QueryMsg, ReferralStatsResp,
+    SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary,
+    TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::spot_price::{
@@ -88,6 +94,7 @@ pub struct PerpsMarket {
     pub token: Token,
     pub id: MarketId,
     pub addr: Addr,
+    pub copy_trading_addr: Addr,
     /// When enabled, time will jump by one block on every exec
     pub automatic_time_jump_enabled: bool,
 
@@ -197,6 +204,37 @@ impl PerpsMarket {
             }),
         };
 
+        let factory_addr = app.borrow().factory_addr.clone();
+        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+
+        let copy_trading_msg = msg::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
+            new_copy_trading: NewCopyTradingParams {
+                name: "Multi test copy trading pool #1".to_owned(),
+                description: "Multi test copy trading description".to_owned(),
+            },
+        };
+
+        let copy_trading_addr = app
+            .borrow_mut()
+            .execute_contract(
+                protocol_owner.clone(),
+                factory_addr.clone(),
+                &copy_trading_msg,
+                &[],
+            )?
+            .events
+            .iter()
+            .find(|e| e.ty == "instantiate")
+            .context("could not instantiate")?
+            .attributes
+            .iter()
+            .find(|a| a.key == "_contract_address")
+            .context("could not find contract_address")?
+            .value
+            .clone();
+
+        let copy_trading_addr = Addr::unchecked(copy_trading_addr);
+
         let market_msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: msg::contracts::market::entry::NewMarketParams {
                 market_id: id.clone(),
@@ -253,9 +291,6 @@ impl PerpsMarket {
             },
         };
 
-        let factory_addr = app.borrow().factory_addr.clone();
-
-        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let market_addr = app
             .borrow_mut()
             .execute_contract(
@@ -293,6 +328,7 @@ impl PerpsMarket {
             addr: market_addr,
             automatic_time_jump_enabled: true,
             debug_001: false,
+            copy_trading_addr,
         };
 
         if bootstap_lp {
@@ -1734,6 +1770,23 @@ impl PerpsMarket {
         Ok(res.position_token)
     }
 
+    pub fn query_factory_copy_contracts(&self) -> Result<CopyTradingResp> {
+        let res: CopyTradingResp = self.query_factory(&FactoryQueryMsg::CopyTrading {
+            start_after: None,
+            limit: None,
+        })?;
+        Ok(res)
+    }
+
+    pub fn query_factory_copy_contracts_leader(&self, leader: &Addr) -> Result<CopyTradingResp> {
+        let res: CopyTradingResp = self.query_factory(&FactoryQueryMsg::CopyTradingForLeader {
+            leader: leader.into(),
+            start_after: None,
+            limit: None,
+        })?;
+        Ok(res)
+    }
+
     pub fn query_position_token_owner(&self, token_id: &str) -> Result<Addr> {
         let contract_addr = self.query_position_token_addr()?;
         let resp: OwnerOfResponse = self.app().cw721_query(
@@ -2055,6 +2108,12 @@ impl PerpsMarket {
         Ok(res)
     }
 
+    pub fn query_factory_raw(&self, key: impl Into<Binary>) -> Result<Option<Vec<u8>>> {
+        let contract_addr = self.app().factory_addr.clone();
+        let result = self.app().wrap().query_wasm_raw(contract_addr, key)?;
+        Ok(result)
+    }
+
     // deliberately use the cw20 msg, not liquidity_token
     pub fn query_liquidity_token<T: DeserializeOwned>(
         &self,
@@ -2090,7 +2149,7 @@ impl PerpsMarket {
         Ok(resp.balance)
     }
 
-    pub(crate) fn query_factory<T: DeserializeOwned>(&self, msg: &FactoryQueryMsg) -> Result<T> {
+    pub fn query_factory<T: DeserializeOwned>(&self, msg: &FactoryQueryMsg) -> Result<T> {
         let contract_addr = self.app().factory_addr.clone();
         self.app()
             .wrap()
@@ -2295,6 +2354,38 @@ impl PerpsMarket {
             .map_err(|err| err.into())
     }
 
+    pub(crate) fn query_copy_trading<T: DeserializeOwned>(
+        &self,
+        msg: &CopyTradingQueryMsg,
+    ) -> Result<T> {
+        let contract_addr = self.copy_trading_addr.clone();
+        self.app()
+            .wrap()
+            .query_wasm_smart(contract_addr, &msg)
+            .map_err(|err| err.into())
+    }
+
+    pub fn query_copy_trading_queue_status(
+        &self,
+        wallet: RawAddr,
+        start_after: Option<msg::contracts::copy_trading::QueuePositionId>,
+        limit: Option<u32>,
+    ) -> Result<msg::contracts::copy_trading::QueueResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::QueueStatus {
+            address: wallet,
+            start_after,
+            limit,
+        })
+    }
+
+    pub fn query_copy_trading_work(&self) -> Result<msg::contracts::copy_trading::WorkResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::HasWork {})
+    }
+
+    pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
+        self.query_copy_trading(&CopyTradingQueryMsg::Config {})
+    }
+
     pub fn query_countertrade_config(&self) -> Result<CountertradeConfig> {
         self.query_countertrade(&CountertradeQueryMsg::Config {})
     }
@@ -2358,6 +2449,32 @@ impl PerpsMarket {
         res.context("Market id {market_id} not found")
     }
 
+    pub fn get_copytrading_token(&self) -> Result<msg::contracts::copy_trading::Token> {
+        let token = self.token.clone();
+        match token {
+            Token::Cw20 { addr, .. } => {
+                let cw20 = addr.validate(self.app().api())?;
+                Ok(msg::contracts::copy_trading::Token::Cw20(cw20))
+            }
+            Token::Native { denom, .. } => Ok(msg::contracts::copy_trading::Token::Native(denom)),
+        }
+    }
+
+    pub fn exec_copytrading_mint_and_deposit(
+        &self,
+        sender: &Addr,
+        amount: &str,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(sender, amount.into_number())?;
+        let wasm_msg = self.make_msg_with_funds(
+            &CopyTradingExecuteMsg::Deposit {},
+            amount.into_number(),
+            &self.copy_trading_addr,
+        )?;
+        self.exec_wasm_msg(sender, wasm_msg)
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,
@@ -2386,6 +2503,23 @@ impl PerpsMarket {
             .execute_contract(sender.clone(), contract_addr, msg, &[])?;
 
         Ok(res)
+    }
+
+    pub fn exec_copytrading(
+        &self,
+        sender: &Addr,
+        msg: &CopyTradingExecuteMsg,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.copy_trading_addr.clone();
+        let res = self
+            .app()
+            .execute_contract(sender.clone(), contract_addr, msg, &[])?;
+
+        Ok(res)
+    }
+
+    pub fn exec_copytrading_do_work(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {})
     }
 
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {

@@ -75,6 +75,7 @@ pub(crate) enum PerpsContract {
     Cw20,
     SimpleOracle,
     Countertrade,
+    CopyTrading,
 }
 
 impl PerpsApp {
@@ -93,6 +94,7 @@ impl PerpsApp {
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
         let simple_oracle_code_id = app.store_code(contract_simple_oracle());
         let countertrade_code_id = app.store_code(contract_countertrade());
+        let copy_trading_code_id = app.store_code(contract_copy_trading());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -107,6 +109,7 @@ impl PerpsApp {
                 kill_switch: TEST_CONFIG.kill_switch.clone().into(),
                 wind_down: TEST_CONFIG.wind_down.clone().into(),
                 label_suffix: Some(" - MULTITEST".to_owned()),
+                copy_trading_code_id: Some(copy_trading_code_id.to_string()),
             },
             &[],
             "factory",
@@ -156,6 +159,7 @@ impl PerpsApp {
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
                 (PerpsContract::SimpleOracle, simple_oracle_code_id),
                 (PerpsContract::Countertrade, countertrade_code_id),
+                (PerpsContract::CopyTrading, copy_trading_code_id),
             ]
             .into(),
             app,
@@ -363,6 +367,14 @@ pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
         )
         .with_reply(countertrade::reply),
     )
+}
+
+pub(crate) fn contract_copy_trading() -> Box<dyn Contract<Empty>> {
+    Box::new(LocalContractWrapper::new(
+        copy_trading::instantiate,
+        copy_trading::execute,
+        copy_trading::query,
+    ))
 }
 
 // struct to satisfy the `Contract` trait
