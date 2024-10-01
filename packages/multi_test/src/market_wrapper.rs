@@ -2382,6 +2382,17 @@ impl PerpsMarket {
         self.query_copy_trading(&CopyTradingQueryMsg::HasWork {})
     }
 
+    pub fn query_copy_trading_balance(
+        &self,
+        wallet: &Addr,
+    ) -> Result<msg::contracts::copy_trading::BalanceResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::Balance {
+            address: wallet.into(),
+            start_after: None,
+            limit: None,
+        })
+    }
+
     pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
         self.query_copy_trading(&CopyTradingQueryMsg::Config {})
     }
@@ -2520,6 +2531,19 @@ impl PerpsMarket {
 
     pub fn exec_copytrading_do_work(&self, sender: &Addr) -> Result<AppResponse> {
         self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {})
+    }
+
+    pub fn exec_copytrading_withdrawal(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {
+        let amount = amount.parse()?;
+        let amount = NonZero::new(amount).context("amount is zero")?;
+        let token = self.get_copytrading_token()?;
+        self.exec_copytrading(
+            sender,
+            &CopyTradingExecuteMsg::Withdraw {
+                shares: amount,
+                token,
+            },
+        )
     }
 
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {

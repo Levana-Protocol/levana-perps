@@ -153,7 +153,15 @@ impl OneLpTokenValue {
                 .checked_div_dec(self.0.into_decimal256())?
                 .into_decimal256(),
         );
-        NonZero::new(new_shares).context("tokens is zero in add_collateral")
+        NonZero::new(new_shares).context("tokens is zero in collateral_to_shares")
+    }
+
+    pub(crate) fn shares_to_collateral(
+        &self,
+        shares: NonZero<LpToken>,
+    ) -> Result<NonZero<Collateral>> {
+        let funds = self.0.checked_mul_dec(shares.into_decimal256())?;
+        NonZero::new(funds).context("funds is zero in shares_to_collateral")
     }
 }
 
@@ -195,20 +203,38 @@ impl LpTokenStatus {
     }
 }
 
-/// Queue position
+/// Queue position pertaining to [crate::state::COLLATERAL_INCREASE_QUEUE]
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) struct QueuePosition {
+pub(crate) struct IncQueuePosition {
     /// Queue item that needs to be processed
-    pub(crate) item: QueueItem,
+    pub(crate) item: IncQueueItem,
     /// Wallet that initiated the specific item action
     pub(crate) wallet: Addr,
 }
 
-impl QueuePosition {
-    pub fn into_queue_resp_item(self, id: QueuePositionId) -> QueueRespItem {
-        QueueRespItem {
-            id,
+/// Queue position pertaining to [crate::state::COLLATERAL_DECREASE_QUEUE]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct DecQueuePosition {
+    /// Queue item that needs to be processed
+    pub(crate) item: DecQueueItem,
+    /// Wallet that initiated the specific item action
+    pub(crate) wallet: Addr,
+}
+
+impl DecQueuePosition {
+    pub fn into_queue_item(self, id: DecQueuePositionId) -> QueueItem {
+        QueueItem::DecCollateral {
             item: self.item,
+            id,
+        }
+    }
+}
+
+impl IncQueuePosition {
+    pub fn into_queue_item(self, id: IncQueuePositionId) -> QueueItem {
+        QueueItem::IncCollaleteral {
+            item: self.item,
+            id,
         }
     }
 }
@@ -243,14 +269,14 @@ pub(crate) struct WalletInfo {
 }
 
 impl<'a> PrimaryKey<'a> for WalletInfo {
-    type Prefix = Token;
+    type Prefix = Addr;
     type SubPrefix = ();
-    type Suffix = Addr;
+    type Suffix = Token;
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        let mut keys = self.token.key();
-        keys.extend(self.wallet.key());
+        let mut keys = self.wallet.key();
+        keys.extend(self.token.key());
         keys
     }
 }
@@ -268,8 +294,11 @@ impl KeyDeserialize for WalletInfo {
                 "WalletInfo keys len is not three",
             ));
         }
-        let token_type = &keys[0];
-        let token = keys[1].as_ref();
+        let wallet = keys[0].as_ref();
+        let wallet = Addr::from_slice(wallet)?;
+
+        let token_type = &keys[1];
+        let token = keys[2].as_ref();
         let token_type = match token_type {
             Key::Val8([token_type]) => token_type,
             _ => return Err(StdError::serialize_err("WalletInfo", "Invalid token type")),
@@ -290,8 +319,7 @@ impl KeyDeserialize for WalletInfo {
                 ))
             }
         };
-        let wallet = keys[3].as_ref();
-        let wallet = Addr::from_slice(wallet)?;
+
         Ok(WalletInfo { token, wallet })
     }
 }

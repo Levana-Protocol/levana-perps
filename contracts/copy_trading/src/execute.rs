@@ -1,13 +1,13 @@
 use crate::{
-    common::get_next_queue_id,
+    common::{get_next_dec_queue_id, get_next_inc_queue_id},
     prelude::*,
     types::{
-        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, QueuePosition,
-        State, WalletInfo,
+        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
+        OneLpTokenValue, ProcessingStatus, State, WalletInfo,
     },
-    work::get_work,
+    work::{get_work, process_queue_item},
 };
-use anyhow::bail;
+use anyhow::{bail, Ok};
 use msg::contracts::copy_trading;
 use shared::time::Timestamp;
 
@@ -116,10 +116,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit {} => {
             let token = funds.require_token()?;
-            let market_info = state.get_full_token_info(storage, token)?;
+            let market_token = state.get_full_token_info(storage, token)?;
             let token = token.clone();
-            let funds = funds.require_some(&market_info)?;
+            let funds = funds.require_some(&market_token)?;
             deposit(storage, sender, funds, token)
+        }
+        ExecuteMsg::Withdraw { shares, token } => {
+            funds.require_none()?;
+            withdraw(storage, sender, shares, token)
         }
         ExecuteMsg::DoWork {} => {
             funds.require_none()?;
@@ -127,6 +131,44 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
         _ => panic!("Not implemented yet"),
     }
+}
+
+fn withdraw(
+    storage: &mut dyn Storage,
+    wallet: Addr,
+    shares: NonZero<LpToken>,
+    token: Token,
+) -> Result<Response> {
+    let wallet_info = WalletInfo {
+        token,
+        wallet: wallet.clone(),
+    };
+    let actual_shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
+    let shares = match actual_shares {
+        Some(actual_shares) => {
+            if shares > actual_shares && shares != actual_shares {
+                bail!("Requesting more withdrawal than balance")
+            }
+            shares
+        }
+        None => bail!("No shares found"),
+    };
+    let dec_queue_id = get_next_dec_queue_id(storage)?;
+    let queue_id = QueuePositionId::DecQueuePositionId(dec_queue_id);
+    crate::state::WALLET_QUEUE_ITEMS.save(storage, (&wallet, queue_id), &())?;
+    let queue_position = DecQueuePosition {
+        item: copy_trading::DecQueueItem::Withdrawal {
+            tokens: shares,
+            token: wallet_info.token,
+        },
+        wallet: wallet_info.wallet,
+    };
+    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &dec_queue_id, &queue_position)?;
+    Ok(Response::new().add_event(
+        Event::new("withdrawal")
+            .add_attribute("shares", shares.to_string())
+            .add_attribute("queue-id", dec_queue_id.to_string()),
+    ))
 }
 
 fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Response> {
@@ -138,47 +180,22 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
     let res = Response::new()
         .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
-    let event = match desc {
+    let (event, msg) = match desc {
         WorkDescription::ComputeLpTokenValue { token } => {
-            compute_lp_token_value(storage, &state, token, env)?
+            let event = compute_lp_token_value(storage, &state, token, env)?;
+            (event, None)
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
-        WorkDescription::ProcessQueueItem { id } => {
-            let queue_item = crate::state::PENDING_QUEUE_ITEMS
-                .may_load(storage, &id)?
-                .context("PENDING_QUEUE_ITEMS load failed")?;
-            match queue_item.item {
-                QueueItem::Deposit { funds, token } => {
-                    let mut totals = crate::state::TOTALS
-                        .may_load(storage, &token)
-                        .context("Could not load TOTALS")?
-                        .unwrap_or_default();
-                    let token_value = state.load_lp_token_value(storage, &token)?;
-                    let new_shares = totals.add_collateral(funds, token_value)?;
-                    crate::state::TOTALS.save(storage, &token, &totals)?;
-                    let wallet_info = WalletInfo {
-                        token,
-                        wallet: queue_item.wallet,
-                    };
-                    let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
-                    let new_shares = match shares {
-                        Some(shares) => shares.checked_add(new_shares.raw())?,
-                        None => new_shares,
-                    };
-                    crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
-                    crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &id)?;
-                    Event::new("deposit")
-                        .add_attribute("funds", funds.to_string())
-                        .add_attribute("shares", new_shares.to_string())
-                }
-                QueueItem::Withdrawal { .. } => todo!(),
-                QueueItem::OpenPosition {} => todo!(),
-            }
-        }
+        WorkDescription::ProcessQueueItem { id } => process_queue_item(id, storage, &state)?,
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
     };
-    Ok(res.add_event(event))
+    let response = res.add_event(event);
+    let response = match msg {
+        Some(msg) => response.add_message(msg),
+        None => response,
+    };
+    Ok(response)
 }
 
 fn deposit(
@@ -187,17 +204,18 @@ fn deposit(
     funds: NonZero<Collateral>,
     token: Token,
 ) -> Result<Response> {
-    let queue_id = get_next_queue_id(storage)?;
+    let inc_queue_id = get_next_inc_queue_id(storage)?;
+    let queue_id = QueuePositionId::IncQueuePositionId(inc_queue_id);
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
-    let queue_position = QueuePosition {
-        item: copy_trading::QueueItem::Deposit { funds, token },
+    let queue_position = IncQueuePosition {
+        item: copy_trading::IncQueueItem::Deposit { funds, token },
         wallet: sender,
     };
-    crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position)?;
+    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
     Ok(Response::new().add_event(
         Event::new("deposit")
             .add_attribute("collateral", funds.to_string())
-            .add_attribute("queue-id", queue_id.to_string()),
+            .add_attribute("queue-id", inc_queue_id.to_string()),
     ))
 }
 

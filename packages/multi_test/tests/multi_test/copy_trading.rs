@@ -3,7 +3,9 @@ use std::str::FromStr;
 use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{QueueItem, QueuePositionId, WorkResp},
+    contracts::copy_trading::{
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId, WorkResp,
+    },
     shared::number::{Collateral, NonZero},
 };
 
@@ -29,16 +31,19 @@ fn deposit() {
         .query_copy_trading_queue_status(trader.into(), None, None)
         .unwrap();
     assert_eq!(response.items.len(), 1);
-    let item = &response.items[0].item;
+    let item = &response.items[0];
 
     assert_eq!(
         item,
-        &QueueItem::Deposit {
-            funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
-            token
+        &QueueItem::IncCollaleteral {
+            item: IncQueueItem::Deposit {
+                funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
+                token,
+            },
+            id: IncQueuePositionId::new(0)
         }
     );
-    assert!(response.processed_till.is_none())
+    assert!(response.inc_processed_till.is_none())
 }
 
 #[test]
@@ -79,7 +84,7 @@ fn detect_process_queue_item_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::new(0)
+                id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(0))
             }
         }
     );
@@ -106,7 +111,17 @@ fn do_actual_deposit() {
 
     // Should not find any work now
     let work = market.query_copy_trading_work().unwrap();
-    assert_eq!(work, WorkResp::NoWork)
+    assert_eq!(work, WorkResp::NoWork);
+
+    let balance = market.query_copy_trading_balance(&trader).unwrap();
+    assert_eq!(balance.balance.len(), 1);
+    assert_eq!(balance.balance[0].shares, "100".parse().unwrap());
+    let token = market.get_copytrading_token().unwrap();
+    assert_eq!(balance.balance[0].token, token);
+
+    let another_trader = market.clone_trader(1).unwrap();
+    let balance = market.query_copy_trading_balance(&another_trader).unwrap();
+    assert!(balance.balance.is_empty());
 }
 
 #[test]
@@ -138,10 +153,62 @@ fn does_not_compute_lp_token_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::new(1)
+                id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(1))
             }
         }
     );
     // Process queue item: Do actual deposit
     market.exec_copytrading_do_work(&trader).unwrap();
+}
+
+#[test]
+fn do_withdraw() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let initial_balance = market.query_copy_trading_balance(&trader).unwrap();
+    assert_eq!(initial_balance.balance[0].shares, "100".parse().unwrap());
+
+    market
+        .exec_copytrading_withdrawal(&trader, "101")
+        .unwrap_err();
+    market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
+                id: QueuePositionId::DecQueuePositionId(DecQueuePositionId::new(0))
+            }
+        }
+    );
+    // Process queue item: do the actual withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let new_balance = market.query_copy_trading_balance(&trader).unwrap();
+    assert_eq!(new_balance.balance[0].shares, "50".parse().unwrap());
+
+    market
+        .exec_copytrading_withdrawal(&trader, "51")
+        .unwrap_err();
+    market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    // Process queue item: do the actual withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market
+        .exec_copytrading_withdrawal(&trader, "1")
+        .unwrap_err();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
 }
