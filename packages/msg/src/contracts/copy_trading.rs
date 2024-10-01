@@ -168,23 +168,35 @@ pub enum QueryMsg {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct QueueResp {
     /// Items in queue for the wallet
-    pub items: Vec<QueueRespItem>,
+    pub items: Vec<QueueItem>,
     /// Last processed [QueuePositionId]
-    pub processed_till: Option<QueuePositionId>,
+    pub inc_processed_till: Option<IncQueuePositionId>,
+    /// Last processed [QueuePositionId]
+    pub dec_processed_till: Option<DecQueuePositionId>,
 }
 
 /// Queue Item
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct QueueRespItem {
-    /// Queue position id
-    pub id: QueuePositionId,
-    /// Item in the queue corresponding to the [QueuePositionId]
-    pub item: QueueItem,
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum QueueItem {
+    /// Item that will lead to increase or no change of collateral
+    IncCollaleteral {
+        /// Item type
+        item: IncQueueItem,
+        /// Queue position id
+        id: IncQueuePositionId,
+    },
+    /// Item that will lead to decrease of collateral
+    DecCollateral {
+        /// Item type
+        item: DecQueueItem,
+        /// Queue position id
+        id: DecQueuePositionId,
+    },
 }
 
 /// Queue item that needs to be processed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub enum QueueItem {
+pub enum IncQueueItem {
     /// Deposit the fund and get some [LpToken]
     Deposit {
         /// Funds to be deposited
@@ -192,6 +204,11 @@ pub enum QueueItem {
         /// Token
         token: Token,
     },
+}
+
+/// Queue item that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum DecQueueItem {
     /// Withdraw via LpToken
     Withdrawal {
         /// Tokens to be withdrawn
@@ -214,13 +231,21 @@ pub enum RequiresToken {
     NoToken {},
 }
 
-impl QueueItem {
+impl IncQueueItem {
     /// Does this queue item require computation of LP token value
     pub fn requires_token(self) -> RequiresToken {
         match self {
-            QueueItem::Deposit { token, .. } => RequiresToken::Token { token },
-            QueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            QueueItem::OpenPosition {} => RequiresToken::NoToken {},
+            IncQueueItem::Deposit { token, .. } => RequiresToken::Token { token },
+        }
+    }
+}
+
+impl DecQueueItem {
+    /// Does this queue item require computation of LP token value
+    pub fn requires_token(self) -> RequiresToken {
+        match self {
+            DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
+            DecQueueItem::OpenPosition {} => RequiresToken::NoToken {},
         }
     }
 }
@@ -439,16 +464,84 @@ pub enum WorkDescription {
     Rebalance {},
 }
 
+/// Queue position id that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum QueuePositionId {
+    /// Queue position id corrsponding to the queue items that will
+    /// increase or won't change the collateral
+    IncQueuePositionId(IncQueuePositionId),
+    /// Queue position id corresponding to the queue items that will
+    /// decrease the collateral
+    DecQueuePositionId(DecQueuePositionId),
+}
+
+impl<'a> PrimaryKey<'a> for QueuePositionId {
+    type Prefix = ();
+    type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        let (queue_type, key) = match self {
+            QueuePositionId::IncQueuePositionId(id) => (0u8, id.key()),
+            QueuePositionId::DecQueuePositionId(id) => (1u8, id.key()),
+        };
+        let mut keys = vec![Key::Val8([queue_type])];
+        keys.extend(key);
+        keys
+    }
+}
+
+impl KeyDeserialize for QueuePositionId {
+    type Output = QueuePositionId;
+
+    const KEY_ELEMS: u16 = 2;
+
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        let (queue_type, queue_id) = <(u8, u64) as KeyDeserialize>::from_vec(value)?;
+        let position_id = match queue_type {
+            0 => QueuePositionId::IncQueuePositionId(IncQueuePositionId(queue_id.into())),
+            1 => QueuePositionId::DecQueuePositionId(DecQueuePositionId(queue_id.into())),
+            _ => {
+                return Err(StdError::serialize_err(
+                    "QueuePositionId",
+                    "Invalid number in queue_type",
+                ))
+            }
+        };
+        Ok(position_id)
+    }
+}
+
+impl<'a> Prefixer<'a> for QueuePositionId {
+    fn prefix(&self) -> Vec<Key> {
+        match self {
+            QueuePositionId::IncQueuePositionId(id) => {
+                let mut keys = vec![Key::Val8([0u8])];
+                keys.extend(id.key());
+                keys
+            }
+            QueuePositionId::DecQueuePositionId(id) => {
+                let mut keys = vec![Key::Val8([1u8])];
+                keys.extend(id.key());
+                keys
+            }
+        }
+    }
+}
+
 /// Queue position number
 #[derive(
     Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize, Debug,
 )]
-pub struct QueuePositionId(Uint64);
+#[serde(rename_all = "snake_case")]
+pub struct IncQueuePositionId(Uint64);
 
-impl QueuePositionId {
+impl IncQueuePositionId {
     /// Construct a new value from a [u64].
     pub fn new(x: u64) -> Self {
-        QueuePositionId(x.into())
+        IncQueuePositionId(x.into())
     }
 
     /// The underlying `u64` representation.
@@ -460,11 +553,11 @@ impl QueuePositionId {
     ///
     /// Panics on overflow
     pub fn next(self) -> Self {
-        QueuePositionId((self.u64() + 1).into())
+        IncQueuePositionId((self.u64() + 1).into())
     }
 }
 
-impl<'a> PrimaryKey<'a> for QueuePositionId {
+impl<'a> PrimaryKey<'a> for IncQueuePositionId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -475,33 +568,100 @@ impl<'a> PrimaryKey<'a> for QueuePositionId {
     }
 }
 
-impl<'a> Prefixer<'a> for QueuePositionId {
+impl<'a> Prefixer<'a> for IncQueuePositionId {
     fn prefix(&self) -> Vec<Key> {
         vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
 }
 
-impl KeyDeserialize for QueuePositionId {
-    type Output = QueuePositionId;
+impl KeyDeserialize for IncQueuePositionId {
+    type Output = IncQueuePositionId;
 
     const KEY_ELEMS: u16 = 1;
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        u64::from_vec(value).map(|x| QueuePositionId(Uint64::new(x)))
+        u64::from_vec(value).map(|x| IncQueuePositionId(Uint64::new(x)))
     }
 }
 
-impl std::fmt::Display for QueuePositionId {
+impl std::fmt::Display for IncQueuePositionId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl FromStr for QueuePositionId {
+impl FromStr for IncQueuePositionId {
     type Err = ParseIntError;
     fn from_str(src: &str) -> Result<Self, ParseIntError> {
-        src.parse().map(|x| QueuePositionId(Uint64::new(x)))
+        src.parse().map(|x| IncQueuePositionId(Uint64::new(x)))
+    }
+}
+
+/// Queue position number
+#[derive(
+    Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize, Debug,
+)]
+#[serde(rename_all = "snake_case")]
+pub struct DecQueuePositionId(Uint64);
+
+impl DecQueuePositionId {
+    /// Construct a new value from a [u64].
+    pub fn new(x: u64) -> Self {
+        DecQueuePositionId(x.into())
+    }
+
+    /// The underlying `u64` representation.
+    pub fn u64(self) -> u64 {
+        self.0.u64()
+    }
+
+    /// Generate the next position ID
+    ///
+    /// Panics on overflow
+    pub fn next(self) -> Self {
+        DecQueuePositionId((self.u64() + 1).into())
+    }
+}
+
+impl<'a> PrimaryKey<'a> for DecQueuePositionId {
+    type Prefix = ();
+    type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
+    }
+}
+
+impl<'a> Prefixer<'a> for DecQueuePositionId {
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
+    }
+}
+
+impl KeyDeserialize for DecQueuePositionId {
+    type Output = DecQueuePositionId;
+
+    const KEY_ELEMS: u16 = 1;
+
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        u64::from_vec(value).map(|x| DecQueuePositionId(Uint64::new(x)))
+    }
+}
+
+impl std::fmt::Display for DecQueuePositionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for DecQueuePositionId {
+    type Err = ParseIntError;
+    fn from_str(src: &str) -> Result<Self, ParseIntError> {
+        src.parse().map(|x| DecQueuePositionId(Uint64::new(x)))
     }
 }
 

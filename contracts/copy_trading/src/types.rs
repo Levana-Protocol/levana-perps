@@ -203,20 +203,38 @@ impl LpTokenStatus {
     }
 }
 
-/// Queue position
+/// Queue position pertaining to [crate::state::COLLATERAL_INCREASE_QUEUE]
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) struct QueuePosition {
+pub(crate) struct IncQueuePosition {
     /// Queue item that needs to be processed
-    pub(crate) item: QueueItem,
+    pub(crate) item: IncQueueItem,
     /// Wallet that initiated the specific item action
     pub(crate) wallet: Addr,
 }
 
-impl QueuePosition {
-    pub fn into_queue_resp_item(self, id: QueuePositionId) -> QueueRespItem {
-        QueueRespItem {
-            id,
+/// Queue position pertaining to [crate::state::COLLATERAL_DECREASE_QUEUE]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct DecQueuePosition {
+    /// Queue item that needs to be processed
+    pub(crate) item: DecQueueItem,
+    /// Wallet that initiated the specific item action
+    pub(crate) wallet: Addr,
+}
+
+impl DecQueuePosition {
+    pub fn into_queue_item(self, id: DecQueuePositionId) -> QueueItem {
+        QueueItem::DecCollateral {
             item: self.item,
+            id,
+        }
+    }
+}
+
+impl IncQueuePosition {
+    pub fn into_queue_item(self, id: IncQueuePositionId) -> QueueItem {
+        QueueItem::IncCollaleteral {
+            item: self.item,
+            id,
         }
     }
 }

@@ -1,11 +1,11 @@
 use crate::{
-    common::get_next_queue_id,
+    common::{get_next_dec_queue_id, get_next_inc_queue_id},
     prelude::*,
     types::{
-        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, QueuePosition,
-        State, WalletInfo,
+        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
+        OneLpTokenValue, ProcessingStatus, State, WalletInfo,
     },
-    work::get_work,
+    work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
 use msg::contracts::copy_trading;
@@ -153,20 +153,21 @@ fn withdraw(
         }
         None => bail!("No shares found"),
     };
-    let queue_id = get_next_queue_id(storage)?;
+    let dec_queue_id = get_next_dec_queue_id(storage)?;
+    let queue_id = QueuePositionId::DecQueuePositionId(dec_queue_id);
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&wallet, queue_id), &())?;
-    let queue_position = QueuePosition {
-        item: copy_trading::QueueItem::Withdrawal {
+    let queue_position = DecQueuePosition {
+        item: copy_trading::DecQueueItem::Withdrawal {
             tokens: shares,
             token: wallet_info.token,
         },
         wallet: wallet_info.wallet,
     };
-    crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position)?;
+    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &dec_queue_id, &queue_position)?;
     Ok(Response::new().add_event(
         Event::new("withdrawal")
             .add_attribute("shares", shares.to_string())
-            .add_attribute("queue-id", queue_id.to_string()),
+            .add_attribute("queue-id", dec_queue_id.to_string()),
     ))
 }
 
@@ -185,101 +186,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
             (event, None)
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
-        WorkDescription::ProcessQueueItem { id } => {
-            let queue_item = crate::state::PENDING_QUEUE_ITEMS
-                .may_load(storage, &id)?
-                .context("PENDING_QUEUE_ITEMS load failed")?;
-            match queue_item.item {
-                QueueItem::Deposit { funds, token } => {
-                    let mut totals = crate::state::TOTALS
-                        .may_load(storage, &token)
-                        .context("Could not load TOTALS")?
-                        .unwrap_or_default();
-                    let token_value = state.load_lp_token_value(storage, &token)?;
-                    let new_shares = totals.add_collateral(funds, token_value)?;
-                    crate::state::TOTALS.save(storage, &token, &totals)?;
-                    let wallet_info = WalletInfo {
-                        token,
-                        wallet: queue_item.wallet,
-                    };
-                    let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
-                    let new_shares = match shares {
-                        Some(shares) => shares.checked_add(new_shares.raw())?,
-                        None => new_shares,
-                    };
-                    crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
-                    crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &id)?;
-                    let event = Event::new("deposit")
-                        .add_attribute("funds", funds.to_string())
-                        .add_attribute("shares", new_shares.to_string());
-                    (event, None)
-                }
-                QueueItem::Withdrawal { tokens, token } => {
-                    let shares = tokens;
-                    let wallet_info = WalletInfo {
-                        token,
-                        wallet: queue_item.wallet,
-                    };
-                    let actual_shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
-                    // This is a sanity check. This should never happen.
-                    let actual_shares = match actual_shares {
-                        Some(actual_shares) => {
-                            if shares > actual_shares && shares != actual_shares {
-                                bail!("Requesting more withdrawal than balance")
-                            }
-                            actual_shares
-                        }
-                        None => bail!("No shares found"),
-                    };
-                    let token_value = state.load_lp_token_value(storage, &wallet_info.token)?;
-                    let funds = token_value.shares_to_collateral(shares)?;
-                    let token = state.get_full_token_info(storage, &wallet_info.token)?;
-                    let withdraw_msg = token.into_transfer_msg(&wallet_info.wallet, funds)?;
-
-                    let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;
-                    crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &id)?;
-                    let contract_token = state.to_token(&token)?;
-                    let mut totals = crate::state::TOTALS
-                        .may_load(storage, &contract_token)?
-                        .context("TOTALS is empty")?;
-                    if funds.raw() > totals.collateral {
-                        bail!("Not enough collateral")
-                    } else {
-                        totals.collateral = totals.collateral.checked_sub(funds.raw())?;
-                    };
-                    let mut pending_store_update = || {
-                        if remaining_shares.is_zero() {
-                            crate::state::SHARES.remove(storage, &wallet_info);
-                        } else {
-                            let remaining_shares = NonZero::new(remaining_shares)
-                                .context("remaining_shares is zero")?;
-                            crate::state::SHARES.save(storage, &wallet_info, &remaining_shares)?;
-                        }
-                        crate::state::TOTALS.save(storage, &contract_token, &totals)?;
-                        Ok(())
-                    };
-                    let mut event = Event::new("withdraw")
-                        .add_attribute("wallet", wallet_info.wallet.to_string())
-                        .add_attribute("funds", funds.to_string())
-                        .add_attribute("burned-shares", shares.to_string());
-                    let withdraw_msg = match withdraw_msg {
-                        Some(withdraw_msg) => {
-                            pending_store_update()?;
-                            Some(withdraw_msg)
-                        }
-                        None => {
-                            // Collateral amount is less than chain's minimum representation.
-                            // So, we do nothing. We just move on to the next item in the queue.
-                            event = event
-                                .add_attribute("funds-less-min-chain", true.to_string());
-                            None
-                        }
-                    };
-                    (event, withdraw_msg)
-                }
-                QueueItem::OpenPosition {} => todo!(),
-            }
-        }
+        WorkDescription::ProcessQueueItem { id } => process_queue_item(id, storage, &state)?,
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
     };
@@ -297,17 +204,18 @@ fn deposit(
     funds: NonZero<Collateral>,
     token: Token,
 ) -> Result<Response> {
-    let queue_id = get_next_queue_id(storage)?;
+    let inc_queue_id = get_next_inc_queue_id(storage)?;
+    let queue_id = QueuePositionId::IncQueuePositionId(inc_queue_id);
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
-    let queue_position = QueuePosition {
-        item: copy_trading::QueueItem::Deposit { funds, token },
+    let queue_position = IncQueuePosition {
+        item: copy_trading::IncQueueItem::Deposit { funds, token },
         wallet: sender,
     };
-    crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position)?;
+    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
     Ok(Response::new().add_event(
         Event::new("deposit")
             .add_attribute("collateral", funds.to_string())
-            .add_attribute("queue-id", queue_id.to_string()),
+            .add_attribute("queue-id", inc_queue_id.to_string()),
     ))
 }
 

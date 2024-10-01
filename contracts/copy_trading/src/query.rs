@@ -87,17 +87,34 @@ fn queue_status(
             .min(DEFAULT_QUERY_LIMIT),
     )?;
     let mut response = vec![];
-    let processed_till = crate::state::LAST_PROCESSED_QUEUE_ID.may_load(storage)?;
+    let inc_processed_till = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
+    let dec_processed_till = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     for item in items.take(limit) {
         let (queue_position, _) = item?;
-        let item = crate::state::PENDING_QUEUE_ITEMS
-            .may_load(storage, &queue_position)?
-            .expect("Logic error in queue_status: PENDING_QUEUE_ITEMS.may_load returned None");
-        let item = item.into_queue_resp_item(queue_position);
-        response.push(item)
+        match queue_position {
+            QueuePositionId::IncQueuePositionId(id) => {
+                let item = crate::state::COLLATERAL_INCREASE_QUEUE
+                    .may_load(storage, &id)?
+                    .expect(
+                        "Logic error in queue_status: PENDING_QUEUE_ITEMS.may_load returned None",
+                    );
+                let item = item.into_queue_item(id);
+                response.push(item)
+            }
+            QueuePositionId::DecQueuePositionId(id) => {
+                let item = crate::state::COLLATERAL_DECREASE_QUEUE
+                    .may_load(storage, &id)?
+                    .expect(
+                        "Logic error in queue_status: PENDING_QUEUE_ITEMS.may_load returned None",
+                    );
+                let item = item.into_queue_item(id);
+                response.push(item)
+            }
+        }
     }
     Ok(QueueResp {
         items: response,
-        processed_till,
+        inc_processed_till,
+        dec_processed_till,
     })
 }

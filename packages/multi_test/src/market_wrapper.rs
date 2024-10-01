@@ -2368,7 +2368,7 @@ impl PerpsMarket {
     pub fn query_copy_trading_queue_status(
         &self,
         wallet: RawAddr,
-        start_after: Option<msg::contracts::copy_trading::QueuePositionId>,
+        start_after: Option<msg::contracts::copy_trading::IncQueuePositionId>,
         limit: Option<u32>,
     ) -> Result<msg::contracts::copy_trading::QueueResp> {
         self.query_copy_trading(&CopyTradingQueryMsg::QueueStatus {

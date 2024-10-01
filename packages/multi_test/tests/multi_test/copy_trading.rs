@@ -3,7 +3,7 @@ use std::str::FromStr;
 use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{QueueItem, QueuePositionId, WorkResp},
+    contracts::copy_trading::{IncQueueItem, IncQueuePositionId, WorkResp},
     shared::number::{Collateral, NonZero},
 };
 
@@ -33,7 +33,7 @@ fn deposit() {
 
     assert_eq!(
         item,
-        &QueueItem::Deposit {
+        &IncQueueItem::Deposit {
             funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
             token
         }
@@ -79,7 +79,7 @@ fn detect_process_queue_item_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::new(0)
+                id: IncQueuePositionId::new(0)
             }
         }
     );
@@ -148,7 +148,7 @@ fn does_not_compute_lp_token_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::new(1)
+                id: IncQueuePositionId::new(1)
             }
         }
     );
@@ -182,7 +182,7 @@ fn do_withdraw() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::new(1)
+                id: IncQueuePositionId::new(1)
             }
         }
     );
