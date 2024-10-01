@@ -1482,9 +1482,9 @@ fn smart_search_bug_perp_4098() {
         // 2. Open 2 shorts. Short is now popular side
         // Told to open a Long of 1.7393 collateral, with leverage 10,
         // expecting a notional of 14.02
-        let long_position_1 = create_position(&market, "11.40", 7, DirectionToBase::Long);
+        let _ = create_position(&market, "11.40", 7, DirectionToBase::Long);
         let long_position_2 = create_position(&market, "2.34", 7, DirectionToBase::Long);
-        let short_position_1 = create_position(&market, "8.6", 7, DirectionToBase::Short);
+        let _ = create_position(&market, "8.6", 7, DirectionToBase::Short);
         let short_position_2 = create_position(&market, "4.5", 7, DirectionToBase::Short);
 
         // We expect the market's short funding to be very high
@@ -1519,7 +1519,7 @@ fn smart_search_bug_perp_4098() {
         let ct_trade = market
             .query_countertrade_market_id(status.market_id)
             .unwrap();
-        assert!(ct_trade.position == None);
+        assert!(ct_trade.position == Option::is_none());
     }
 }
 fn create_position(
