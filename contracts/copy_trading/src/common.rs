@@ -69,16 +69,13 @@ impl<'a> State<'a> {
             factory,
             &msg::contracts::factory::entry::QueryMsg::Markets {
                 start_after,
-                limit: Some(5),
+                limit: Some(30),
             },
         )?;
         Ok(markets)
     }
 
-    pub(crate) fn batched_stored_market_info(
-        &self,
-        storage: &mut dyn Storage,
-    ) -> Result<()> {
+    pub(crate) fn batched_stored_market_info(&self, storage: &mut dyn Storage) -> Result<()> {
         let status = crate::state::MARKET_LOADER_STATUS
             .may_load(storage)?
             .unwrap_or_default();
@@ -86,13 +83,20 @@ impl<'a> State<'a> {
             MarketLoaderStatus::NotStarted => None,
             MarketLoaderStatus::OnGoing { last_seen } => Some(last_seen),
             MarketLoaderStatus::Finished { last_seen } => {
+                // This codepath will only reach when six hours have
+                // exceeded and we want to check if the remote factory
+                // contract has changed.
                 let factory_market_last_added = self.raw_query_last_market_added()?;
                 let last_seen = match factory_market_last_added {
                     Some(factory_market_last_added) => {
+                        // This codepath will reach when factory added
+                        // some market at some point of time.
                         let market_added_at =
                             crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
                         if let Some(market_added_at) = market_added_at {
                             if market_added_at < factory_market_last_added {
+                                // Was the factory updated since we last
+                                // loaded market in this contract ?
                                 last_seen
                             } else {
                                 return Ok(());
@@ -101,7 +105,14 @@ impl<'a> State<'a> {
                             bail!("Impossible case: LAST_MARKET_ADD_CHECK is not loaded in finished step")
                         }
                     }
-                    None => return Ok(()),
+                    None => {
+                        // Remote factory contract doesn't have
+                        // anything set. That means no market was
+                        // newly added since we loaded it last
+                        // time. We return early since we have nothing
+                        // to query and store.
+                        return Ok(());
+                    }
                 };
                 Some(last_seen)
             }
