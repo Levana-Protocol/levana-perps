@@ -88,7 +88,7 @@ fn get_work_from_dec_queue(
     }
 }
 
-pub(crate) fn get_work(state: &State, storage: &dyn Storage, env: &Env) -> Result<WorkResp> {
+pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp> {
     let market_status = crate::state::MARKET_LOADER_STATUS.may_load(storage)?;
     match market_status {
         Some(market_status) => match market_status {
@@ -103,7 +103,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage, env: &Env) -> Resul
                 })
             }
             crate::types::MarketLoaderStatus::Finished { .. } => {
-                let now = env.block.time;
+                let now = state.env.block.time;
                 let last_seen = crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
                 match last_seen {
                     Some(last_seen) => {

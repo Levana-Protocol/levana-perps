@@ -40,7 +40,8 @@ impl<'a> State<'a> {
                 config,
                 api: deps.api,
                 querier: deps.querier,
-                my_addr: env.contract.address,
+                my_addr: env.contract.address.clone(),
+                env,
             },
             deps.storage,
         ))
@@ -56,6 +57,7 @@ impl<'a> State<'a> {
                 api: deps.api,
                 querier: deps.querier,
                 my_addr: env.contract.address.clone(),
+                env: env.clone(),
             },
             deps.storage,
         ))
@@ -67,17 +69,13 @@ impl<'a> State<'a> {
             factory,
             &msg::contracts::factory::entry::QueryMsg::Markets {
                 start_after,
-                limit: Some(5),
+                limit: Some(30),
             },
         )?;
         Ok(markets)
     }
 
-    pub(crate) fn batched_stored_market_info(
-        &self,
-        storage: &mut dyn Storage,
-        env: &Env,
-    ) -> Result<()> {
+    pub(crate) fn batched_stored_market_info(&self, storage: &mut dyn Storage) -> Result<()> {
         let status = crate::state::MARKET_LOADER_STATUS
             .may_load(storage)?
             .unwrap_or_default();
@@ -85,13 +83,20 @@ impl<'a> State<'a> {
             MarketLoaderStatus::NotStarted => None,
             MarketLoaderStatus::OnGoing { last_seen } => Some(last_seen),
             MarketLoaderStatus::Finished { last_seen } => {
+                // This codepath will only reach when six hours have
+                // exceeded and we want to check if the remote factory
+                // contract has changed.
                 let factory_market_last_added = self.raw_query_last_market_added()?;
                 let last_seen = match factory_market_last_added {
                     Some(factory_market_last_added) => {
+                        // This codepath will reach when factory added
+                        // some market at some point of time.
                         let market_added_at =
                             crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
                         if let Some(market_added_at) = market_added_at {
                             if market_added_at < factory_market_last_added {
+                                // Was the factory updated since we last
+                                // loaded market in this contract ?
                                 last_seen
                             } else {
                                 return Ok(());
@@ -100,7 +105,14 @@ impl<'a> State<'a> {
                             bail!("Impossible case: LAST_MARKET_ADD_CHECK is not loaded in finished step")
                         }
                     }
-                    None => return Ok(()),
+                    None => {
+                        // Remote factory contract doesn't have
+                        // anything set. That means no market was
+                        // newly added since we loaded it last
+                        // time. We return early since we have nothing
+                        // to query and store.
+                        return Ok(());
+                    }
                 };
                 Some(last_seen)
             }
@@ -108,25 +120,25 @@ impl<'a> State<'a> {
         let markets = self.load_market_ids(start_after.clone())?;
         if markets.is_empty() {
             crate::state::LAST_MARKET_ADD_CHECK
-                .save(storage, &Timestamp::into(env.block.time.into()))?;
+                .save(storage, &Timestamp::into(self.env.block.time.into()))?;
             if let Some(last_seen) = start_after {
-                crate::state::LAST_MARKET_ADD_CHECK.save(storage, &env.block.time.into())?;
                 crate::state::MARKET_LOADER_STATUS
                     .save(storage, &MarketLoaderStatus::Finished { last_seen })?;
             }
             return Ok(());
-        }
-        let mut last_seen = None;
-        for market in markets {
-            let result = self.load_cache_market_info(storage, &market)?;
-            last_seen = Some(result.id);
-        }
-        if let Some(last_seen) = last_seen {
-            crate::state::MARKET_LOADER_STATUS
-                .save(storage, &MarketLoaderStatus::OnGoing { last_seen })?;
+        } else {
+            let mut last_seen = None;
+            for market in markets {
+                let result = self.load_cache_market_info(storage, &market)?;
+                last_seen = Some(result.id);
+            }
+            if let Some(last_seen) = last_seen {
+                crate::state::MARKET_LOADER_STATUS
+                    .save(storage, &MarketLoaderStatus::OnGoing { last_seen })?;
+            }
         }
         crate::state::LAST_MARKET_ADD_CHECK
-            .save(storage, &Timestamp::into(env.block.time.into()))?;
+            .save(storage, &Timestamp::into(self.env.block.time.into()))?;
         Ok(())
     }
 

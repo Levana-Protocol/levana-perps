@@ -61,7 +61,7 @@ pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
 /// Local cache of markets information
 pub(crate) const MARKETS_TOKEN: Map<(Token, MarketId), MarketInfo> = Map::new("markets-token");
 
-/// When did the factory was queried last time to check if new market was added ?
+/// When did we last query the list of markets from the factory? Needed to efficiently check if a new market was added.
 pub(crate) const LAST_MARKET_ADD_CHECK: Item<Timestamp> = Item::new("last-market-add-check");
 
 /// Status of the market loader

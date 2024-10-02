@@ -128,7 +128,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
         ExecuteMsg::DoWork {} => {
             funds.require_none()?;
-            do_work(state, storage, &env)
+            do_work(state, storage)
         }
         ExecuteMsg::LeaderMsg { market_id, message } => {
             todo!()
@@ -263,8 +263,8 @@ fn withdraw(
     ))
 }
 
-fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Response> {
-    let work = get_work(&state, storage, env)?;
+fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
+    let work = get_work(&state, storage)?;
     let desc = match work {
         WorkResp::NoWork => bail!("No work items available"),
         WorkResp::HasWork { work_description } => work_description,
@@ -274,7 +274,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
 
     let (event, msg) = match desc {
         WorkDescription::LoadMarket {} => {
-            state.batched_stored_market_info(storage, env)?;
+            state.batched_stored_market_info(storage)?;
             let status = crate::state::MARKET_LOADER_STATUS
                 .may_load(storage)?
                 .unwrap_or_default();
@@ -283,7 +283,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
             (event, None)
         }
         WorkDescription::ComputeLpTokenValue { token } => {
-            let event = compute_lp_token_value(storage, &state, token, env)?;
+            let event = compute_lp_token_value(storage, &state, token)?;
             (event, None)
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
@@ -320,12 +320,7 @@ fn deposit(
     ))
 }
 
-fn compute_lp_token_value(
-    storage: &mut dyn Storage,
-    state: &State,
-    token: Token,
-    env: &Env,
-) -> Result<Event> {
+fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Event> {
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALUE")?;
@@ -338,7 +333,7 @@ fn compute_lp_token_value(
             let token_value = LpTokenValue {
                 value: OneLpTokenValue(Collateral::one()),
                 status: crate::types::LpTokenStatus::Valid {
-                    timestamp: env.block.time.into(),
+                    timestamp: state.env.block.time.into(),
                 },
             };
             crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
@@ -381,7 +376,7 @@ fn compute_lp_token_value(
     let token_value = LpTokenValue {
         value: OneLpTokenValue(one_share_value),
         status: crate::types::LpTokenStatus::Valid {
-            timestamp: Timestamp::from(env.block.time),
+            timestamp: Timestamp::from(state.env.block.time),
         },
     };
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
