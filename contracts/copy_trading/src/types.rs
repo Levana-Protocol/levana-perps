@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use cosmwasm_std::{StdError, StdResult};
+use cosmwasm_std::{CosmosMsg, StdError, StdResult, SubMsg, WasmMsg};
 use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
 use msg::contracts::market::{
@@ -343,6 +343,22 @@ impl Display for MarketLoaderStatus {
             MarketLoaderStatus::NotStarted => f.write_str("NotStarted"),
             MarketLoaderStatus::OnGoing { last_seen } => write!(f, "Ongoing {}", last_seen),
             MarketLoaderStatus::Finished { last_seen } => write!(f, "Finished {}", last_seen),
+        }
+    }
+}
+
+pub(crate) struct WorkResponse {
+    pub(crate) event: Event,
+    pub(crate) sub_wasm_msg: Option<SubMsg<WasmMsg>>,
+    pub(crate) withdrawal_msg: Option<CosmosMsg>,
+}
+
+impl WorkResponse {
+    pub(crate) fn new(event: Event) -> Self {
+        Self {
+            event,
+            sub_wasm_msg: None,
+            withdrawal_msg: None,
         }
     }
 }

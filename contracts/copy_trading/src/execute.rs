@@ -3,7 +3,7 @@ use crate::{
     prelude::*,
     types::{
         DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
-        OneLpTokenValue, ProcessingStatus, State, WalletInfo,
+        OneLpTokenValue, ProcessingStatus, State, WalletInfo, WorkResponse,
     },
     work::{get_work, process_queue_item},
 };
@@ -272,7 +272,7 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
     let res = Response::new()
         .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
-    let (event, msg) = match desc {
+    match desc {
         WorkDescription::LoadMarket {} => {
             state.batched_stored_market_info(storage)?;
             let status = crate::state::MARKET_LOADER_STATUS
@@ -280,23 +280,30 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
                 .unwrap_or_default();
             let event =
                 Event::new("market-loader-status").add_attribute("value", status.to_string());
-            (event, None)
+            let res = res.add_event(event);
+            Ok(res)
         }
         WorkDescription::ComputeLpTokenValue { token } => {
             let event = compute_lp_token_value(storage, &state, token)?;
-            (event, None)
+            let res = res.add_event(event);
+            Ok(res)
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
-        WorkDescription::ProcessQueueItem { id } => process_queue_item(id, storage, &state)?,
+        WorkDescription::ProcessQueueItem { id } => {
+            let res = process_queue_item(id, storage, &state, res)?;
+            Ok(res)
+        } ,
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
-    };
-    let response = res.add_event(event);
-    let response = match msg {
-        Some(msg) => response.add_message(msg),
-        None => response,
-    };
-    Ok(response)
+    }// ;
+    // let mut response = res.add_event(work_response.event);
+    // if let Some(sub_wasm_msg) = work_response.sub_wasm_msg {
+    //     response = response.add_submessage(sub_wasm_msg);
+    // }
+    // if let Some(withdraw_msg) = work_response.withdrawal_msg {
+    //     response = response.add_message(withdraw_msg);
+    // }
+    // Ok(response)
 }
 
 fn deposit(

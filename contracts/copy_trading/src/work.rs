@@ -1,11 +1,13 @@
 use anyhow::bail;
-use cosmwasm_std::CosmosMsg;
+use cosmwasm_std::{CosmosMsg, SubMsg};
 
 use crate::{
     common::SIX_HOURS_IN_SECONDS,
     prelude::*,
-    types::{State, WalletInfo},
+    reply::REPLY_ID_OPEN_POSITION,
+    types::{State, WalletInfo, WorkResponse},
 };
+use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
 fn get_work_from_dec_queue(
     queue_id: DecQueuePositionId,
@@ -223,7 +225,8 @@ pub(crate) fn process_queue_item(
     id: QueuePositionId,
     storage: &mut dyn Storage,
     state: &State,
-) -> Result<(Event, Option<CosmosMsg>)> {
+    response: Response,
+) -> Result<Response> {
     match id {
         QueuePositionId::IncQueuePositionId(id) => {
             let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
@@ -252,7 +255,8 @@ pub(crate) fn process_queue_item(
                     let event = Event::new("deposit")
                         .add_attribute("funds", funds.to_string())
                         .add_attribute("shares", new_shares.to_string());
-                    Ok((event, None))
+                    let response = response.add_event(event);
+                    Ok(response)
                 }
             }
         }
@@ -322,9 +326,55 @@ pub(crate) fn process_queue_item(
                             None
                         }
                     };
-                    Ok((event, withdraw_msg))
+                    let response = response.add_event(event);
+                    let response = match withdraw_msg {
+                        Some(withdraw_msg) => response.add_message(withdraw_msg),
+                        None => response,
+                    };
+                    Ok(response)
                 }
-                DecQueueItem::OpenPosition {} => todo!(),
+                DecQueueItem::MarketItem { id, token: _, item } => match item {
+                    DecMarketItem::OpenPosition {
+                        slippage_assert,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                        collateral,
+                    } => {
+                        let id = crate::state::MARKETS
+                            .may_load(storage, &id)?
+                            .context("MARKETS store is empty")?;
+                        let msg = id.token.into_market_execute_msg(
+                            &id.addr,
+                            collateral.raw(),
+                            MarketExecuteMsg::OpenPosition {
+                                slippage_assert,
+                                leverage,
+                                direction,
+                                max_gains: None,
+                                stop_loss_override,
+                                take_profit: Some(take_profit),
+                            },
+                        )?;
+                        let event = Event::new("open-position")
+                            .add_attribute("direction", direction.as_str())
+                            .add_attribute("leverage", leverage.to_string())
+                            .add_attribute("collateral", collateral.to_string())
+                            .add_attribute("take_profit", take_profit.to_string())
+                            .add_attribute("market", id.id.as_str());
+                        let event = if let Some(stop_loss_override) = stop_loss_override {
+                            event
+                                .add_attribute("stop_loss_override", stop_loss_override.to_string())
+                        } else {
+                            event
+                        };
+                        let sub_msg = SubMsg::reply_on_success(msg, REPLY_ID_OPEN_POSITION);
+                        let response = response.add_event(event);
+                        let response = response.add_submessage(sub_msg);
+                        Ok(response)
+                    }
+                },
             }
         }
     }

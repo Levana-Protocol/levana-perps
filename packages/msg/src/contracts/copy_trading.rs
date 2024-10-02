@@ -2,13 +2,14 @@
 
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
-use super::market::entry::ExecuteMsg as MarketExecuteMsg;
+use super::market::entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert};
 use anyhow::anyhow;
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
     number::{Collateral, LpToken, NonZero, Usd},
-    storage::{MarketId, RawAddr},
+    price::{PriceBaseInQuote, TakeProfitTrader},
+    storage::{DirectionToBase, LeverageToBase, MarketId, RawAddr},
     time::Timestamp,
 };
 
@@ -216,8 +217,36 @@ pub enum DecQueueItem {
         /// Token type
         token: Token,
     },
-    /// Open Position etc. etc.
-    OpenPosition {},
+    /// Market action items
+    MarketItem {
+        /// Market id
+        id: MarketId,
+        /// Market token
+        token: Token,
+        /// Market item
+        item: DecMarketItem,
+    },
+}
+
+/// Queue item that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum DecMarketItem {
+    /// Open position
+    OpenPosition {
+        /// Collateral for the position
+        collateral: NonZero<Collateral>,
+        /// Assertion that the price has not moved too far
+        slippage_assert: Option<SlippageAssert>,
+        /// Leverage of new position
+        leverage: LeverageToBase,
+        /// Direction of new position
+        direction: DirectionToBase,
+        /// Stop loss price of new position
+        stop_loss_override: Option<PriceBaseInQuote>,
+        /// Take profit price of new position
+        #[serde(alias = "take_profit_override")]
+        take_profit: TakeProfitTrader,
+    },
 }
 
 /// Token required for the queue item
@@ -245,7 +274,9 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::OpenPosition {} => RequiresToken::NoToken {},
+            DecQueueItem::MarketItem { token, item, .. } => match item {
+                DecMarketItem::OpenPosition { .. } => RequiresToken::Token { token },
+            },
         }
     }
 }
