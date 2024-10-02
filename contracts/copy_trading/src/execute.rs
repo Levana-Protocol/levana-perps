@@ -130,8 +130,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             do_work(state, storage)
         }
-        ExecuteMsg::LeaderMsg { market_id, message } => {
-            todo!()
+        ExecuteMsg::LeaderMsg {
+            market_id,
+            message,
+            collateral,
+        } => {
+            funds.require_none()?;
+            // todo: assert that it is executed by leader
+            execute_leader_msg(storage, &state, market_id, message, collateral)
         }
         _ => panic!("Not implemented yet"),
     }
@@ -142,7 +148,7 @@ fn execute_leader_msg(
     state: &State,
     market_id: MarketId,
     message: Box<MarketExecuteMsg>,
-    funds: &Funds,
+    collateral: Option<NonZero<Collateral>>,
 ) -> Result<Response> {
     let not_supported_response = |message: &str| {
         let response = Response::new().add_event(
@@ -152,6 +158,10 @@ fn execute_leader_msg(
         );
         Ok(response)
     };
+    let market_info = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS store is empty")?;
+    let token = state.to_token(&market_info.token)?;
     match *message {
         MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
         MarketExecuteMsg::Receive { .. } => not_supported_response("receive"),
@@ -162,7 +172,47 @@ fn execute_leader_msg(
             max_gains,
             stop_loss_override,
             take_profit,
-        } => todo!(),
+        } => {
+            // todo: validation
+            // todo: assert is leader at a higher stage
+            let collateral = match collateral {
+                Some(collateral) => collateral,
+                None => bail!("No supplied collateral for opening position"),
+            };
+            if max_gains.is_some() {
+                bail!("max_gains is deprecated and not accepted")
+            }
+            if take_profit.is_none() {
+                bail!("take profit is not specified")
+            }
+            let dec_queue_id = get_next_dec_queue_id(storage)?;
+
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: DecMarketItem::OpenPosition {
+                        collateral,
+                        slippage_assert,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                    },
+                },
+                wallet: state.config.leader.clone(),
+            };
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                storage,
+                &dec_queue_id,
+                &queue_position,
+            )?;
+            Ok(Response::new().add_event(
+                Event::new("open-position")
+                    .add_attribute("queue-id", dec_queue_id.to_string())
+                    .add_attribute("collateral", collateral.to_string()),
+            ))
+        }
         MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => todo!(),
         MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
             id,
@@ -292,18 +342,10 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
         WorkDescription::ProcessQueueItem { id } => {
             let res = process_queue_item(id, storage, &state, res)?;
             Ok(res)
-        } ,
+        }
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
-    }// ;
-    // let mut response = res.add_event(work_response.event);
-    // if let Some(sub_wasm_msg) = work_response.sub_wasm_msg {
-    //     response = response.add_submessage(sub_wasm_msg);
-    // }
-    // if let Some(withdraw_msg) = work_response.withdrawal_msg {
-    //     response = response.add_message(withdraw_msg);
-    // }
-    // Ok(response)
+    }
 }
 
 fn deposit(

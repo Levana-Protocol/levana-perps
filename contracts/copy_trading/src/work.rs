@@ -354,14 +354,13 @@ pub(crate) fn process_queue_item(
                                 direction,
                                 max_gains: None,
                                 stop_loss_override,
-                                take_profit: Some(take_profit),
+                                take_profit,
                             },
                         )?;
                         let event = Event::new("open-position")
                             .add_attribute("direction", direction.as_str())
                             .add_attribute("leverage", leverage.to_string())
                             .add_attribute("collateral", collateral.to_string())
-                            .add_attribute("take_profit", take_profit.to_string())
                             .add_attribute("market", id.id.as_str());
                         let event = if let Some(stop_loss_override) = stop_loss_override {
                             event

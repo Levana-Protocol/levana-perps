@@ -114,6 +114,8 @@ pub enum ExecuteMsg {
         market_id: MarketId,
         /// Message
         message: Box<MarketExecuteMsg>,
+        /// Collateral to use for the action
+        collateral: Option<NonZero<Collateral>>
     },
     /// Perform queue work
     DoWork {},
@@ -245,7 +247,7 @@ pub enum DecMarketItem {
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
         #[serde(alias = "take_profit_override")]
-        take_profit: TakeProfitTrader,
+        take_profit: Option<TakeProfitTrader>,
     },
 }
 
