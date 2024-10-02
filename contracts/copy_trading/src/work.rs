@@ -368,7 +368,8 @@ pub(crate) fn process_queue_item(
                         } else {
                             event
                         };
-                        let sub_msg = SubMsg::reply_on_success(msg, REPLY_ID_OPEN_POSITION);
+                        // let sub_msg = SubMsg::reply_on_success(msg, REPLY_ID_OPEN_POSITION);
+                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
                         let response = response.add_event(event);
                         let response = response.add_submessage(sub_msg);
                         Ok(response)

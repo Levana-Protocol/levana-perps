@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
-use cosmwasm_std::Event;
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use cosmwasm_std::{Addr, Event};
+use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{
+    contracts::{copy_trading::{
         DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId,
         WorkDescription, WorkResp,
-    },
+    }, market::position::PositionId},
     shared::number::{Collateral, NonZero},
 };
 
@@ -116,6 +116,33 @@ fn detect_process_queue_item_work() {
             }
         }
     );
+}
+
+fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+    let token = market.get_copytrading_token().unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    // Needs to compute lp token value for the initial deposit
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
+                token
+            }
+        }
+    );
+
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    // Should not find any work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
 }
 
 #[test]
@@ -276,4 +303,38 @@ fn load_market_after_six_hours() {
             work_description: WorkDescription::LoadMarket {}
         }
     );
+}
+
+#[test]
+fn leader_opens_correct_position() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+    load_markets(&market);
+
+    deposit_money(&market, &trader, "200");
+
+    market.exec_ct_leader("50").unwrap();
+    // market.exec_ct_leader("2.5").unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: WorkDescription::ProcessQueueItem {
+                id: QueuePositionId::DecQueuePositionId(DecQueuePositionId::new(0))
+            }
+        }
+    );
+
+    // Process queue item: Open the position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let position_ids = market.query_position_token_ids(&market.copy_trading_addr).unwrap();
+    let position_ids = position_ids.iter().map(|item| PositionId::new(item.parse().unwrap())).collect::<Vec<_>>();
+    println!("foo: {position_ids:?}");
+
+    // todo: query that market has one position opened
+    // todo: query the remaining collateral
 }
