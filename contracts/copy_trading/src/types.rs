@@ -27,7 +27,7 @@ pub(crate) struct State<'a> {
     pub(crate) config: Config,
     pub(crate) querier: QuerierWrapper<'a, Empty>,
     pub(crate) my_addr: Addr,
-    pub(crate) env: Env
+    pub(crate) env: Env,
 }
 
 /// Total LP share information
