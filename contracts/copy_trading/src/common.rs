@@ -122,20 +122,20 @@ impl<'a> State<'a> {
             crate::state::LAST_MARKET_ADD_CHECK
                 .save(storage, &Timestamp::into(self.env.block.time.into()))?;
             if let Some(last_seen) = start_after {
-                crate::state::LAST_MARKET_ADD_CHECK.save(storage, &self.env.block.time.into())?;
                 crate::state::MARKET_LOADER_STATUS
                     .save(storage, &MarketLoaderStatus::Finished { last_seen })?;
             }
             return Ok(());
-        }
-        let mut last_seen = None;
-        for market in markets {
-            let result = self.load_cache_market_info(storage, &market)?;
-            last_seen = Some(result.id);
-        }
-        if let Some(last_seen) = last_seen {
-            crate::state::MARKET_LOADER_STATUS
-                .save(storage, &MarketLoaderStatus::OnGoing { last_seen })?;
+        } else {
+            let mut last_seen = None;
+            for market in markets {
+                let result = self.load_cache_market_info(storage, &market)?;
+                last_seen = Some(result.id);
+            }
+            if let Some(last_seen) = last_seen {
+                crate::state::MARKET_LOADER_STATUS
+                    .save(storage, &MarketLoaderStatus::OnGoing { last_seen })?;
+            }
         }
         crate::state::LAST_MARKET_ADD_CHECK
             .save(storage, &Timestamp::into(self.env.block.time.into()))?;
