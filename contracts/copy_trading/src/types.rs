@@ -27,6 +27,7 @@ pub(crate) struct State<'a> {
     pub(crate) config: Config,
     pub(crate) querier: QuerierWrapper<'a, Empty>,
     pub(crate) my_addr: Addr,
+    pub(crate) env: Env,
 }
 
 /// Total LP share information
@@ -321,5 +322,27 @@ impl KeyDeserialize for WalletInfo {
         };
 
         Ok(WalletInfo { token, wallet })
+    }
+}
+
+/// Status of the market loader
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+pub enum MarketLoaderStatus {
+    /// Not yet started
+    #[default]
+    NotStarted,
+    /// On going
+    OnGoing { last_seen: MarketId },
+    /// Finished
+    Finished { last_seen: MarketId },
+}
+
+impl Display for MarketLoaderStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MarketLoaderStatus::NotStarted => f.write_str("NotStarted"),
+            MarketLoaderStatus::OnGoing { last_seen } => write!(f, "Ongoing {}", last_seen),
+            MarketLoaderStatus::Finished { last_seen } => write!(f, "Finished {}", last_seen),
+        }
     }
 }

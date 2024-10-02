@@ -1,8 +1,8 @@
 use crate::{
     prelude::*,
     types::{
-        MarketInfo, OneLpTokenValue, OpenPositionsResp, PositionCollateral, State, TokenResp,
-        Totals,
+        MarketInfo, MarketLoaderStatus, OneLpTokenValue, OpenPositionsResp, PositionCollateral,
+        State, TokenResp, Totals,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -15,6 +15,9 @@ use msg::contracts::{
         position::{PositionId, PositionsResp},
     },
 };
+use shared::{namespace::FACTORY_MARKET_LAST_ADDED, time::Timestamp};
+
+pub(crate) const SIX_HOURS_IN_SECONDS: u64 = 6 * 60 * 60;
 
 impl<'a> State<'a> {
     pub(crate) fn to_token(&self, token: &msg::token::Token) -> Result<Token> {
@@ -37,7 +40,8 @@ impl<'a> State<'a> {
                 config,
                 api: deps.api,
                 querier: deps.querier,
-                my_addr: env.contract.address,
+                my_addr: env.contract.address.clone(),
+                env,
             },
             deps.storage,
         ))
@@ -53,29 +57,89 @@ impl<'a> State<'a> {
                 api: deps.api,
                 querier: deps.querier,
                 my_addr: env.contract.address.clone(),
+                env: env.clone(),
             },
             deps.storage,
         ))
     }
 
-    pub(crate) fn load_all_market_ids(&self) -> Result<Vec<MarketId>> {
+    fn load_market_ids(&self, start_after: Option<MarketId>) -> Result<Vec<MarketId>> {
         let factory = &self.config.factory;
-        let mut all_markets = vec![];
-        let mut start_after = None;
-        loop {
-            let MarketsResp { mut markets } = self.querier.query_wasm_smart(
-                factory,
-                &msg::contracts::factory::entry::QueryMsg::Markets {
-                    start_after,
-                    limit: None,
-                },
-            )?;
-            if markets.is_empty() {
-                return Ok(all_markets);
+        let MarketsResp { markets } = self.querier.query_wasm_smart(
+            factory,
+            &msg::contracts::factory::entry::QueryMsg::Markets {
+                start_after,
+                limit: Some(30),
+            },
+        )?;
+        Ok(markets)
+    }
+
+    pub(crate) fn batched_stored_market_info(&self, storage: &mut dyn Storage) -> Result<()> {
+        let status = crate::state::MARKET_LOADER_STATUS
+            .may_load(storage)?
+            .unwrap_or_default();
+        let start_after = match status {
+            MarketLoaderStatus::NotStarted => None,
+            MarketLoaderStatus::OnGoing { last_seen } => Some(last_seen),
+            MarketLoaderStatus::Finished { last_seen } => {
+                // This codepath will only reach when six hours have
+                // exceeded and we want to check if the remote factory
+                // contract has changed.
+                let factory_market_last_added = self.raw_query_last_market_added()?;
+                let last_seen = match factory_market_last_added {
+                    Some(factory_market_last_added) => {
+                        // This codepath will reach when factory added
+                        // some market at some point of time.
+                        let market_added_at =
+                            crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
+                        if let Some(market_added_at) = market_added_at {
+                            if market_added_at < factory_market_last_added {
+                                // Was the factory updated since we last
+                                // loaded market in this contract ?
+                                last_seen
+                            } else {
+                                return Ok(());
+                            }
+                        } else {
+                            bail!("Impossible case: LAST_MARKET_ADD_CHECK is not loaded in finished step")
+                        }
+                    }
+                    None => {
+                        // Remote factory contract doesn't have
+                        // anything set. That means no market was
+                        // newly added since we loaded it last
+                        // time. We return early since we have nothing
+                        // to query and store.
+                        return Ok(());
+                    }
+                };
+                Some(last_seen)
             }
-            start_after = markets.last().cloned();
-            all_markets.append(&mut markets);
+        };
+        let markets = self.load_market_ids(start_after.clone())?;
+        if markets.is_empty() {
+            crate::state::LAST_MARKET_ADD_CHECK
+                .save(storage, &Timestamp::into(self.env.block.time.into()))?;
+            if let Some(last_seen) = start_after {
+                crate::state::MARKET_LOADER_STATUS
+                    .save(storage, &MarketLoaderStatus::Finished { last_seen })?;
+            }
+            return Ok(());
+        } else {
+            let mut last_seen = None;
+            for market in markets {
+                let result = self.load_cache_market_info(storage, &market)?;
+                last_seen = Some(result.id);
+            }
+            if let Some(last_seen) = last_seen {
+                crate::state::MARKET_LOADER_STATUS
+                    .save(storage, &MarketLoaderStatus::OnGoing { last_seen })?;
+            }
         }
+        crate::state::LAST_MARKET_ADD_CHECK
+            .save(storage, &Timestamp::into(self.env.block.time.into()))?;
+        Ok(())
     }
 
     /// Returns true if loaded from the cache.
@@ -150,23 +214,41 @@ impl<'a> State<'a> {
             crate::state::MARKETS
                 .save(storage, &market.id, &market)
                 .context("Could not save cached markets info")?;
+            let token = self.to_token(&market.token)?;
+            crate::state::MARKETS_TOKEN.save(storage, (token, market.id.clone()), &market)?;
         }
         Ok(market)
     }
 
-    pub(crate) fn get_full_token_info(
+    pub(crate) fn raw_query_last_market_added(&self) -> Result<Option<Timestamp>> {
+        let contract = &self.config.factory;
+        let key = FACTORY_MARKET_LAST_ADDED.as_bytes().to_vec();
+        let result = self.querier.query_wasm_raw(contract, key)?;
+        match result {
+            Some(result) => {
+                let time = cosmwasm_std::from_json(result.as_slice())?;
+                Ok(Some(time))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub(crate) fn get_first_full_token_info(
         &self,
         storage: &mut dyn Storage,
         token: &Token,
     ) -> Result<msg::token::Token> {
-        let markets = self.load_all_market_ids()?;
-        for market_id in markets {
-            let market_info = self.load_cache_market_info(storage, &market_id)?;
-            if token.is_same(&market_info.token) {
-                return Ok(market_info.token);
+        let market = crate::state::MARKETS_TOKEN
+            .prefix(token.clone())
+            .range(storage, None, None, cosmwasm_std::Order::Ascending)
+            .next();
+        match market {
+            Some(market_info) => {
+                let (_, market_info) = market_info?;
+                Ok(market_info.token)
             }
+            None => Err(anyhow!("{token} not supported by factory")),
         }
-        Err(anyhow!("{token} not supported by factory"))
     }
 
     pub(crate) fn load_market_ids_with_token(
@@ -174,13 +256,16 @@ impl<'a> State<'a> {
         storage: &mut dyn Storage,
         token: &Token,
     ) -> Result<Vec<MarketInfo>> {
-        let markets = self.load_all_market_ids()?;
+        let markets = crate::state::MARKETS_TOKEN.prefix(token.clone()).range(
+            storage,
+            None,
+            None,
+            Order::Ascending,
+        );
         let mut result = vec![];
-        for market_id in markets {
-            let market_info = self.load_cache_market_info(storage, &market_id)?;
-            if token.is_same(&market_info.token) {
-                result.push(market_info);
-            }
+        for market in markets {
+            let (_, market_info) = market?;
+            result.push(market_info);
         }
         Ok(result)
     }

@@ -2,6 +2,7 @@ use anyhow::bail;
 use cosmwasm_std::CosmosMsg;
 
 use crate::{
+    common::SIX_HOURS_IN_SECONDS,
     prelude::*,
     types::{State, WalletInfo},
 };
@@ -88,6 +89,43 @@ fn get_work_from_dec_queue(
 }
 
 pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp> {
+    let market_status = crate::state::MARKET_LOADER_STATUS.may_load(storage)?;
+    match market_status {
+        Some(market_status) => match market_status {
+            crate::types::MarketLoaderStatus::NotStarted => {
+                return Ok(WorkResp::HasWork {
+                    work_description: WorkDescription::LoadMarket {},
+                })
+            }
+            crate::types::MarketLoaderStatus::OnGoing { .. } => {
+                return Ok(WorkResp::HasWork {
+                    work_description: WorkDescription::LoadMarket {},
+                })
+            }
+            crate::types::MarketLoaderStatus::Finished { .. } => {
+                let now = state.env.block.time;
+                let last_seen = crate::state::LAST_MARKET_ADD_CHECK.may_load(storage)?;
+                match last_seen {
+                    Some(last_seen) => {
+                        if last_seen.plus_seconds(SIX_HOURS_IN_SECONDS) < now.into() {
+                            return Ok(WorkResp::HasWork {
+                                work_description: WorkDescription::LoadMarket {},
+                            });
+                        }
+                    }
+                    None => bail!(
+                        "Impossible: LAST_MARKET_ADD_CHECK uninitialized during Finished status"
+                    ),
+                }
+            }
+        },
+        None => {
+            return Ok(WorkResp::HasWork {
+                work_description: WorkDescription::LoadMarket {},
+            })
+        }
+    }
+
     let inc_queue = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
     let dec_queue = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     let next_inc_queue_position = match inc_queue {
@@ -242,7 +280,7 @@ pub(crate) fn process_queue_item(
                     };
                     let token_value = state.load_lp_token_value(storage, &wallet_info.token)?;
                     let funds = token_value.shares_to_collateral(shares)?;
-                    let token = state.get_full_token_info(storage, &wallet_info.token)?;
+                    let token = state.get_first_full_token_info(storage, &wallet_info.token)?;
                     let withdraw_msg = token.into_transfer_msg(&wallet_info.wallet, funds)?;
 
                     let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;

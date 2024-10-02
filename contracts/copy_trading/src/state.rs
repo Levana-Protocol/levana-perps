@@ -1,8 +1,10 @@
+use shared::time::Timestamp;
+
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo, Totals,
-        WalletInfo,
+        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketLoaderStatus,
+        MarketWorkInfo, Totals, WalletInfo,
     },
 };
 
@@ -55,3 +57,12 @@ pub(crate) const MARKET_WORK_INFO: Map<&MarketId, MarketWorkInfo> = Map::new("ma
 
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
+
+/// Local cache of markets information
+pub(crate) const MARKETS_TOKEN: Map<(Token, MarketId), MarketInfo> = Map::new("markets-token");
+
+/// When did we last query the list of markets from the factory? Needed to efficiently check if a new market was added.
+pub(crate) const LAST_MARKET_ADD_CHECK: Item<Timestamp> = Item::new("last-market-add-check");
+
+/// Status of the market loader
+pub(crate) const MARKET_LOADER_STATUS: Item<MarketLoaderStatus> = Item::new("market-loader-status");
