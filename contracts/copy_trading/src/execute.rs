@@ -164,6 +164,7 @@ fn execute_leader_msg(
     let token = state.to_token(&market_info.token)?;
     match *message {
         MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
+        // implement
         MarketExecuteMsg::Receive { .. } => not_supported_response("receive"),
         MarketExecuteMsg::OpenPosition {
             slippage_assert,
@@ -213,30 +214,40 @@ fn execute_leader_msg(
                     .add_attribute("collateral", collateral.to_string()),
             ))
         }
+        // decrea coll
         MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => todo!(),
+        // dec collater
         MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
             id,
             slippage_assert,
         } => todo!(),
+        // increase coll
         MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => todo!(),
+        // increas
         MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
             id,
             amount,
             slippage_assert,
         } => todo!(),
+        // no impact on collateral. only impatcs notional size.
         MarketExecuteMsg::UpdatePositionLeverage {
             id,
             leverage,
             slippage_assert,
         } => todo!(),
+        // no impact. todo: look through the codebase.
         MarketExecuteMsg::UpdatePositionMaxGains { id, max_gains } => todo!(),
+        //
         MarketExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => todo!(),
+        // no impact
         MarketExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => todo!(),
+        // no impact.
         MarketExecuteMsg::SetTriggerOrder {
             id,
             stop_loss_override,
             take_profit,
         } => todo!(),
+        // reduces collateral
         MarketExecuteMsg::PlaceLimitOrder {
             trigger_price,
             leverage,
@@ -245,29 +256,45 @@ fn execute_leader_msg(
             stop_loss_override,
             take_profit,
         } => todo!(),
+        // increse collateral
         MarketExecuteMsg::CancelLimitOrder { order_id } => todo!(),
+        // increase or leave it exactly same.
         MarketExecuteMsg::ClosePosition {
             id,
             slippage_assert,
         } => todo!(),
+        // not allowed
         MarketExecuteMsg::DepositLiquidity { stake_to_xlp } => todo!(),
+        // not allowed
         MarketExecuteMsg::ReinvestYield {
             stake_to_xlp,
             amount,
         } => todo!(),
+        // not allowed
         MarketExecuteMsg::WithdrawLiquidity { lp_amount } => todo!(),
+        // not allowed
         MarketExecuteMsg::ClaimYield {} => todo!(),
+        // not allowed
         MarketExecuteMsg::StakeLp { amount } => todo!(),
+        // not allowed
         MarketExecuteMsg::UnstakeXlp { amount } => todo!(),
         MarketExecuteMsg::StopUnstakingXlp {} => todo!(),
         MarketExecuteMsg::CollectUnstakedLp {} => todo!(),
+        // not allowed
         MarketExecuteMsg::Crank { execs, rewards } => todo!(),
+        // disallow this
         MarketExecuteMsg::NftProxy { sender, msg } => todo!(),
+        // not allowed
         MarketExecuteMsg::LiquidityTokenProxy { sender, kind, msg } => todo!(),
+        // not allowed
         MarketExecuteMsg::TransferDaoFees {} => todo!(),
+        // not allowed
         MarketExecuteMsg::CloseAllPositions {} => todo!(),
+        // not allowed
         MarketExecuteMsg::ProvideCrankFunds {} => todo!(),
+        // not allowed
         MarketExecuteMsg::SetManualPrice { price, price_usd } => todo!(),
+        // not allowed
         MarketExecuteMsg::PerformDeferredExec {
             id,
             price_point_timestamp,
