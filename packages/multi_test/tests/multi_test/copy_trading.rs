@@ -258,8 +258,11 @@ fn do_withdraw() {
     let queue_resp = market
         .query_copy_trading_queue_status(trader.into(), None, None)
         .unwrap();
-    assert_eq!(queue_resp.items.len(), 1);
-    assert_eq!(queue_resp.items[0].status, ProcessingStatus::Finished);
+    assert_eq!(queue_resp.items.len(), 3);
+    assert!(queue_resp
+        .items
+        .iter()
+        .all(|item| item.status == ProcessingStatus::Finished));
 }
 
 #[test]
