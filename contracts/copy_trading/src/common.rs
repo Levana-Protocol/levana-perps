@@ -454,7 +454,6 @@ pub(crate) fn get_current_processed_dec_queue_id(
 ) -> Result<(DecQueuePositionId, DecQueuePosition)> {
     let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     let queue_id = match queue_id {
-        // todo: write test by having more than one items in decrement queue
         Some(queue_id) => queue_id.next(),
         None => DecQueuePositionId::new(0),
     };
