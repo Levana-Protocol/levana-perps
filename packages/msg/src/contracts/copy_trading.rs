@@ -3,7 +3,7 @@
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
 use super::market::entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
@@ -63,6 +63,14 @@ impl Config {
         } else {
             Ok(())
         }
+    }
+
+    /// Check leader
+    pub fn check_leader(&self, sender: &Addr) -> anyhow::Result<()> {
+        if self.leader != sender {
+            bail!("Unautorized access, only {} allowed", self.leader)
+        }
+        Ok(())
     }
 }
 

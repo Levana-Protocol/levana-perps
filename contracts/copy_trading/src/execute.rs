@@ -3,7 +3,7 @@ use crate::{
     prelude::*,
     types::{
         DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
-        OneLpTokenValue, ProcessingStatus, State, WalletInfo, WorkResponse,
+        OneLpTokenValue, ProcessingStatus, State, WalletInfo,
     },
     work::{get_work, process_queue_item},
 };
@@ -138,8 +138,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             message,
             collateral,
         } => {
+            state.config.check_leader(&sender)?;
             funds.require_none()?;
-            // todo: assert that it is executed by leader
             execute_leader_msg(storage, &state, market_id, message, collateral)
         }
         _ => panic!("Not implemented yet"),
@@ -168,7 +168,7 @@ fn execute_leader_msg(
     match *message {
         MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
         // implement
-        MarketExecuteMsg::Receive { .. } => not_supported_response("receive"),
+        MarketExecuteMsg::Receive { .. } => todo!(),
         MarketExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
@@ -177,8 +177,6 @@ fn execute_leader_msg(
             stop_loss_override,
             take_profit,
         } => {
-            // todo: validation
-            // todo: assert is leader at a higher stage
             let collateral = match collateral {
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for opening position"),
@@ -224,90 +222,49 @@ fn execute_leader_msg(
             ))
         }
         // decrea coll
-        MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => todo!(),
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { .. } => todo!(),
         // dec collater
-        MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
-            id,
-            slippage_assert,
-        } => todo!(),
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactSize { .. } => todo!(),
         // increase coll
-        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => todo!(),
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => todo!(),
         // increas
-        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
-            id,
-            amount,
-            slippage_assert,
-        } => todo!(),
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => todo!(),
         // no impact on collateral. only impatcs notional size.
-        MarketExecuteMsg::UpdatePositionLeverage {
-            id,
-            leverage,
-            slippage_assert,
-        } => todo!(),
+        MarketExecuteMsg::UpdatePositionLeverage { .. } => todo!(),
         // no impact. todo: look through the codebase.
-        MarketExecuteMsg::UpdatePositionMaxGains { id, max_gains } => todo!(),
+        MarketExecuteMsg::UpdatePositionMaxGains { .. } => todo!(),
         //
-        MarketExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => todo!(),
+        MarketExecuteMsg::UpdatePositionTakeProfitPrice { .. } => todo!(),
         // no impact
-        MarketExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => todo!(),
+        MarketExecuteMsg::UpdatePositionStopLossPrice { .. } => todo!(),
         // no impact.
-        MarketExecuteMsg::SetTriggerOrder {
-            id,
-            stop_loss_override,
-            take_profit,
-        } => todo!(),
+        MarketExecuteMsg::SetTriggerOrder { .. } => todo!(),
         // reduces collateral
-        MarketExecuteMsg::PlaceLimitOrder {
-            trigger_price,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit,
-        } => todo!(),
+        MarketExecuteMsg::PlaceLimitOrder { .. } => todo!(),
         // increse collateral
-        MarketExecuteMsg::CancelLimitOrder { order_id } => todo!(),
+        MarketExecuteMsg::CancelLimitOrder { .. } => todo!(),
         // increase or leave it exactly same.
-        MarketExecuteMsg::ClosePosition {
-            id,
-            slippage_assert,
-        } => todo!(),
-        // not allowed
-        MarketExecuteMsg::DepositLiquidity { stake_to_xlp } => todo!(),
-        // not allowed
-        MarketExecuteMsg::ReinvestYield {
-            stake_to_xlp,
-            amount,
-        } => todo!(),
-        // not allowed
-        MarketExecuteMsg::WithdrawLiquidity { lp_amount } => todo!(),
-        // not allowed
-        MarketExecuteMsg::ClaimYield {} => todo!(),
-        // not allowed
-        MarketExecuteMsg::StakeLp { amount } => todo!(),
-        // not allowed
-        MarketExecuteMsg::UnstakeXlp { amount } => todo!(),
-        MarketExecuteMsg::StopUnstakingXlp {} => todo!(),
-        MarketExecuteMsg::CollectUnstakedLp {} => todo!(),
-        // not allowed
-        MarketExecuteMsg::Crank { execs, rewards } => todo!(),
-        // disallow this
-        MarketExecuteMsg::NftProxy { sender, msg } => todo!(),
-        // not allowed
-        MarketExecuteMsg::LiquidityTokenProxy { sender, kind, msg } => todo!(),
-        // not allowed
-        MarketExecuteMsg::TransferDaoFees {} => todo!(),
-        // not allowed
-        MarketExecuteMsg::CloseAllPositions {} => todo!(),
-        // not allowed
-        MarketExecuteMsg::ProvideCrankFunds {} => todo!(),
-        // not allowed
-        MarketExecuteMsg::SetManualPrice { price, price_usd } => todo!(),
-        // not allowed
-        MarketExecuteMsg::PerformDeferredExec {
-            id,
-            price_point_timestamp,
-        } => todo!(),
+        MarketExecuteMsg::ClosePosition { .. } => todo!(),
+        MarketExecuteMsg::DepositLiquidity { .. } => not_supported_response("deposit-liqudiity"),
+        MarketExecuteMsg::ReinvestYield { .. } => not_supported_response("reinvest yield"),
+        MarketExecuteMsg::WithdrawLiquidity { .. } => not_supported_response("withdraw-liquidity"),
+        MarketExecuteMsg::ClaimYield {} => not_supported_response("claim-yield"),
+        MarketExecuteMsg::StakeLp { .. } => not_supported_response("stake-lp"),
+        MarketExecuteMsg::UnstakeXlp { .. } => not_supported_response("unstake-xlp"),
+        MarketExecuteMsg::StopUnstakingXlp {} => not_supported_response("stop-unstaking-xlp"),
+        MarketExecuteMsg::CollectUnstakedLp {} => not_supported_response("collect-unstaked-lp"),
+        MarketExecuteMsg::Crank { .. } => not_supported_response("crank"),
+        MarketExecuteMsg::NftProxy { .. } => not_supported_response("nft-proxy"),
+        MarketExecuteMsg::LiquidityTokenProxy { .. } => {
+            not_supported_response("liquidity-token-proxy")
+        }
+        MarketExecuteMsg::TransferDaoFees {} => not_supported_response("transfer-dao-fees"),
+        MarketExecuteMsg::CloseAllPositions {} => not_supported_response("close-all-positions"),
+        MarketExecuteMsg::ProvideCrankFunds {} => not_supported_response("provide-crank-funds"),
+        MarketExecuteMsg::SetManualPrice { .. } => not_supported_response("set-manual-price"),
+        MarketExecuteMsg::PerformDeferredExec { .. } => {
+            not_supported_response("perform-deferred-exec")
+        }
     }
 }
 

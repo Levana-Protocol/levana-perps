@@ -453,7 +453,7 @@ fn withdraw_bug_perp_4159() {
 
     // Does full withdrawal
     market.exec_copytrading_do_work(&trader).unwrap();
-    // todo: This should not fail making the queue stuck!
+    // This should not fail making the queue stuck!
     market.exec_copytrading_do_work(&trader).unwrap();
     // There should be no work now
     let work = market.query_copy_trading_work().unwrap();
