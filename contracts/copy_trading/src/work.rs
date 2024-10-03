@@ -333,7 +333,7 @@ pub(crate) fn process_queue_item(
                     };
                     Ok(response)
                 }
-                DecQueueItem::MarketItem { id, token: _, item } => match item {
+                DecQueueItem::MarketItem { id, token, item } => match item {
                     DecMarketItem::OpenPosition {
                         slippage_assert,
                         leverage,
@@ -357,6 +357,7 @@ pub(crate) fn process_queue_item(
                                 take_profit,
                             },
                         )?;
+                        let mut totals = crate::state::TOTALS.may_load(storage, &token)?.context("TOTALS store is empty")?;
                         let event = Event::new("open-position")
                             .add_attribute("direction", direction.as_str())
                             .add_attribute("leverage", leverage.to_string())
@@ -368,8 +369,14 @@ pub(crate) fn process_queue_item(
                         } else {
                             event
                         };
-                        // let sub_msg = SubMsg::reply_on_success(msg, REPLY_ID_OPEN_POSITION);
-                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
+                        // todo: Check if we have available collateral
+                        // If not, we should fail by updating the status of the queue
+                        // todo: fix failing test!
+
+                        totals.collateral = totals.collateral.checked_sub(collateral.raw())?;
+
+                        let sub_msg = SubMsg::reply_on_success(msg, REPLY_ID_OPEN_POSITION);
+                        // let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
                         let response = response.add_event(event);
                         let response = response.add_submessage(sub_msg);
                         Ok(response)
