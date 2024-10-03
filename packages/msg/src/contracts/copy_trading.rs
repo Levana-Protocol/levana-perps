@@ -151,10 +151,10 @@ pub enum QueryMsg {
     /// Check the status of the copy trading contract for all the
     /// markets that it's trading on
     ///
-    /// Returns [StatusResp]
-    Status {
+    /// Returns [LeaderStatusResp]
+    LeaderStatus {
         /// Value from [BalanceResp::next_start_after]
-        start_after: Option<MarketId>,
+        start_after: Option<Token>,
         /// How many values to return
         limit: Option<u32>,
     },
@@ -248,6 +248,26 @@ impl DecQueueItem {
             DecQueueItem::OpenPosition {} => RequiresToken::NoToken {},
         }
     }
+}
+
+/// Individual market response from [QueryMsg::Status]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct LeaderStatusResp {
+    /// Tokens for the leader
+    pub tokens: Vec<TokenStatus>,
+}
+
+/// Individual market response from [QueryMsg::Status]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct TokenStatus {
+    /// Token
+    pub token: Token,
+    /// Available collateral for the leader
+    pub collateral: Collateral,
+    /// Total shares so far. Represents AUM.
+    pub shares: LpToken,
 }
 
 /// Individual market response from [QueryMsg::Status]
@@ -368,6 +388,17 @@ impl KeyDeserialize for Token {
                 ))
             }
         };
+        Ok(token)
+    }
+}
+
+impl KeyDeserialize for &Token {
+    type Output = Token;
+
+    const KEY_ELEMS: u16 = 2;
+
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        let token = <Token as KeyDeserialize>::from_vec(value)?;
         Ok(token)
     }
 }
