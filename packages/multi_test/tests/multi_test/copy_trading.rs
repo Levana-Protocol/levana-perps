@@ -326,3 +326,33 @@ fn query_leader_tokens() {
     assert_eq!(tokens[0].collateral, "50".parse().unwrap());
     assert_eq!(tokens[0].shares, "100".parse().unwrap());
 }
+
+#[test]
+fn withdraw_bug_perp_4159() {
+     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    // Issue full withdrawal
+    market.exec_copytrading_withdrawal(&trader, "100").unwrap();
+    // You can still issue full withdrawal since withdrawal action has not been executed yet
+    market.exec_copytrading_withdrawal(&trader, "100").unwrap();
+
+    // Does full withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // todo: This should not fail making the queue stuck!
+    market.exec_copytrading_do_work(&trader).unwrap_err();
+    // There should be no work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+}

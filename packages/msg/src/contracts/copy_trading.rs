@@ -213,6 +213,14 @@ pub enum FailedReason {
         /// Requested collateral
         funds: NonZero<Collateral>,
     },
+    /// Wallet does not have enough shares
+    #[error("Shares not available. Requested {requested}, but only available {available}")]
+    NotEnoughShares {
+        /// Available shares
+        available: LpToken,
+        /// Requested shares
+        requested: LpToken
+    },
 }
 
 /// Queue Item
