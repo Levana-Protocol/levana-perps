@@ -199,14 +199,14 @@ fn execute_leader_msg(
                 item: copy_trading::DecQueueItem::MarketItem {
                     id: market_id,
                     token,
-                    item: DecMarketItem::OpenPosition {
+                    item: Box::new(DecMarketItem::OpenPosition {
                         collateral,
                         slippage_assert,
                         leverage,
                         direction,
                         stop_loss_override,
                         take_profit,
-                    },
+                    }),
                 },
                 status: copy_trading::ProcessingStatus::InProgress,
                 wallet: state.config.leader.clone(),
@@ -379,9 +379,9 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
             crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
             crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
-            return Ok(Response::new().add_event(
+            Ok(Response::new().add_event(
                 Event::new("handle-deferred-exec-id").add_attribute("success", true.to_string()),
-            ));
+            ))
         }
         DeferredExecStatus::Failure {
             reason,
@@ -398,9 +398,9 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
             crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
             crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
-            return Ok(Response::new().add_event(
+            Ok(Response::new().add_event(
                 Event::new("handle-deferred-exec-id").add_attribute("success", false.to_string()),
-            ));
+            ))
         }
     }
 }

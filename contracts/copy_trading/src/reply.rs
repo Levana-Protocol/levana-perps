@@ -48,7 +48,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 let mut totals = crate::state::TOTALS
                     .may_load(storage, &token)?
                     .context("TOTALS store is empty")?;
-                match item {
+                match *item {
                     DecMarketItem::OpenPosition { collateral, .. } => {
                         totals.collateral = totals.collateral.checked_add(collateral.raw())?;
                         crate::state::TOTALS.save(storage, &token, &totals)?;

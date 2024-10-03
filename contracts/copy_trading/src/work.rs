@@ -1,9 +1,6 @@
 use anyhow::bail;
 use cosmwasm_std::SubMsg;
-use msg::contracts::{
-    copy_trading,
-    market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
-};
+use msg::contracts::{copy_trading, market::deferred_execution::GetDeferredExecResp};
 
 use crate::{
     common::{get_current_processed_dec_queue_id, SIX_HOURS_IN_SECONDS},
@@ -420,7 +417,7 @@ pub(crate) fn process_queue_item(
                     )?;
                     Ok(response)
                 }
-                DecQueueItem::MarketItem { id, token, item } => match item {
+                DecQueueItem::MarketItem { id, token, item } => match *item {
                     DecMarketItem::OpenPosition {
                         slippage_assert,
                         leverage,

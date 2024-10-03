@@ -293,7 +293,7 @@ pub enum FailedReason {
         executed: Timestamp,
         /// Price point when it was cranked, if applicable
         crank_price: Option<PricePoint>,
-    }
+    },
 }
 
 /// Queue Item
@@ -309,7 +309,7 @@ pub enum QueueItem {
     /// Item that will lead to decrease of collateral
     DecCollateral {
         /// Item type
-        item: DecQueueItem,
+        item: Box<DecQueueItem>,
         /// Queue position id
         id: DecQueuePositionId,
     },
@@ -344,7 +344,7 @@ pub enum DecQueueItem {
         /// Market token
         token: Token,
         /// Market item
-        item: DecMarketItem,
+        item: Box<DecMarketItem>,
     },
 }
 
@@ -394,7 +394,7 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::MarketItem { token, item, .. } => match item {
+            DecQueueItem::MarketItem { token, item, .. } => match *item {
                 DecMarketItem::OpenPosition { .. } => RequiresToken::Token { token },
             },
         }
