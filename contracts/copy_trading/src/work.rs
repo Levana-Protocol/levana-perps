@@ -1,5 +1,6 @@
 use anyhow::bail;
 use cosmwasm_std::CosmosMsg;
+use msg::contracts::copy_trading;
 
 use crate::{
     common::SIX_HOURS_IN_SECONDS,
@@ -226,10 +227,10 @@ pub(crate) fn process_queue_item(
 ) -> Result<(Event, Option<CosmosMsg>)> {
     match id {
         QueuePositionId::IncQueuePositionId(id) => {
-            let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
+            let mut queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
                 .may_load(storage, &id)?
                 .context("PENDING_QUEUE_ITEMS load failed")?;
-            match queue_item.item {
+            match queue_item.item.clone() {
                 IncQueueItem::Deposit { funds, token } => {
                     let mut totals = crate::state::TOTALS
                         .may_load(storage, &token)
@@ -240,15 +241,17 @@ pub(crate) fn process_queue_item(
                     crate::state::TOTALS.save(storage, &token, &totals)?;
                     let wallet_info = WalletInfo {
                         token,
-                        wallet: queue_item.wallet,
+                        wallet: queue_item.wallet.clone(),
                     };
                     let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
                     let new_shares = match shares {
                         Some(shares) => shares.checked_add(new_shares.raw())?,
                         None => new_shares,
                     };
+                    queue_item.status = copy_trading::ProcessingStatus::Finished;
                     crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
                     crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &id)?;
+                    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &id, &queue_item)?;
                     let event = Event::new("deposit")
                         .add_attribute("funds", funds.to_string())
                         .add_attribute("shares", new_shares.to_string());
@@ -257,15 +260,15 @@ pub(crate) fn process_queue_item(
             }
         }
         QueuePositionId::DecQueuePositionId(id) => {
-            let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
+            let mut queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
                 .may_load(storage, &id)?
                 .context("COLLATERAL_DECREASE_QUEUE load failed")?;
-            match queue_item.item {
+            match queue_item.item.clone() {
                 DecQueueItem::Withdrawal { tokens, token } => {
                     let shares = tokens;
                     let wallet_info = WalletInfo {
                         token,
-                        wallet: queue_item.wallet,
+                        wallet: queue_item.wallet.clone(),
                     };
                     let actual_shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
                     // This is a sanity check. This should never happen.
@@ -313,15 +316,20 @@ pub(crate) fn process_queue_item(
                     let withdraw_msg = match withdraw_msg {
                         Some(withdraw_msg) => {
                             pending_store_update()?;
+                            queue_item.status = copy_trading::ProcessingStatus::Finished;
                             Some(withdraw_msg)
                         }
                         None => {
                             // Collateral amount is less than chain's minimum representation.
                             // So, we do nothing. We just move on to the next item in the queue.
                             event = event.add_attribute("funds-less-min-chain", true.to_string());
+                            queue_item.status = copy_trading::ProcessingStatus::Failed(
+                                FailedReason::FundLessThanMinChain { funds },
+                            );
                             None
                         }
                     };
+                    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &id, &queue_item)?;
                     Ok((event, withdraw_msg))
                 }
                 DecQueueItem::OpenPosition {} => todo!(),

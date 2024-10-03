@@ -3,6 +3,7 @@ use std::fmt::Display;
 use cosmwasm_std::{StdError, StdResult};
 use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
+use msg::contracts::copy_trading;
 use msg::contracts::market::{
     deferred_execution::DeferredExecId,
     order::OrderId,
@@ -205,37 +206,47 @@ impl LpTokenStatus {
 }
 
 /// Queue position pertaining to [crate::state::COLLATERAL_INCREASE_QUEUE]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub(crate) struct IncQueuePosition {
     /// Queue item that needs to be processed
     pub(crate) item: IncQueueItem,
     /// Wallet that initiated the specific item action
     pub(crate) wallet: Addr,
+    /// Processing status
+    pub(crate) status: copy_trading::ProcessingStatus,
 }
 
 /// Queue position pertaining to [crate::state::COLLATERAL_DECREASE_QUEUE]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub(crate) struct DecQueuePosition {
     /// Queue item that needs to be processed
     pub(crate) item: DecQueueItem,
     /// Wallet that initiated the specific item action
     pub(crate) wallet: Addr,
+    /// Processing status
+    pub(crate) status: copy_trading::ProcessingStatus,
 }
 
 impl DecQueuePosition {
-    pub fn into_queue_item(self, id: DecQueuePositionId) -> QueueItem {
-        QueueItem::DecCollateral {
-            item: self.item,
-            id,
+    pub fn into_queue_item(self, id: DecQueuePositionId) -> QueueItemStatus {
+        QueueItemStatus {
+            item: QueueItem::DecCollateral {
+                item: self.item,
+                id,
+            },
+            status: self.status,
         }
     }
 }
 
 impl IncQueuePosition {
-    pub fn into_queue_item(self, id: IncQueuePositionId) -> QueueItem {
-        QueueItem::IncCollaleteral {
-            item: self.item,
-            id,
+    pub fn into_queue_item(self, id: IncQueuePositionId) -> QueueItemStatus {
+        QueueItemStatus {
+            item: QueueItem::IncCollaleteral {
+                item: self.item,
+                id,
+            },
+            status: self.status,
         }
     }
 }
