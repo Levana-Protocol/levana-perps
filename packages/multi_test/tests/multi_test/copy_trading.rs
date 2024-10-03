@@ -1,11 +1,15 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Event};
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::{copy_trading::{
-        DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem, QueueItemStatus, QueuePositionId, WorkDescription, WorkResp
-    }, market::position::PositionId},
+    contracts::{
+        copy_trading::{
+            DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem,
+            QueueItemStatus, QueuePositionId, WorkDescription, WorkResp,
+        },
+        market::position::PositionId,
+    },
     shared::number::{Collateral, NonZero},
 };
 
@@ -30,11 +34,10 @@ fn deposit() {
         .unwrap();
 
     let response = market
-        .query_copy_trading_queue_status(trader.into(), None, None)
+        .query_copy_trading_queue_status(trader.into())
         .unwrap();
     assert_eq!(response.items.len(), 1);
     let item = &response.items[0];
-
 
     assert_eq!(
         item,
@@ -184,7 +187,7 @@ fn do_actual_deposit() {
     assert!(balance.balance.is_empty());
 
     let queue_resp = market
-        .query_copy_trading_queue_status(trader.into(), None, None)
+        .query_copy_trading_queue_status(trader.into())
         .unwrap();
     assert_eq!(queue_resp.items.len(), 1);
     assert_eq!(queue_resp.items[0].status, ProcessingStatus::Finished);
@@ -283,7 +286,7 @@ fn do_withdraw() {
     assert_eq!(work, WorkResp::NoWork);
 
     let queue_resp = market
-        .query_copy_trading_queue_status(trader.into(), None, None)
+        .query_copy_trading_queue_status(trader.into())
         .unwrap();
     assert_eq!(queue_resp.items.len(), 3);
     assert!(queue_resp
@@ -362,6 +365,8 @@ fn leader_opens_correct_position() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+
     load_markets(&market);
 
     deposit_money(&market, &trader, "200");
@@ -369,6 +374,7 @@ fn leader_opens_correct_position() {
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "200".parse().unwrap());
 
+    // Leader queues to open a new position
     market.exec_ct_leader("50").unwrap();
     // market.exec_ct_leader("2.5").unwrap();
     let work = market.query_copy_trading_work().unwrap();
@@ -385,13 +391,25 @@ fn leader_opens_correct_position() {
     market.exec_copytrading_do_work(&trader).unwrap();
     market.exec_crank_till_finished(&lp).unwrap();
 
-    let position_ids = market.query_position_token_ids(&market.copy_trading_addr).unwrap();
-    let position_ids = position_ids.iter().map(|item| PositionId::new(item.parse().unwrap())).collect::<Vec<_>>();
+    let position_ids = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap();
+    let position_ids = position_ids
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
     assert!(position_ids.len() == 1);
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "150".parse().unwrap());
+
+    let items = market
+        .query_copy_trading_queue_status(leader.into())
+        .unwrap();
+    // We don't know if we were able to successfully finish
+    assert!(items.items.iter().any(|item| item.status.pending()))
+    // todo: Figure out what should be the proper next step
 }
 
 #[test]
@@ -424,7 +442,7 @@ fn withdraw_bug_perp_4159() {
     assert_eq!(work, WorkResp::NoWork);
 
     let items = market
-        .query_copy_trading_queue_status(trader.into(), None, None)
+        .query_copy_trading_queue_status(trader.into())
         .unwrap();
     // The invalid withdrawal failed
     assert!(items.items.iter().any(|item| item.status.failed()))

@@ -211,6 +211,16 @@ impl ProcessingStatus {
             ProcessingStatus::InProgress => false,
         }
     }
+
+    /// Is any status pending ?
+    pub fn pending(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => true,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => false,
+            ProcessingStatus::InProgress => true,
+        }
+    }
 }
 
 /// Failure reason on why queue processing failed
