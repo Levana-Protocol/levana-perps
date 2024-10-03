@@ -1,8 +1,8 @@
 use crate::{
     prelude::*,
     types::{
-        MarketInfo, MarketLoaderStatus, OneLpTokenValue, OpenPositionsResp, PositionCollateral,
-        State, TokenResp, Totals,
+        DecQueuePosition, MarketInfo, MarketLoaderStatus, OneLpTokenValue, OpenPositionsResp,
+        PositionCollateral, State, TokenResp, Totals,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -447,4 +447,21 @@ pub(crate) fn get_next_dec_queue_id(storage: &mut dyn Storage) -> Result<DecQueu
     };
     crate::state::LAST_INSERTED_DEC_QUEUE_ID.save(storage, &queue_id)?;
     Ok(queue_id)
+}
+
+pub(crate) fn get_current_processed_dec_queue_id(
+    storage: &dyn Storage,
+) -> Result<(DecQueuePositionId, DecQueuePosition)> {
+    let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
+    let queue_id = match queue_id {
+        // todo: write test by having more than one items in decrement queue
+        Some(queue_id) => queue_id.next(),
+        None => DecQueuePositionId::new(0),
+    };
+    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
+    let queue_item = match queue_item {
+        Some(queue_item) => queue_item,
+        None => bail!("Impossible: Work handle not able to find queue item"),
+    };
+    Ok((queue_id, queue_item))
 }

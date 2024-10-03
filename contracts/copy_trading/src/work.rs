@@ -1,12 +1,15 @@
 use anyhow::bail;
-use cosmwasm_std::{CosmosMsg, SubMsg};
-use msg::contracts::copy_trading;
+use cosmwasm_std::SubMsg;
+use msg::contracts::{
+    copy_trading,
+    market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
+};
 
 use crate::{
-    common::SIX_HOURS_IN_SECONDS,
+    common::{get_current_processed_dec_queue_id, SIX_HOURS_IN_SECONDS},
     prelude::*,
     reply::REPLY_ID_OPEN_POSITION,
-    types::{State, WalletInfo, WorkResponse},
+    types::{State, WalletInfo},
 };
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
@@ -35,8 +38,30 @@ fn get_work_from_dec_queue(
                             let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
                                 .may_load(storage)?
                                 .flatten();
-                            if let Some(_) = deferred_exec_id {
-                                // todo: Do query here and ensure that it is not pending.
+                            if let Some(deferred_exec_id) = deferred_exec_id {
+                                let (_queue_id, queue_item) =
+                                    get_current_processed_dec_queue_id(storage)?;
+                                let market_id = match queue_item.item.clone() {
+                                    DecQueueItem::MarketItem { id, .. } => id,
+                                    _ => bail!(
+                                        "Impossible: Deferred work handler got non market item"
+                                    ),
+                                };
+                                let market_addr = crate::state::MARKETS
+                                    .may_load(storage, &market_id)?
+                                    .context("MARKETS state is empty")?
+                                    .addr;
+                                let response =
+                                    state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+                                let status = match response {
+                                    GetDeferredExecResp::Found { item } => item,
+                                    GetDeferredExecResp::NotFound {} => {
+                                        bail!("Impossible: Deferred exec id not found")
+                                    }
+                                };
+                                if status.status.is_pending() {
+                                    return Ok(WorkResp::NoWork);
+                                }
                                 return Ok(WorkResp::HasWork {
                                     work_description: WorkDescription::HandleDeferredExecId {},
                                 });

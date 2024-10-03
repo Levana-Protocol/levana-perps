@@ -1,5 +1,5 @@
 use crate::{
-    common::{get_next_dec_queue_id, get_next_inc_queue_id},
+    common::{get_current_processed_dec_queue_id, get_next_dec_queue_id, get_next_inc_queue_id},
     prelude::*,
     types::{
         DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
@@ -146,6 +146,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
 }
 
+#[allow(deprecated)]
 fn execute_leader_msg(
     storage: &mut dyn Storage,
     state: &State,
@@ -354,20 +355,10 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         Some(deferred_exec_id) => deferred_exec_id,
         None => bail!("Impossible: Work handle unable to find deferred exec id"),
     };
-    let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
-    let queue_id = match queue_id {
-        // todo: write test by having more than one items in decrement queue
-        Some(queue_id) => queue_id.next(),
-        None => DecQueuePositionId::new(0),
-    };
-    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
-    let mut queue_item = match queue_item {
-        Some(queue_item) => queue_item,
-        None => bail!("Impossible: Work handle not able to find queue item"),
-    };
+    let (queue_id, mut queue_item) = get_current_processed_dec_queue_id(storage)?;
     assert!(queue_item.status.in_progress());
-    let (market_id, token, item) = match queue_item.item.clone() {
-        DecQueueItem::MarketItem { id, token, item } => (id, token, item),
+    let market_id = match queue_item.item.clone() {
+        DecQueueItem::MarketItem { id, .. } => id,
         _ => bail!("Impossible: Deferred work handler got non market item"),
     };
     let market_addr = crate::state::MARKETS
@@ -382,7 +373,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         }
     };
     match status.status {
-        DeferredExecStatus::Pending => todo!(),
+        DeferredExecStatus::Pending => bail!("Impossible: Deferred exec status is pending"),
         DeferredExecStatus::Success { .. } => {
             queue_item.status = copy_trading::ProcessingStatus::Finished;
             crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
@@ -396,7 +387,21 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             reason,
             executed,
             crank_price,
-        } => todo!(),
+        } => {
+            // todo: Confirm with lvn-rusty-dragon on when this failure can happen
+            queue_item.status =
+                copy_trading::ProcessingStatus::Failed(FailedReason::DeferredExecFailure {
+                    reason,
+                    executed,
+                    crank_price,
+                });
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+            crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
+            crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
+            return Ok(Response::new().add_event(
+                Event::new("handle-deferred-exec-id").add_attribute("success", false.to_string()),
+            ));
+        }
     }
 }
 

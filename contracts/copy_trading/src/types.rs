@@ -357,19 +357,3 @@ impl Display for MarketLoaderStatus {
         }
     }
 }
-
-pub(crate) struct WorkResponse {
-    pub(crate) event: Event,
-    pub(crate) sub_wasm_msg: Option<SubMsg<WasmMsg>>,
-    pub(crate) withdrawal_msg: Option<CosmosMsg>,
-}
-
-impl WorkResponse {
-    pub(crate) fn new(event: Event) -> Self {
-        Self {
-            event,
-            sub_wasm_msg: None,
-            withdrawal_msg: None,
-        }
-    }
-}

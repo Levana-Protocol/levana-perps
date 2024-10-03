@@ -8,7 +8,7 @@ use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint6
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
     number::{Collateral, LpToken, NonZero, Usd},
-    price::{PriceBaseInQuote, TakeProfitTrader},
+    price::{PriceBaseInQuote, PricePoint, TakeProfitTrader},
     storage::{DirectionToBase, LeverageToBase, MarketId, RawAddr},
     time::Timestamp,
 };
@@ -277,13 +277,23 @@ pub enum FailedReason {
         requested: LpToken,
     },
     /// Received error from Market contract
-    #[error("{market_id:?} result in error: {message}")]
+    #[error("{market_id} result in error: {message}")]
     MarketError {
         /// Market ID which result in error
         market_id: MarketId,
         /// Error message
         message: String,
     },
+    /// Deferred exec failure
+    #[error("Deferred exec failure at {executed} because of: {reason}")]
+    DeferredExecFailure {
+        /// Reason it didn't apply successfully
+        reason: String,
+        /// Timestamp when it failed execution
+        executed: Timestamp,
+        /// Price point when it was cranked, if applicable
+        crank_price: Option<PricePoint>,
+    }
 }
 
 /// Queue Item
