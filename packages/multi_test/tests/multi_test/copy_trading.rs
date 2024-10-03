@@ -5,12 +5,10 @@ use std::str::FromStr;
 use cosmwasm_std::{Addr, Event};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::
-        copy_trading::{
-            DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem,
-            QueueItemStatus, QueuePositionId, WorkDescription, WorkResp,
-        }
-    ,
+    contracts::copy_trading::{
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem,
+        QueueItemStatus, QueuePositionId, WorkDescription, WorkResp,
+    },
     shared::number::{Collateral, NonZero},
 };
 
@@ -153,13 +151,12 @@ pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
 }
 
 pub(crate) fn withdraw_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
-    market.exec_copytrading_withdrawal(&trader, amount).unwrap();
+    market.exec_copytrading_withdrawal(trader, amount).unwrap();
     // Process queue item: do the actual withdrawal
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
 }
-
 
 #[test]
 fn do_actual_deposit() {
