@@ -332,7 +332,7 @@ fn query_leader_tokens() {
 
 #[test]
 fn withdraw_bug_perp_4159() {
-     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     load_markets(&market);
@@ -354,8 +354,14 @@ fn withdraw_bug_perp_4159() {
     // Does full withdrawal
     market.exec_copytrading_do_work(&trader).unwrap();
     // todo: This should not fail making the queue stuck!
-    market.exec_copytrading_do_work(&trader).unwrap_err();
+    market.exec_copytrading_do_work(&trader).unwrap();
     // There should be no work now
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
+
+    let items = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    // The invalid withdrawal failed
+    assert!(items.items.iter().any(|item| item.status.failed()))
 }

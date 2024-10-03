@@ -196,6 +196,17 @@ pub enum ProcessingStatus {
     Failed(FailedReason),
 }
 
+impl ProcessingStatus {
+    /// Did the processing fail ?
+    pub fn failed(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => true,
+        }
+    }
+}
+
 /// Failure reason on why queue processing failed
 #[derive(Error, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum FailedReason {
@@ -219,7 +230,7 @@ pub enum FailedReason {
         /// Available shares
         available: LpToken,
         /// Requested shares
-        requested: LpToken
+        requested: LpToken,
     },
 }
 

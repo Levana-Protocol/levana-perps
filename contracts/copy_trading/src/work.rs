@@ -289,6 +289,11 @@ pub(crate) fn process_queue_item(
                                         requested: shares.raw(),
                                     });
                                 event = event.add_attribute("failed", true.to_string());
+                                crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                                    storage,
+                                    &id,
+                                    &queue_item,
+                                )?;
                                 return Ok((event, None));
                             }
                             actual_shares
@@ -300,6 +305,11 @@ pub(crate) fn process_queue_item(
                                     requested: shares.raw(),
                                 });
                             event = event.add_attribute("failed", true.to_string());
+                            crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                                storage,
+                                &id,
+                                &queue_item,
+                            )?;
                             return Ok((event, None));
                         }
                     };
