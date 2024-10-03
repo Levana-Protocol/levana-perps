@@ -1,5 +1,6 @@
 use anyhow::bail;
 use cosmwasm_std::{CosmosMsg, SubMsg};
+use msg::contracts::copy_trading;
 
 use crate::{
     common::SIX_HOURS_IN_SECONDS,
@@ -229,10 +230,10 @@ pub(crate) fn process_queue_item(
 ) -> Result<Response> {
     match id {
         QueuePositionId::IncQueuePositionId(id) => {
-            let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
+            let mut queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
                 .may_load(storage, &id)?
                 .context("PENDING_QUEUE_ITEMS load failed")?;
-            match queue_item.item {
+            match queue_item.item.clone() {
                 IncQueueItem::Deposit { funds, token } => {
                     let mut totals = crate::state::TOTALS
                         .may_load(storage, &token)
@@ -243,15 +244,17 @@ pub(crate) fn process_queue_item(
                     crate::state::TOTALS.save(storage, &token, &totals)?;
                     let wallet_info = WalletInfo {
                         token,
-                        wallet: queue_item.wallet,
+                        wallet: queue_item.wallet.clone(),
                     };
                     let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
                     let new_shares = match shares {
                         Some(shares) => shares.checked_add(new_shares.raw())?,
                         None => new_shares,
                     };
+                    queue_item.status = copy_trading::ProcessingStatus::Finished;
                     crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
                     crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &id)?;
+                    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &id, &queue_item)?;
                     let event = Event::new("deposit")
                         .add_attribute("funds", funds.to_string())
                         .add_attribute("shares", new_shares.to_string());
@@ -261,26 +264,60 @@ pub(crate) fn process_queue_item(
             }
         }
         QueuePositionId::DecQueuePositionId(id) => {
-            let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
+            let mut queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
                 .may_load(storage, &id)?
                 .context("COLLATERAL_DECREASE_QUEUE load failed")?;
-            match queue_item.item {
+            match queue_item.item.clone() {
                 DecQueueItem::Withdrawal { tokens, token } => {
+                    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &id)?;
                     let shares = tokens;
                     let wallet_info = WalletInfo {
-                        token,
-                        wallet: queue_item.wallet,
+                        token: token.clone(),
+                        wallet: queue_item.wallet.clone(),
                     };
+                    let mut event = Event::new("withdraw")
+                        .add_attribute("wallet", wallet_info.wallet.to_string())
+                        .add_attribute("token", token.to_string())
+                        .add_attribute("shares", tokens.to_string());
+
                     let actual_shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
-                    // This is a sanity check. This should never happen.
+                    // This is not a sanity check. This can happen
+                    // whem multipe withdrawal requests are issues
+                    // without the queue getting processed.
                     let actual_shares = match actual_shares {
                         Some(actual_shares) => {
                             if shares > actual_shares && shares != actual_shares {
-                                bail!("Requesting more withdrawal than balance")
+                                queue_item.status =
+                                    ProcessingStatus::Failed(FailedReason::NotEnoughShares {
+                                        available: actual_shares.raw(),
+                                        requested: shares.raw(),
+                                    });
+                                event = event.add_attribute("failed", true.to_string());
+                                crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                                    storage,
+                                    &id,
+                                    &queue_item,
+                                )?;
+                                let response = Response::new().add_event(event);
+                                return Ok(response);
                             }
                             actual_shares
                         }
-                        None => bail!("No shares found"),
+                        None => {
+                            queue_item.status =
+                                ProcessingStatus::Failed(FailedReason::NotEnoughShares {
+                                    available: LpToken::zero(),
+                                    requested: shares.raw(),
+                                });
+                            event = event.add_attribute("failed", true.to_string());
+                            crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                                storage,
+                                &id,
+                                &queue_item,
+                            )?;
+                            let response = Response::new().add_event(event);
+                            return Ok(response);
+                        }
                     };
                     let token_value = state.load_lp_token_value(storage, &wallet_info.token)?;
                     let funds = token_value.shares_to_collateral(shares)?;
@@ -288,7 +325,6 @@ pub(crate) fn process_queue_item(
                     let withdraw_msg = token.into_transfer_msg(&wallet_info.wallet, funds)?;
 
                     let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;
-                    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &id)?;
                     let contract_token = state.to_token(&token)?;
                     let mut totals = crate::state::TOTALS
                         .may_load(storage, &contract_token)?
@@ -310,19 +346,22 @@ pub(crate) fn process_queue_item(
                         let result: Result<()> = Ok(());
                         result
                     };
-                    let mut event = Event::new("withdraw")
-                        .add_attribute("wallet", wallet_info.wallet.to_string())
-                        .add_attribute("funds", funds.to_string())
-                        .add_attribute("burned-shares", shares.to_string());
+                    event = event.add_attribute("funds", funds.to_string());
                     let withdraw_msg = match withdraw_msg {
                         Some(withdraw_msg) => {
                             pending_store_update()?;
+                            queue_item.status = copy_trading::ProcessingStatus::Finished;
                             Some(withdraw_msg)
                         }
                         None => {
                             // Collateral amount is less than chain's minimum representation.
                             // So, we do nothing. We just move on to the next item in the queue.
-                            event = event.add_attribute("funds-less-min-chain", true.to_string());
+                            event = event
+                                .add_attribute("funds-less-min-chain", true.to_string())
+                                .add_attribute("failed", true.to_string());
+                            queue_item.status = copy_trading::ProcessingStatus::Failed(
+                                FailedReason::FundLessThanMinChain { funds },
+                            );
                             None
                         }
                     };
@@ -331,6 +370,7 @@ pub(crate) fn process_queue_item(
                         Some(withdraw_msg) => response.add_message(withdraw_msg),
                         None => response,
                     };
+                    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &id, &queue_item)?;
                     Ok(response)
                 }
                 DecQueueItem::MarketItem { id, token, item } => match item {
@@ -357,7 +397,9 @@ pub(crate) fn process_queue_item(
                                 take_profit,
                             },
                         )?;
-                        let mut totals = crate::state::TOTALS.may_load(storage, &token)?.context("TOTALS store is empty")?;
+                        let mut totals = crate::state::TOTALS
+                            .may_load(storage, &token)?
+                            .context("TOTALS store is empty")?;
                         let event = Event::new("open-position")
                             .add_attribute("direction", direction.as_str())
                             .add_attribute("leverage", leverage.to_string())

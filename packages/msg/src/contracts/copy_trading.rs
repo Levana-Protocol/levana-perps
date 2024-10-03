@@ -12,6 +12,7 @@ use shared::{
     storage::{DirectionToBase, LeverageToBase, MarketId, RawAddr},
     time::Timestamp,
 };
+use thiserror::Error;
 
 /// Message for instantiating a new copy trading contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -171,11 +172,69 @@ pub enum QueryMsg {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct QueueResp {
     /// Items in queue for the wallet
-    pub items: Vec<QueueItem>,
+    pub items: Vec<QueueItemStatus>,
     /// Last processed [QueuePositionId]
     pub inc_processed_till: Option<IncQueuePositionId>,
     /// Last processed [QueuePositionId]
     pub dec_processed_till: Option<DecQueuePositionId>,
+}
+
+/// Queue item status
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub struct QueueItemStatus {
+    /// Queue item
+    pub item: QueueItem,
+    /// Status of processing
+    pub status: ProcessingStatus,
+}
+
+/// Queue item Processing status
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum ProcessingStatus {
+    /// Not started processing yet
+    NotProcessed,
+    /// Successfully finished processing
+    Finished,
+    /// Failed during processing
+    Failed(FailedReason),
+}
+
+impl ProcessingStatus {
+    /// Did the processing fail ?
+    pub fn failed(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => true,
+        }
+    }
+}
+
+/// Failure reason on why queue processing failed
+#[derive(Error, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum FailedReason {
+    /// Not enough collateral available
+    #[error("Collateral not available. Requested {requested}, but only available {available}")]
+    NotEnoughCollateral {
+        /// Available collateral
+        available: Collateral,
+        /// Requested collateral
+        requested: NonZero<Collateral>,
+    },
+    /// Fund less than chain's minimum representation
+    #[error("Collateral amount {funds} is less than chain's minimum representation.not available")]
+    FundLessThanMinChain {
+        /// Requested collateral
+        funds: NonZero<Collateral>,
+    },
+    /// Wallet does not have enough shares
+    #[error("Shares not available. Requested {requested}, but only available {available}")]
+    NotEnoughShares {
+        /// Available shares
+        available: LpToken,
+        /// Requested shares
+        requested: LpToken,
+    },
 }
 
 /// Queue Item

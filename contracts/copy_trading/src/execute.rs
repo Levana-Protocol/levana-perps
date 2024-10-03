@@ -331,6 +331,7 @@ fn withdraw(
             token: wallet_info.token,
         },
         wallet: wallet_info.wallet,
+        status: copy_trading::ProcessingStatus::NotProcessed,
     };
     crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &dec_queue_id, &queue_position)?;
     Ok(Response::new().add_event(
@@ -387,6 +388,7 @@ fn deposit(
     let queue_position = IncQueuePosition {
         item: copy_trading::IncQueueItem::Deposit { funds, token },
         wallet: sender,
+        status: copy_trading::ProcessingStatus::NotProcessed,
     };
     crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
     Ok(Response::new().add_event(

@@ -38,12 +38,15 @@ fn deposit() {
 
     assert_eq!(
         item,
-        &QueueItem::IncCollaleteral {
-            item: IncQueueItem::Deposit {
-                funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
-                token,
+        &QueueItemStatus {
+            item: QueueItem::IncCollaleteral {
+                item: IncQueueItem::Deposit {
+                    funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
+                    token,
+                },
+                id: IncQueuePositionId::new(0)
             },
-            id: IncQueuePositionId::new(0)
+            status: ProcessingStatus::NotProcessed
         }
     );
     assert!(response.inc_processed_till.is_none())
@@ -179,6 +182,12 @@ fn do_actual_deposit() {
     let another_trader = market.clone_trader(1).unwrap();
     let balance = market.query_copy_trading_balance(&another_trader).unwrap();
     assert!(balance.balance.is_empty());
+
+    let queue_resp = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    assert_eq!(queue_resp.items.len(), 1);
+    assert_eq!(queue_resp.items[0].status, ProcessingStatus::Finished);
 }
 
 #[test]
@@ -272,6 +281,15 @@ fn do_withdraw() {
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
+
+    let queue_resp = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    assert_eq!(queue_resp.items.len(), 3);
+    assert!(queue_resp
+        .items
+        .iter()
+        .all(|item| item.status == ProcessingStatus::Finished));
 }
 
 #[test]
@@ -339,7 +357,6 @@ fn query_leader_tokens() {
     assert_eq!(tokens[0].shares, "100".parse().unwrap());
 }
 
-
 #[test]
 fn leader_opens_correct_position() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
@@ -378,4 +395,40 @@ fn leader_opens_correct_position() {
 
     // todo: query that market has one position opened
     // todo: query the remaining collateral
+}
+
+#[test]
+fn withdraw_bug_perp_4159() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    // Issue full withdrawal
+    market.exec_copytrading_withdrawal(&trader, "100").unwrap();
+    // You can still issue full withdrawal since withdrawal action has not been executed yet
+    market.exec_copytrading_withdrawal(&trader, "100").unwrap();
+
+    // Does full withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // todo: This should not fail making the queue stuck!
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // There should be no work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let items = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    // The invalid withdrawal failed
+    assert!(items.items.iter().any(|item| item.status.failed()))
 }
