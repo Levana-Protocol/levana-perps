@@ -383,8 +383,8 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
         WorkDescription::HandleDeferredExecId {} => {
-            let foo = handle_deferred_exec_id(storage, &state);
-            todo!()
+            let response = handle_deferred_exec_id(storage, &state)?;
+            Ok(response)
         }
     }
 }
@@ -400,7 +400,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
     let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     let queue_id = match queue_id {
         Some(queue_id) => queue_id,
-        None => bail!("Impossible: Work handle unable to find queue id"),
+        None => DecQueuePositionId::new(0),
     };
     let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
     let mut queue_item = match queue_item {
@@ -430,7 +430,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
             return Ok(Response::new().add_event(
                 Event::new("handle-deferred-exec-id").add_attribute("success", true.to_string()),
-            ))
+            ));
         }
         DeferredExecStatus::Failure {
             reason,

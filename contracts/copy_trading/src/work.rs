@@ -31,6 +31,17 @@ fn get_work_from_dec_queue(
             match lp_token_value {
                 Some(lp_token_value) => {
                     if lp_token_value.status.valid() {
+                        if status == ProcessingStatus::InProgress {
+                            let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                                .may_load(storage)?
+                                .flatten();
+                            if let Some(_) = deferred_exec_id {
+                                // todo: Do query here and ensure that it is not pending.
+                                return Ok(WorkResp::HasWork {
+                                    work_description: WorkDescription::HandleDeferredExecId {},
+                                });
+                            }
+                        }
                         return Ok(WorkResp::HasWork {
                             work_description: WorkDescription::ProcessQueueItem {
                                 id: QueuePositionId::DecQueuePositionId(queue_id),
@@ -42,18 +53,6 @@ fn get_work_from_dec_queue(
                     // For this token, the value was never in the store.
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
-                }
-            }
-
-            if status == ProcessingStatus::InProgress {
-                let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
-                    .may_load(storage)?
-                    .flatten();
-                if let Some(_) = deferred_exec_id {
-                    // todo: Do query here and ensure that it is not pending.
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::HandleDeferredExecId {},
                     });
                 }
             }

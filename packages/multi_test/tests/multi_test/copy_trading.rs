@@ -411,8 +411,13 @@ fn leader_opens_correct_position() {
     assert!(items.items.iter().any(|item| item.status.pending()));
 
     let work = market.query_copy_trading_work().unwrap();
-    assert_eq!(work, WorkResp::NoWork);
+    assert_eq!(work, WorkResp::HasWork { work_description: WorkDescription::HandleDeferredExecId {  } });
 
+    // Process queue item: Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
     // todo: Figure out what should be the proper next step
 }
 
