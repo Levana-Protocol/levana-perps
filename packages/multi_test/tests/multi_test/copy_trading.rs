@@ -152,6 +152,15 @@ pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
     assert_eq!(work, WorkResp::NoWork);
 }
 
+pub(crate) fn withdraw_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
+    market.exec_copytrading_withdrawal(&trader, amount).unwrap();
+    // Process queue item: do the actual withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+}
+
+
 #[test]
 fn do_actual_deposit() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
