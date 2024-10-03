@@ -475,9 +475,6 @@ pub(crate) fn process_queue_item(
                             return Ok(response.add_event(event));
                         }
 
-                        // todo: Check if we have available collateral
-                        // If not, we should fail by updating the status of the queue
-                        // todo: fix failing test!
                         crate::state::TOTALS.save(storage, &token, &totals)?;
                         queue_item.status = ProcessingStatus::InProgress;
                         // We use reply aways so that we also handle the error case

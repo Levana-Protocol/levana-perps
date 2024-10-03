@@ -2478,17 +2478,22 @@ impl PerpsMarket {
         }
     }
 
-    pub fn exec_ct_leader(&self, amount: &str) -> Result<AppResponse> {
+    pub fn exec_copy_trading_open_position(
+        &self,
+        amount: &str,
+        direction: DirectionToBase,
+        take_profit: &str,
+    ) -> Result<AppResponse> {
         let amount = amount.parse()?;
         let market_id = self.id.clone();
         let leverage = "7".parse().unwrap();
         let msg = Box::new(MarketExecuteMsg::OpenPosition {
             slippage_assert: None,
             leverage,
-            direction: DirectionToBase::Long,
+            direction,
             max_gains: None,
             stop_loss_override: None,
-            take_profit: Some(TakeProfitTrader::Finite("1.1".parse().unwrap())),
+            take_profit: Some(TakeProfitTrader::Finite(take_profit.parse().unwrap())),
         });
         let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
             market_id,
