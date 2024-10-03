@@ -1,11 +1,10 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Event};
-use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
+use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::{copy_trading::{
-        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId,
-        WorkDescription, WorkResp,
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem, QueueItemStatus, QueuePositionId, WorkDescription, WorkResp
     }, market::position::PositionId},
     shared::number::{Collateral, NonZero},
 };
@@ -35,6 +34,7 @@ fn deposit() {
         .unwrap();
     assert_eq!(response.items.len(), 1);
     let item = &response.items[0];
+
 
     assert_eq!(
         item,
@@ -123,7 +123,7 @@ fn detect_process_queue_item_work() {
 
 fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
     market
-        .exec_copytrading_mint_and_deposit(&trader, amount)
+        .exec_copytrading_mint_and_deposit(trader, amount)
         .unwrap();
     let token = market.get_copytrading_token().unwrap();
 
@@ -139,9 +139,9 @@ fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
     );
 
     // Compute LP token value
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual deposit
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
 
     // Should not find any work now
     let work = market.query_copy_trading_work().unwrap();
@@ -387,14 +387,11 @@ fn leader_opens_correct_position() {
 
     let position_ids = market.query_position_token_ids(&market.copy_trading_addr).unwrap();
     let position_ids = position_ids.iter().map(|item| PositionId::new(item.parse().unwrap())).collect::<Vec<_>>();
-    println!("foo: {position_ids:?}");
+    assert!(position_ids.len() == 1);
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
-    assert_ne!(tokens[0].collateral, "200".parse().unwrap());
-
-    // todo: query that market has one position opened
-    // todo: query the remaining collateral
+    assert_eq!(tokens[0].collateral, "150".parse().unwrap());
 }
 
 #[test]

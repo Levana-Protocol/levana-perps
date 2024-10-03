@@ -201,6 +201,7 @@ fn execute_leader_msg(
                         take_profit,
                     },
                 },
+                status: copy_trading::ProcessingStatus::InProgress,
                 wallet: state.config.leader.clone(),
             };
             crate::state::COLLATERAL_DECREASE_QUEUE.save(

@@ -116,7 +116,7 @@ pub enum ExecuteMsg {
         /// Message
         message: Box<MarketExecuteMsg>,
         /// Collateral to use for the action
-        collateral: Option<NonZero<Collateral>>
+        collateral: Option<NonZero<Collateral>>,
     },
     /// Perform queue work
     DoWork {},
@@ -195,6 +195,8 @@ pub enum ProcessingStatus {
     NotProcessed,
     /// Successfully finished processing
     Finished,
+    /// In progress
+    InProgress,
     /// Failed during processing
     Failed(FailedReason),
 }
@@ -206,6 +208,7 @@ impl ProcessingStatus {
             ProcessingStatus::NotProcessed => false,
             ProcessingStatus::Finished => false,
             ProcessingStatus::Failed(_) => true,
+            ProcessingStatus::InProgress => false,
         }
     }
 }
