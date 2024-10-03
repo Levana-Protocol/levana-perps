@@ -600,6 +600,8 @@ pub enum WorkDescription {
     /// Rebalance for case when someone sends collateral directly to
     /// the contract without getting LpTokens
     Rebalance {},
+    /// Handle deferred exec id
+    HandleDeferredExecId {}
 }
 
 /// Queue position id that needs to be processed

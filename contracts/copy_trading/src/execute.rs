@@ -8,8 +8,11 @@ use crate::{
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-use msg::contracts::copy_trading;
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use msg::contracts::{
+    copy_trading,
+    market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
+};
 use shared::time::Timestamp;
 
 #[must_use]
@@ -379,6 +382,61 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
         }
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
+        WorkDescription::HandleDeferredExecId {} => {
+            let foo = handle_deferred_exec_id(storage, &state);
+            todo!()
+        }
+    }
+}
+
+fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<Response> {
+    let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+        .may_load(storage)?
+        .flatten();
+    let deferred_exec_id = match deferred_exec_id {
+        Some(deferred_exec_id) => deferred_exec_id,
+        None => bail!("Impossible: Work handle unable to find deferred exec id"),
+    };
+    let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
+    let queue_id = match queue_id {
+        Some(queue_id) => queue_id,
+        None => bail!("Impossible: Work handle unable to find queue id"),
+    };
+    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
+    let mut queue_item = match queue_item {
+        Some(queue_item) => queue_item,
+        None => bail!("Impossible: Work handle not able to find queue item"),
+    };
+    let (market_id, token, item) = match queue_item.item.clone() {
+        DecQueueItem::MarketItem { id, token, item } => (id, token, item),
+        _ => bail!("Impossible: Deferred work handler got non market item"),
+    };
+    let market_addr = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS state is empty")?
+        .addr;
+    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let status = match response {
+        GetDeferredExecResp::Found { item } => item,
+        GetDeferredExecResp::NotFound {} => {
+            bail!("Impossible: Deferred exec id not found")
+        }
+    };
+    match status.status {
+        DeferredExecStatus::Pending => todo!(),
+        DeferredExecStatus::Success { .. } => {
+            queue_item.status = copy_trading::ProcessingStatus::Finished;
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+            crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
+            return Ok(Response::new().add_event(
+                Event::new("handle-deferred-exec-id").add_attribute("success", true.to_string()),
+            ))
+        }
+        DeferredExecStatus::Failure {
+            reason,
+            executed,
+            crank_price,
+        } => todo!(),
     }
 }
 

@@ -19,9 +19,11 @@ fn get_work_from_dec_queue(
         .key(&queue_id)
         .may_load(storage)?;
     let queue_item = match queue_item {
-        Some(queue_item) => queue_item.item,
+        Some(queue_item) => queue_item,
         None => return Ok(WorkResp::NoWork),
     };
+    let status = queue_item.status;
+    let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
     match requires_token {
         RequiresToken::Token { token } => {
@@ -43,6 +45,19 @@ fn get_work_from_dec_queue(
                     });
                 }
             }
+
+            if status == ProcessingStatus::InProgress {
+                let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                    .may_load(storage)?
+                    .flatten();
+                if let Some(_) = deferred_exec_id {
+                    // todo: Do query here and ensure that it is not pending.
+                    return Ok(WorkResp::HasWork {
+                        work_description: WorkDescription::HandleDeferredExecId {},
+                    });
+                }
+            }
+
             let market_works =
                 crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
             for market_work in market_works {
@@ -254,7 +269,11 @@ pub(crate) fn process_queue_item(
                     queue_item.status = copy_trading::ProcessingStatus::Finished;
                     crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
                     crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &queue_pos_id)?;
-                    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &queue_pos_id, &queue_item)?;
+                    crate::state::COLLATERAL_INCREASE_QUEUE.save(
+                        storage,
+                        &queue_pos_id,
+                        &queue_item,
+                    )?;
                     let event = Event::new("deposit")
                         .add_attribute("funds", funds.to_string())
                         .add_attribute("shares", new_shares.to_string());
@@ -370,7 +389,11 @@ pub(crate) fn process_queue_item(
                         Some(withdraw_msg) => response.add_message(withdraw_msg),
                         None => response,
                     };
-                    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_pos_id, &queue_item)?;
+                    crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                        storage,
+                        &queue_pos_id,
+                        &queue_item,
+                    )?;
                     Ok(response)
                 }
                 DecQueueItem::MarketItem { id, token, item } => match item {

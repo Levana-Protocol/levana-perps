@@ -9,7 +9,7 @@ use anyhow::{bail, Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
-        deferred_execution::{DeferredExecId, ListDeferredExecsResp},
+        deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
         entry::{LimitOrdersResp, PositionsQueryFeeApproach},
         order::OrderId,
         position::{PositionId, PositionsResp},
@@ -340,6 +340,17 @@ impl<'a> State<'a> {
                 order: None,
             },
         )?;
+        Ok(result)
+    }
+
+    pub(crate) fn get_deferred_exec(
+        &self,
+        market_addr: &Addr,
+        id: DeferredExecId,
+    ) -> Result<GetDeferredExecResp> {
+        let result = self
+            .querier
+            .query_wasm_smart(market_addr, &MarketQueryMsg::GetDeferredExec { id })?;
         Ok(result)
     }
 

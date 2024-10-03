@@ -408,7 +408,11 @@ fn leader_opens_correct_position() {
         .query_copy_trading_queue_status(leader.into())
         .unwrap();
     // We don't know if we were able to successfully finish
-    assert!(items.items.iter().any(|item| item.status.pending()))
+    assert!(items.items.iter().any(|item| item.status.pending()));
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
     // todo: Figure out what should be the proper next step
 }
 
