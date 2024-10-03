@@ -8,7 +8,6 @@ pub(crate) const REPLY_ID_OPEN_POSITION: u64 = 0;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
-    println!("inside reply");
     let (_state, storage) = State::load_mut(deps, &env)?;
     if msg.id == REPLY_ID_OPEN_POSITION {
         match msg.result {
@@ -28,7 +27,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
             }
             cosmwasm_std::SubMsgResult::Err(e) => {
                 // Opening position has failed
-                println!("reply failed!");
                 let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
                 let queue_id = match queue_id {
                     Some(queue_id) => queue_id.next(),
