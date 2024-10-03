@@ -14,10 +14,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             let balance = balance(storage, wallet, start_after, limit)?;
             to_json_binary(&balance)
         }
-        QueryMsg::Status {
-            start_after: _,
-            limit: _,
-        } => todo!(),
         QueryMsg::HasWork {} => {
             let work = get_work(&state, storage)?;
             to_json_binary(&work)
@@ -31,11 +27,42 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             let response = queue_status(storage, wallet, start_after, limit)?;
             to_json_binary(&response)
         }
+        QueryMsg::LeaderStatus { start_after, limit } => {
+            let response = leader_status(storage, start_after, limit)?;
+            to_json_binary(&response)
+        }
     }
     .map_err(anyhow::Error::from)
 }
 
 const DEFAULT_QUERY_LIMIT: u32 = 10;
+
+fn leader_status(
+    storage: &dyn Storage,
+    start_after: Option<Token>,
+    limit: Option<u32>,
+) -> Result<LeaderStatusResp> {
+    let limit = usize::try_from(
+        limit
+            .unwrap_or(DEFAULT_QUERY_LIMIT)
+            .min(DEFAULT_QUERY_LIMIT),
+    )?;
+    let start_after = start_after.as_ref().map(Bound::exclusive);
+    let tokens = crate::state::TOTALS
+        .range(storage, None, start_after, Order::Ascending)
+        .take(limit);
+    let response = tokens
+        .map(|item| {
+            item.map(|(token, totals)| TokenStatus {
+                token,
+                collateral: totals.collateral,
+                shares: totals.shares,
+            })
+        })
+        .collect::<cosmwasm_std::StdResult<Vec<_>>>()?;
+    let response = LeaderStatusResp { tokens: response };
+    Ok(response)
+}
 
 fn balance(
     storage: &dyn Storage,

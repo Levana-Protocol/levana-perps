@@ -338,3 +338,37 @@ fn leader_opens_correct_position() {
     // todo: query that market has one position opened
     // todo: query the remaining collateral
 }
+
+#[test]
+fn query_leader_tokens() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens.len(), 1);
+
+    assert_eq!(tokens[0].collateral, "100".parse().unwrap());
+    assert_eq!(tokens[0].shares, "100".parse().unwrap());
+
+    market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens.len(), 1);
+
+    assert_eq!(tokens[0].collateral, "50".parse().unwrap());
+    assert_eq!(tokens[0].shares, "100".parse().unwrap());
+}

@@ -2382,6 +2382,15 @@ impl PerpsMarket {
         self.query_copy_trading(&CopyTradingQueryMsg::HasWork {})
     }
 
+    pub fn query_copy_trading_leader_tokens(
+        &self,
+    ) -> Result<msg::contracts::copy_trading::LeaderStatusResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::LeaderStatus {
+            start_after: None,
+            limit: None,
+        })
+    }
+
     pub fn query_copy_trading_balance(
         &self,
         wallet: &Addr,

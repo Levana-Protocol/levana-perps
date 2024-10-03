@@ -303,3 +303,7 @@ build-perps-deploy-image:
 # Push perps-deploy docker image
 push-perps-deploy-image:
 	docker push ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
+
+quant:
+  nodemon -e rs --exec "env MARKET_COLLATERAL_TYPE=base MARKET_TOKEN_KIND=native cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::smart_search_bug_perp_4098 --exact --show-output -- --nocapture"
+  # nodemon -e rs --exec "env MARKET_COLLATERAL_TYPE=quote MARKET_TOKEN_KIND=cw20 cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::smart_search_bug_perp_4098 --exact --show-output -- --nocapture"
