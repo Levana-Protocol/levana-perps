@@ -448,6 +448,8 @@ pub(crate) fn process_queue_item(
                                 &queue_pos_id,
                                 &queue_item,
                             )?;
+                            crate::state::LAST_PROCESSED_DEC_QUEUE_ID
+                                .save(storage, &queue_pos_id)?;
                             return Ok(response.add_event(event));
                         }
 
@@ -456,8 +458,8 @@ pub(crate) fn process_queue_item(
                         // todo: fix failing test!
                         crate::state::TOTALS.save(storage, &token, &totals)?;
                         queue_item.status = ProcessingStatus::InProgress;
-                        let sub_msg = SubMsg::reply_on_success(msg, REPLY_ID_OPEN_POSITION);
-                        // let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
+                        // We use reply aways so that we also handle the error case
+                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
                         let response = response.add_event(event);
                         let response = response.add_submessage(sub_msg);
                         Ok(response)

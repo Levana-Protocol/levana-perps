@@ -399,7 +399,8 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
     };
     let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     let queue_id = match queue_id {
-        Some(queue_id) => queue_id,
+        // todo: write test by having more than one items in decrement queue
+        Some(queue_id) => queue_id.next(),
         None => DecQueuePositionId::new(0),
     };
     let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
@@ -407,6 +408,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         Some(queue_item) => queue_item,
         None => bail!("Impossible: Work handle not able to find queue item"),
     };
+    assert!(queue_item.status.in_progress());
     let (market_id, token, item) = match queue_item.item.clone() {
         DecQueueItem::MarketItem { id, token, item } => (id, token, item),
         _ => bail!("Impossible: Deferred work handler got non market item"),
@@ -428,6 +430,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             queue_item.status = copy_trading::ProcessingStatus::Finished;
             crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
             crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
+            crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
             return Ok(Response::new().add_event(
                 Event::new("handle-deferred-exec-id").add_attribute("success", true.to_string()),
             ));

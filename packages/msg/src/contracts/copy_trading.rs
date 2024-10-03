@@ -221,6 +221,26 @@ impl ProcessingStatus {
             ProcessingStatus::InProgress => true,
         }
     }
+
+    /// Did the status finish ?
+    pub fn finish(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => true,
+            ProcessingStatus::Failed(_) => false,
+            ProcessingStatus::InProgress => false,
+        }
+    }
+
+    /// Is any status currently in progres ?
+    pub fn in_progress(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => false,
+            ProcessingStatus::InProgress => true,
+        }
+    }
 }
 
 /// Failure reason on why queue processing failed
@@ -247,6 +267,14 @@ pub enum FailedReason {
         available: LpToken,
         /// Requested shares
         requested: LpToken,
+    },
+    /// Received error from Market contract
+    #[error("{market_id:?} result in error: {message}")]
+    MarketError {
+        /// Market ID which result in error
+        market_id: MarketId,
+        /// Error message
+        message: String,
     },
 }
 
@@ -601,7 +629,7 @@ pub enum WorkDescription {
     /// the contract without getting LpTokens
     Rebalance {},
     /// Handle deferred exec id
-    HandleDeferredExecId {}
+    HandleDeferredExecId {},
 }
 
 /// Queue position id that needs to be processed
