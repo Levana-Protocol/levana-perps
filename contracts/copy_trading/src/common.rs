@@ -99,6 +99,8 @@ impl<'a> State<'a> {
                                 // loaded market in this contract ?
                                 last_seen
                             } else {
+                                crate::state::LAST_MARKET_ADD_CHECK
+                                    .save(storage, &Timestamp::into(self.env.block.time.into()))?;
                                 return Ok(());
                             }
                         } else {
