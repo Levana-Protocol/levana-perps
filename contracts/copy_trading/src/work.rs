@@ -119,7 +119,7 @@ fn get_work_from_dec_queue(
 
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ResetStats {},
+                        work_description: WorkDescription::ResetStats { token },
                     });
                 }
                 if !work.processing_status.is_validated() {
@@ -250,7 +250,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
 
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ResetStats {},
+                        work_description: WorkDescription::ResetStats { token },
                     });
                 }
                 if !work.processing_status.is_validated() {

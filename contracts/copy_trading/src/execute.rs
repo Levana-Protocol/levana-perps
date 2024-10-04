@@ -338,13 +338,22 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
             let res = process_queue_item(id, storage, &state, res)?;
             Ok(res)
         }
-        WorkDescription::ResetStats {} => todo!(),
-        WorkDescription::Rebalance {} => todo!(),
+        WorkDescription::ResetStats { token } => reset_stats(storage, &state, token),
         WorkDescription::HandleDeferredExecId {} => {
             let response = handle_deferred_exec_id(storage, &state)?;
             Ok(response)
         }
     }
+}
+
+fn reset_stats(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
+    let markets = state.load_market_ids_with_token(storage, &token)?;
+    let market_work_info = MarketWorkInfo::default();
+    for market in markets {
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work_info)?;
+    }
+    Ok(Response::new()
+        .add_event(Event::new("reset-stats").add_attribute("token", token.to_string())))
 }
 
 fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<Response> {

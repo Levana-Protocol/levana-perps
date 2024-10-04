@@ -642,10 +642,10 @@ pub enum WorkDescription {
         id: QueuePositionId,
     },
     /// Reset market specific statistics
-    ResetStats {},
-    /// Rebalance for case when someone sends collateral directly to
-    /// the contract without getting LpTokens
-    Rebalance {},
+    ResetStats {
+        /// Token
+        token: Token,
+    },
     /// Handle deferred exec id
     HandleDeferredExecId {},
 }

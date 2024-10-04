@@ -235,7 +235,7 @@ impl<'a> State<'a> {
 
     pub(crate) fn get_first_full_token_info(
         &self,
-        storage: &mut dyn Storage,
+        storage: &dyn Storage,
         token: &Token,
     ) -> Result<msg::token::Token> {
         let market = crate::state::MARKETS_TOKEN
@@ -253,7 +253,7 @@ impl<'a> State<'a> {
 
     pub(crate) fn load_market_ids_with_token(
         &self,
-        storage: &mut dyn Storage,
+        storage: &dyn Storage,
         token: &Token,
     ) -> Result<Vec<MarketInfo>> {
         let markets = crate::state::MARKETS_TOKEN.prefix(token.clone()).range(
