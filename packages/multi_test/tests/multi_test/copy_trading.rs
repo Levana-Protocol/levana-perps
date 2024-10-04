@@ -374,7 +374,7 @@ fn query_leader_tokens() {
     assert_eq!(tokens.len(), 1);
 
     assert_eq!(tokens[0].collateral, "50".parse().unwrap());
-    assert_eq!(tokens[0].shares, "100".parse().unwrap());
+    assert_eq!(tokens[0].shares, "50".parse().unwrap());
 }
 
 #[test]
@@ -396,7 +396,8 @@ fn withdraw_bug_perp_4159() {
     // Does full withdrawal
     market.exec_copytrading_do_work(&trader).unwrap();
     // Compute LP token value
-    market.exec_copytrading_do_work(&trader).unwrap();
+    let response = market.exec_copytrading_do_work(&trader).unwrap();
+    response.assert_event(&Event::new("wasm-lp-token").add_attribute("value", "1".to_owned()));
     // This should not fail making the queue stuck!
     market.exec_copytrading_do_work(&trader).unwrap();
     // There should be no work now
