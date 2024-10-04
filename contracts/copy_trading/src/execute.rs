@@ -499,6 +499,7 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
             queue_id,
         },
     };
+
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
     let event = Event::new("lp-token")
         .add_attribute("validation", "success".to_string())

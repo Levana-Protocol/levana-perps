@@ -396,9 +396,25 @@ pub(crate) fn process_queue_item(
                         .may_load(storage, &contract_token)?
                         .context("TOTALS is empty")?;
                     if funds.raw() > totals.collateral {
-                        bail!("Not enough collateral")
+                        queue_item.status = copy_trading::ProcessingStatus::Failed(
+                            FailedReason::NotEnoughCollateral {
+                                available: totals.collateral,
+                                requested: funds,
+                            },
+                        );
+                        crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                            storage,
+                            &queue_pos_id,
+                            &queue_item,
+                        )?;
+                        let event = event
+                            .add_attribute("failed", true.to_string())
+                            .add_attribute("reason", "not-enough-collateral");
+                        let response = Response::new().add_event(event);
+                        return Ok(response);
                     } else {
                         totals.collateral = totals.collateral.checked_sub(funds.raw())?;
+                        totals.shares = totals.shares.checked_sub(shares.raw())?;
                     };
                     let mut pending_store_update = || -> std::result::Result<(), _> {
                         if remaining_shares.is_zero() {
