@@ -1,5 +1,8 @@
 use crate::{
-    common::{get_current_processed_dec_queue_id, get_next_dec_queue_id, get_next_inc_queue_id},
+    common::{
+        get_current_processed_dec_queue_id, get_current_queue_element, get_next_dec_queue_id,
+        get_next_inc_queue_id,
+    },
     prelude::*,
     types::{
         DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
@@ -355,7 +358,12 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         Some(deferred_exec_id) => deferred_exec_id,
         None => bail!("Impossible: Work handle unable to find deferred exec id"),
     };
-    let (queue_id, mut queue_item) = get_current_processed_dec_queue_id(storage)?;
+    let (queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
+    let mut queue_item = match queue_item {
+        Some(queue_item) => queue_item,
+        None => bail!("Impossible: Work handle not able to find queue item"),
+    };
+
     assert!(queue_item.status.in_progress());
     let market_id = match queue_item.item.clone() {
         DecQueueItem::MarketItem { id, .. } => id,
@@ -431,16 +439,19 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALUE")?;
+    let queue_id = get_current_queue_element(storage)?;
     let token_value = match token_value {
         Some(token_value) => token_value,
         None => {
             // The value is not yet stored which means no deposit has
             // happened yet. In this case, the initial value of the
             // token would be one.
+
             let token_value = LpTokenValue {
                 value: OneLpTokenValue(Collateral::one()),
                 status: crate::types::LpTokenStatus::Valid {
                     timestamp: state.env.block.time.into(),
+                    queue_id,
                 },
             };
             crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
@@ -448,7 +459,7 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
         }
     };
 
-    if token_value.status.valid() {
+    if token_value.status.valid(&queue_id) {
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
     // todo: track operations
@@ -480,10 +491,12 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
         .checked_add(total_open_position_collateral)?;
     let total_shares = totals.shares;
     let one_share_value = total_collateral.checked_div_dec(total_shares.into_decimal256())?;
+    let queue_id = get_current_queue_element(storage)?;
     let token_value = LpTokenValue {
         value: OneLpTokenValue(one_share_value),
         status: crate::types::LpTokenStatus::Valid {
             timestamp: Timestamp::from(state.env.block.time),
+            queue_id,
         },
     };
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;

@@ -150,7 +150,6 @@ fn leader_incorrect_position() {
     load_markets(&market);
 
     deposit_money(&market, &trader, "200");
-
     withdraw_money(&market, &trader, "10");
     withdraw_money(&market, &trader, "10");
 
@@ -294,4 +293,72 @@ fn lp_token_value_reduced_after_open() {
     assert!(shares.raw() > "20".parse().unwrap());
 }
 
-// todo: test to make the validation fail!
+
+// #[test]
+// fn leader_position_closed() {
+//     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+//     let trader = market.clone_trader(0).unwrap();
+//     let lp = market.clone_lp(0).unwrap();
+
+//     load_markets(&market);
+//     deposit_money(&market, &trader, "200");
+//     withdraw_money(&market, &trader, "10");
+
+//     let status = market.query_copy_trading_leader_tokens().unwrap();
+//     let tokens = status.tokens;
+//     assert_eq!(tokens[0].collateral, "190".parse().unwrap());
+
+//     // Leader opens a position
+//     market
+//         .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+//         .unwrap();
+
+//     // Process queue item: Open the position
+//     market.exec_copytrading_do_work(&trader).unwrap();
+//     market.exec_crank_till_finished(&lp).unwrap();
+
+//     // Process queue item: Handle deferred exec id
+//     market.exec_copytrading_do_work(&trader).unwrap();
+
+//     let work = market.query_copy_trading_work().unwrap();
+//     assert_eq!(work, WorkResp::NoWork);
+
+//     let position_ids = market
+//         .query_position_token_ids(&market.copy_trading_addr)
+//         .unwrap()
+//         .iter()
+//         .map(|item| PositionId::new(item.parse().unwrap()))
+//         .collect::<Vec<_>>();
+
+//     assert_eq!(position_ids.len(), 1);
+
+//     withdraw_money(&market, &trader, "10");
+
+//     let foo = market.query_collateral_balance(&market.copy_trading_addr).unwrap();
+//     println!("foo 0: {foo}");
+
+//     // We are going to make a profit!
+//     market.exec_set_price("1.5".try_into().unwrap()).unwrap();
+//     market.exec_crank(&lp).unwrap();
+
+//     let closed_position = market
+//         .query_closed_position(&market.copy_trading_addr, position_ids[0])
+//         .unwrap();
+//     println!("pos: {closed_position:#?}");
+
+//     let foo = market.query_collateral_balance(&market.copy_trading_addr).unwrap();
+//     println!("foo 1: {foo}");
+
+
+//     let trader1 = market.clone_trader(1).unwrap();
+//     deposit_money(&market, &trader1, "20");
+//     let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+//     let shares = tokens.balance[0].shares;
+//     println!("shares: {shares}");
+//     // Since token value has increased, you can buy less shares for the same amount
+//     // todo: fix it
+//     assert!(shares.raw() < "20".parse().unwrap());
+
+// }
+
+// todo: Make the position in a non profitable way

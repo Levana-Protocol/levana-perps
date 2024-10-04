@@ -394,8 +394,12 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::MarketItem { token, item, .. } => match *item {
-                DecMarketItem::OpenPosition { .. } => RequiresToken::Token { token },
+            DecQueueItem::MarketItem { item, .. } => match *item {
+                DecMarketItem::OpenPosition { .. } => {
+                    // For opening a position, we don't require LP
+                    // token value to be computed.
+                    RequiresToken::NoToken {}
+                }
             },
         }
     }
