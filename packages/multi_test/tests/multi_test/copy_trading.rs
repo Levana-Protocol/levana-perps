@@ -147,6 +147,8 @@ pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
     // Compute LP token value
     market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual deposit
+    // let work = market.query_copy_trading_work().unwrap();
+    // println!("work: {work:?}");
     market.exec_copytrading_do_work(trader).unwrap();
 
     // Should not find any work now
