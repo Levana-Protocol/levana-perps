@@ -183,7 +183,7 @@ fn execute_leader_msg(
                 None => bail!("No supplied collateral for opening position"),
             };
             if max_gains.is_some() {
-                bail!("max_gains is deprecated and not accepted")
+                bail!("max_gains is deprecated, use take_profit instead")
             }
             if take_profit.is_none() {
                 bail!("take profit is not specified")
