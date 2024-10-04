@@ -140,11 +140,19 @@ fn get_work_from_dec_queue(
                 work_description: WorkDescription::ComputeLpTokenValue { token },
             })
         }
-        RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
-            work_description: WorkDescription::ProcessQueueItem {
-                id: queue_id,
-            },
-        }),
+        RequiresToken::NoToken {} => {
+            if status == ProcessingStatus::InProgress {
+                let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                    .may_load(storage)?
+                    .flatten();
+                if let Some(deferred_exec_id) = deferred_exec_id {
+                    return get_deferred_work(storage, state, deferred_exec_id);
+                }
+            }
+            Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ProcessQueueItem { id: queue_id },
+            })
+        }
     }
 }
 
