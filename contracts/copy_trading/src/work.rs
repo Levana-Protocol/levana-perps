@@ -37,9 +37,9 @@ fn get_deferred_work(
     if status.status.is_pending() {
         return Ok(WorkResp::NoWork);
     }
-    return Ok(WorkResp::HasWork {
+    Ok(WorkResp::HasWork {
         work_description: WorkDescription::HandleDeferredExecId {},
-    });
+    })
 }
 
 fn get_work_from_dec_queue(
@@ -499,12 +499,11 @@ pub(crate) fn process_queue_item(
                         token_value.set_outdated();
                         crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
                         queue_item.status = ProcessingStatus::InProgress;
-                        // todo: Why this didn't cause issue ?
-                        // crate::state::COLLATERAL_DECREASE_QUEUE.save(
-                        //     storage,
-                        //     &queue_pos_id,
-                        //     &queue_item,
-                        // )?;
+                        crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                            storage,
+                            &queue_pos_id,
+                            &queue_item,
+                        )?;
                         // We use reply aways so that we also handle the error case
                         let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
                         let response = response.add_event(event);

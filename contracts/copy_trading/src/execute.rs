@@ -208,7 +208,7 @@ fn execute_leader_msg(
                         take_profit,
                     }),
                 },
-                status: copy_trading::ProcessingStatus::InProgress,
+                status: copy_trading::ProcessingStatus::NotProcessed,
                 wallet: state.config.leader.clone(),
             };
             crate::state::COLLATERAL_DECREASE_QUEUE.save(

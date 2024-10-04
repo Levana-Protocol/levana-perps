@@ -85,7 +85,6 @@ fn leader_opens_correct_position() {
     market
         .exec_copy_trading_open_position("50", DirectionToBase::Long, "1.5")
         .unwrap();
-    // market.exec_ct_leader("2.5").unwrap();
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(
         work,
