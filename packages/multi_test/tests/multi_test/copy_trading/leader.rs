@@ -293,7 +293,6 @@ fn lp_token_value_reduced_after_open() {
     assert!(shares.raw() > "20".parse().unwrap());
 }
 
-
 // #[test]
 // fn leader_position_closed() {
 //     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
@@ -348,7 +347,6 @@ fn lp_token_value_reduced_after_open() {
 
 //     let foo = market.query_collateral_balance(&market.copy_trading_addr).unwrap();
 //     println!("foo 1: {foo}");
-
 
 //     let trader1 = market.clone_trader(1).unwrap();
 //     deposit_money(&market, &trader1, "20");
