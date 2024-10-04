@@ -150,7 +150,6 @@ fn leader_incorrect_position() {
     load_markets(&market);
 
     deposit_money(&market, &trader, "200");
-
     withdraw_money(&market, &trader, "10");
     withdraw_money(&market, &trader, "10");
 
@@ -294,4 +293,19 @@ fn lp_token_value_reduced_after_open() {
     assert!(shares.raw() > "20".parse().unwrap());
 }
 
-// todo: test to make the validation fail!
+#[test]
+fn load_work_after_six_hours() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    load_markets(&market);
+
+    market
+        .set_time(levana_perpswap_multi_test::time::TimeJump::Hours(7))
+        .unwrap();
+
+    // Process queue item: Load market after 6 hours.
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+}

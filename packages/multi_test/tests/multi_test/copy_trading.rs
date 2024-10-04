@@ -124,6 +124,10 @@ fn detect_process_queue_item_work() {
 }
 
 pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
+    // Should not have any prior work
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
     market
         .exec_copytrading_mint_and_deposit(trader, amount)
         .unwrap();
@@ -151,7 +155,13 @@ pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
 }
 
 pub(crate) fn withdraw_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
+    // Should not find any work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
     market.exec_copytrading_withdrawal(trader, amount).unwrap();
+    // Process queue item: compute lp token value
+    market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual withdrawal
     market.exec_copytrading_do_work(trader).unwrap();
     let work = market.query_copy_trading_work().unwrap();
@@ -204,6 +214,7 @@ fn do_actual_deposit() {
 fn does_not_compute_lp_token_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
+    let token = market.get_copytrading_token().unwrap();
 
     load_markets(&market);
 
@@ -225,18 +236,27 @@ fn does_not_compute_lp_token_work() {
         .exec_copytrading_mint_and_deposit(&trader, "100")
         .unwrap();
 
-    // Should not compute LP token value since there has been no positions opened etc.
+    // Should compute LP token value even if there are no positions
+    // opened. Because the leader could have opened a position which
+    // would have liquidated. Once it gets liquidated, the token value
+    // would have to be re-computed.
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(1))
+            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
+                token
             }
         }
     );
+    // Process queue item: Compute lp token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+
     // Process queue item: Do actual deposit
     market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
 }
 
 #[test]
@@ -246,14 +266,7 @@ fn do_withdraw() {
 
     load_markets(&market);
 
-    market
-        .exec_copytrading_mint_and_deposit(&trader, "100")
-        .unwrap();
-
-    // Compute LP token value
-    market.exec_copytrading_do_work(&trader).unwrap();
-    // Process queue item: do the actual deposit
-    market.exec_copytrading_do_work(&trader).unwrap();
+    deposit_money(&market, &trader, "100");
 
     let initial_balance = market.query_copy_trading_balance(&trader).unwrap();
     assert_eq!(initial_balance.balance[0].shares, "100".parse().unwrap());
@@ -261,7 +274,10 @@ fn do_withdraw() {
     market
         .exec_copytrading_withdrawal(&trader, "101")
         .unwrap_err();
+
     market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    // Process queue item: Compute lp token value
+    market.exec_copytrading_do_work(&trader).unwrap();
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(
         work,
@@ -283,6 +299,8 @@ fn do_withdraw() {
         .exec_copytrading_withdrawal(&trader, "51")
         .unwrap_err();
     market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
     // Process queue item: do the actual withdrawal
     market.exec_copytrading_do_work(&trader).unwrap();
     market
@@ -340,14 +358,7 @@ fn query_leader_tokens() {
 
     load_markets(&market);
 
-    market
-        .exec_copytrading_mint_and_deposit(&trader, "100")
-        .unwrap();
-
-    // Compute LP token value
-    market.exec_copytrading_do_work(&trader).unwrap();
-    // Process queue item: do the actual deposit
-    market.exec_copytrading_do_work(&trader).unwrap();
+    deposit_money(&market, &trader, "100");
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -356,8 +367,7 @@ fn query_leader_tokens() {
     assert_eq!(tokens[0].collateral, "100".parse().unwrap());
     assert_eq!(tokens[0].shares, "100".parse().unwrap());
 
-    market.exec_copytrading_withdrawal(&trader, "50").unwrap();
-    market.exec_copytrading_do_work(&trader).unwrap();
+    withdraw_money(&market, &trader, "50");
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -374,21 +384,18 @@ fn withdraw_bug_perp_4159() {
 
     load_markets(&market);
 
-    market
-        .exec_copytrading_mint_and_deposit(&trader, "100")
-        .unwrap();
-
-    // Compute LP token value
-    market.exec_copytrading_do_work(&trader).unwrap();
-    // Process queue item: do the actual deposit
-    market.exec_copytrading_do_work(&trader).unwrap();
+    deposit_money(&market, &trader, "100");
 
     // Issue full withdrawal
     market.exec_copytrading_withdrawal(&trader, "100").unwrap();
     // You can still issue full withdrawal since withdrawal action has not been executed yet
     market.exec_copytrading_withdrawal(&trader, "100").unwrap();
 
+    // Compute LP token value
+    market.exec_copytrading_do_work(&trader).unwrap();
     // Does full withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Compute LP token value
     market.exec_copytrading_do_work(&trader).unwrap();
     // This should not fail making the queue stuck!
     market.exec_copytrading_do_work(&trader).unwrap();

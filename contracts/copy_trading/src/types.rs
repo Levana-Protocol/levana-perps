@@ -195,6 +195,8 @@ pub(crate) enum LpTokenStatus {
     Valid {
         /// Timestamp the value was last computed
         timestamp: Timestamp,
+        /// Computed for which queue id
+        queue_id: QueuePositionId,
     },
     /// Outdated because of open positions etc. Need to be computed
     /// again.
@@ -203,9 +205,12 @@ pub(crate) enum LpTokenStatus {
 }
 
 impl LpTokenStatus {
-    pub(crate) fn valid(&self) -> bool {
+    pub(crate) fn valid(&self, queue_id: &QueuePositionId) -> bool {
         match self {
-            LpTokenStatus::Valid { .. } => true,
+            LpTokenStatus::Valid {
+                queue_id: self_queue_id,
+                ..
+            } => self_queue_id == queue_id,
             LpTokenStatus::Outdated => false,
         }
     }

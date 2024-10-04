@@ -6,10 +6,13 @@ use msg::contracts::{
 };
 
 use crate::{
-    common::{get_current_processed_dec_queue_id, SIX_HOURS_IN_SECONDS},
+    common::{
+        get_current_processed_dec_queue_id, get_current_processed_inc_queue_id,
+        SIX_HOURS_IN_SECONDS,
+    },
     prelude::*,
     reply::REPLY_ID_OPEN_POSITION,
-    types::{State, WalletInfo},
+    types::{DecQueuePosition, State, WalletInfo},
 };
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
@@ -19,6 +22,10 @@ fn get_deferred_work(
     deferred_exec_id: DeferredExecId,
 ) -> Result<WorkResp> {
     let (_queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
+    let queue_item = match queue_item {
+        Some(queue_item) => queue_item,
+        None => bail!("Impossible: Work handle not able to find queue item"),
+    };
     let market_id = match queue_item.item.clone() {
         DecQueueItem::MarketItem { id, .. } => id,
         _ => bail!("Impossible: Deferred work handler got non market item"),
@@ -44,12 +51,11 @@ fn get_deferred_work(
 
 fn get_work_from_dec_queue(
     queue_id: DecQueuePositionId,
+    queue_item: Option<DecQueuePosition>,
     storage: &dyn Storage,
     state: &State,
 ) -> Result<WorkResp> {
-    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
-        .key(&queue_id)
-        .may_load(storage)?;
+    let queue_id = QueuePositionId::DecQueuePositionId(queue_id);
     let queue_item = match queue_item {
         Some(queue_item) => queue_item,
         None => return Ok(WorkResp::NoWork),
@@ -62,7 +68,7 @@ fn get_work_from_dec_queue(
             let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
             match lp_token_value {
                 Some(lp_token_value) => {
-                    if lp_token_value.status.valid() {
+                    if lp_token_value.status.valid(&queue_id) {
                         if status == ProcessingStatus::InProgress {
                             let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
                                 .may_load(storage)?
@@ -72,9 +78,7 @@ fn get_work_from_dec_queue(
                             }
                         }
                         return Ok(WorkResp::HasWork {
-                            work_description: WorkDescription::ProcessQueueItem {
-                                id: QueuePositionId::DecQueuePositionId(queue_id),
-                            },
+                            work_description: WorkDescription::ProcessQueueItem { id: queue_id },
                         });
                     } else {
                         // LP token is invalid. But if we have
@@ -136,11 +140,19 @@ fn get_work_from_dec_queue(
                 work_description: WorkDescription::ComputeLpTokenValue { token },
             })
         }
-        RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
-            work_description: WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::DecQueuePositionId(queue_id),
-            },
-        }),
+        RequiresToken::NoToken {} => {
+            if status == ProcessingStatus::InProgress {
+                let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                    .may_load(storage)?
+                    .flatten();
+                if let Some(deferred_exec_id) = deferred_exec_id {
+                    return get_deferred_work(storage, state, deferred_exec_id);
+                }
+            }
+            Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ProcessQueueItem { id: queue_id },
+            })
+        }
     }
 }
 
@@ -182,28 +194,20 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
         }
     }
 
-    let inc_queue = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
-    let dec_queue = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
-    let next_inc_queue_position = match inc_queue {
-        Some(queue_position) => queue_position.next(),
-        None => IncQueuePositionId::new(0),
-    };
-    let next_dec_queue_position = match dec_queue {
-        Some(queue_position) => queue_position.next(),
-        None => DecQueuePositionId::new(0),
-    };
-    let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
-        .key(&next_inc_queue_position)
-        .may_load(storage)?;
-
-    let queue_item = match queue_item {
-        Some(queue_item) => queue_item.item,
+    let (next_inc_queue_position, inc_queue_item) = get_current_processed_inc_queue_id(storage)?;
+    // We always prioritize queue items that increases our collateral
+    let queue_item = match inc_queue_item {
+        Some(inc_queue_item) => inc_queue_item,
         None => {
-            let work = get_work_from_dec_queue(next_dec_queue_position, storage, state)?;
+            let (next_dec_queue_position, dec_queue_item) =
+                get_current_processed_dec_queue_id(storage)?;
+            let work =
+                get_work_from_dec_queue(next_dec_queue_position, dec_queue_item, storage, state)?;
             return Ok(work);
         }
     };
 
+    let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
 
     match requires_token {
@@ -211,7 +215,12 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
             let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
             match lp_token_value {
                 Some(lp_token_value) => {
-                    if lp_token_value.status.valid() {
+                    if lp_token_value
+                        .status
+                        .valid(&QueuePositionId::IncQueuePositionId(
+                            next_inc_queue_position,
+                        ))
+                    {
                         return Ok(WorkResp::HasWork {
                             work_description: WorkDescription::ProcessQueueItem {
                                 id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
@@ -387,9 +396,25 @@ pub(crate) fn process_queue_item(
                         .may_load(storage, &contract_token)?
                         .context("TOTALS is empty")?;
                     if funds.raw() > totals.collateral {
-                        bail!("Not enough collateral")
+                        queue_item.status = copy_trading::ProcessingStatus::Failed(
+                            FailedReason::NotEnoughCollateral {
+                                available: totals.collateral,
+                                requested: funds,
+                            },
+                        );
+                        crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                            storage,
+                            &queue_pos_id,
+                            &queue_item,
+                        )?;
+                        let event = event
+                            .add_attribute("failed", true.to_string())
+                            .add_attribute("reason", "not-enough-collateral");
+                        let response = Response::new().add_event(event);
+                        return Ok(response);
                     } else {
                         totals.collateral = totals.collateral.checked_sub(funds.raw())?;
+                        totals.shares = totals.shares.checked_sub(shares.raw())?;
                     };
                     let mut pending_store_update = || -> std::result::Result<(), _> {
                         if remaining_shares.is_zero() {

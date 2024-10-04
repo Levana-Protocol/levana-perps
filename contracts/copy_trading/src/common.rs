@@ -1,8 +1,8 @@
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, MarketInfo, MarketLoaderStatus, OneLpTokenValue, OpenPositionsResp,
-        PositionCollateral, State, TokenResp, Totals,
+        DecQueuePosition, IncQueuePosition, MarketInfo, MarketLoaderStatus, OneLpTokenValue,
+        OpenPositionsResp, PositionCollateral, State, TokenResp, Totals,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -99,6 +99,8 @@ impl<'a> State<'a> {
                                 // loaded market in this contract ?
                                 last_seen
                             } else {
+                                crate::state::LAST_MARKET_ADD_CHECK
+                                    .save(storage, &Timestamp::into(self.env.block.time.into()))?;
                                 return Ok(());
                             }
                         } else {
@@ -449,18 +451,46 @@ pub(crate) fn get_next_dec_queue_id(storage: &mut dyn Storage) -> Result<DecQueu
     Ok(queue_id)
 }
 
+/// Get queue element from Dec queue to process currently
 pub(crate) fn get_current_processed_dec_queue_id(
     storage: &dyn Storage,
-) -> Result<(DecQueuePositionId, DecQueuePosition)> {
+) -> Result<(DecQueuePositionId, Option<DecQueuePosition>)> {
     let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     let queue_id = match queue_id {
         Some(queue_id) => queue_id.next(),
         None => DecQueuePositionId::new(0),
     };
     let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
-    let queue_item = match queue_item {
-        Some(queue_item) => queue_item,
-        None => bail!("Impossible: Work handle not able to find queue item"),
-    };
+
     Ok((queue_id, queue_item))
+}
+
+/// Get queue element from Inc queue to process currently
+pub(crate) fn get_current_processed_inc_queue_id(
+    storage: &dyn Storage,
+) -> Result<(IncQueuePositionId, Option<IncQueuePosition>)> {
+    let queue_id = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
+    let queue_id = match queue_id {
+        Some(queue_id) => queue_id.next(),
+        None => IncQueuePositionId::new(0),
+    };
+    let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE.may_load(storage, &queue_id)?;
+
+    Ok((queue_id, queue_item))
+}
+
+/// Get current queue element id that needs to be processed. Before
+/// calling this function ensure that there is atleast one pending
+/// element in the queue to be processed.
+pub(crate) fn get_current_queue_element(storage: &dyn Storage) -> Result<QueuePositionId> {
+    let (queue_id, queue_item) = get_current_processed_inc_queue_id(storage)?;
+    if queue_item.is_some() {
+        Ok(QueuePositionId::IncQueuePositionId(queue_id))
+    } else {
+        let (queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
+        if queue_item.is_some() {
+            return Ok(QueuePositionId::DecQueuePositionId(queue_id));
+        }
+        bail!("No queue item found to process")
+    }
 }
