@@ -182,6 +182,12 @@ pub(crate) struct LpTokenValue {
     pub(crate) status: LpTokenStatus,
 }
 
+impl LpTokenValue {
+    pub(crate) fn set_outdated(&mut self) {
+        self.status = LpTokenStatus::Outdated;
+    }
+}
+
 /// Status of [LpTokenValue]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub(crate) enum LpTokenStatus {

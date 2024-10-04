@@ -511,11 +511,11 @@ fn validate_single_market(
         .unwrap_or_default();
     let mut total_open_positions = 0u64;
     let mut total_orders = 0u64;
+    let mut tokens_start_after = None;
     // todo: need to break if query limit exeeded
     loop {
         // We have to iterate again entirely, because a position can
         // close.
-        let mut tokens_start_after = None;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
@@ -531,8 +531,8 @@ fn validate_single_market(
         crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
         return Ok(ValidationStatus::Failed);
     }
+    let mut orders_start_after = None;
     loop {
-        let mut orders_start_after = None;
         let orders = state.load_orders(&market.addr, orders_start_after)?;
         orders_start_after = orders.next_start_after;
         // todo: optimize if empty orders
@@ -565,8 +565,8 @@ fn process_single_market(
         .may_load(storage, &market.id)
         .context("Could not load MARKET_WORK_INFO")?
         .unwrap_or_default();
+    let mut tokens_start_after = None;
     loop {
-        let mut tokens_start_after = None;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
@@ -586,8 +586,8 @@ fn process_single_market(
     }
     // todo: do not save here, if we are saving below
     crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
+    let mut orders_start_after = None;
     loop {
-        let mut orders_start_after = None;
         let orders = state.load_orders(&market.addr, orders_start_after)?;
         orders_start_after = orders.next_start_after;
         // todo: optimize if empty orders

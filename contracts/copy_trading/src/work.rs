@@ -1,6 +1,9 @@
 use anyhow::bail;
 use cosmwasm_std::SubMsg;
-use msg::contracts::{copy_trading, market::deferred_execution::GetDeferredExecResp};
+use msg::contracts::{
+    copy_trading,
+    market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
+};
 
 use crate::{
     common::{get_current_processed_dec_queue_id, SIX_HOURS_IN_SECONDS},
@@ -9,6 +12,35 @@ use crate::{
     types::{State, WalletInfo},
 };
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+
+fn get_deferred_work(
+    storage: &dyn Storage,
+    state: &State,
+    deferred_exec_id: DeferredExecId,
+) -> Result<WorkResp> {
+    let (_queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
+    let market_id = match queue_item.item.clone() {
+        DecQueueItem::MarketItem { id, .. } => id,
+        _ => bail!("Impossible: Deferred work handler got non market item"),
+    };
+    let market_addr = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS state is empty")?
+        .addr;
+    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let status = match response {
+        GetDeferredExecResp::Found { item } => item,
+        GetDeferredExecResp::NotFound {} => {
+            bail!("Impossible: Deferred exec id not found")
+        }
+    };
+    if status.status.is_pending() {
+        return Ok(WorkResp::NoWork);
+    }
+    return Ok(WorkResp::HasWork {
+        work_description: WorkDescription::HandleDeferredExecId {},
+    });
+}
 
 fn get_work_from_dec_queue(
     queue_id: DecQueuePositionId,
@@ -36,32 +68,7 @@ fn get_work_from_dec_queue(
                                 .may_load(storage)?
                                 .flatten();
                             if let Some(deferred_exec_id) = deferred_exec_id {
-                                let (_queue_id, queue_item) =
-                                    get_current_processed_dec_queue_id(storage)?;
-                                let market_id = match queue_item.item.clone() {
-                                    DecQueueItem::MarketItem { id, .. } => id,
-                                    _ => bail!(
-                                        "Impossible: Deferred work handler got non market item"
-                                    ),
-                                };
-                                let market_addr = crate::state::MARKETS
-                                    .may_load(storage, &market_id)?
-                                    .context("MARKETS state is empty")?
-                                    .addr;
-                                let response =
-                                    state.get_deferred_exec(&market_addr, deferred_exec_id)?;
-                                let status = match response {
-                                    GetDeferredExecResp::Found { item } => item,
-                                    GetDeferredExecResp::NotFound {} => {
-                                        bail!("Impossible: Deferred exec id not found")
-                                    }
-                                };
-                                if status.status.is_pending() {
-                                    return Ok(WorkResp::NoWork);
-                                }
-                                return Ok(WorkResp::HasWork {
-                                    work_description: WorkDescription::HandleDeferredExecId {},
-                                });
+                                return get_deferred_work(storage, state, deferred_exec_id);
                             }
                         }
                         return Ok(WorkResp::HasWork {
@@ -69,6 +76,16 @@ fn get_work_from_dec_queue(
                                 id: QueuePositionId::DecQueuePositionId(queue_id),
                             },
                         });
+                    } else {
+                        // LP token is invalid. But if we have
+                        // deferred exec id, best to handle it
+                        // before we try to compute lp token value.
+                        let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                            .may_load(storage)?
+                            .flatten();
+                        if let Some(deferred_exec_id) = deferred_exec_id {
+                            return get_deferred_work(storage, state, deferred_exec_id);
+                        }
                     }
                 }
                 None => {
@@ -476,7 +493,18 @@ pub(crate) fn process_queue_item(
                         }
 
                         crate::state::TOTALS.save(storage, &token, &totals)?;
+                        let mut token_value = crate::state::LP_TOKEN_VALUE
+                            .may_load(storage, &token)?
+                            .context("LP_TOKEN_VALUE store is empty")?;
+                        token_value.set_outdated();
+                        crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
                         queue_item.status = ProcessingStatus::InProgress;
+                        // todo: Why this didn't cause issue ?
+                        // crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                        //     storage,
+                        //     &queue_pos_id,
+                        //     &queue_item,
+                        // )?;
                         // We use reply aways so that we also handle the error case
                         let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
                         let response = response.add_event(event);
