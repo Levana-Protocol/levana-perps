@@ -256,3 +256,42 @@ fn leader_open_position_compute_token() {
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "230".parse().unwrap());
 }
+
+#[test]
+fn lp_token_value_reduced_after_open() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200");
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "200".parse().unwrap());
+
+    // Leader opens a position
+    market
+        .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+        .unwrap();
+
+    // Process queue item: Open the position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    // Process queue item: Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    deposit_money(&market, &trader1, "20");
+    let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+    let shares = tokens.balance[0].shares;
+    // Since token value has reduced, he can buy more shares for the same amount
+    assert!(shares.raw() > "20".parse().unwrap());
+}
+
+// todo: test to make the validation fail!
