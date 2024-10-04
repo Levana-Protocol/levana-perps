@@ -1,6 +1,6 @@
 use anyhow::bail;
 use cosmwasm_std::CosmosMsg;
-use msg::contracts::copy_trading;
+use perpswap::contracts::copy_trading;
 
 use crate::{
     common::SIX_HOURS_IN_SECONDS,

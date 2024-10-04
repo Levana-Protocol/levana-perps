@@ -8,8 +8,8 @@ use crate::{
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-use msg::contracts::copy_trading;
-use shared::time::Timestamp;
+use perpswap::contracts::copy_trading;
+use perpswap::time::Timestamp;
 
 #[must_use]
 enum Funds {
@@ -37,7 +37,7 @@ impl Funds {
         }
     }
 
-    fn require_some(self, market_token: &msg::token::Token) -> Result<NonZero<Collateral>> {
+    fn require_some(self, market_token: &perpswap::token::Token) -> Result<NonZero<Collateral>> {
         match self {
             Funds::NoFunds => Err(anyhow!(
                 "Message requires attached funds, but none were provided"

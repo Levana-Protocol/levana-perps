@@ -7,6 +7,7 @@ members = [
     "contracts/position_token",
     "packages/msg",
     "packages/shared",
+    "packages/perpswap",
 ]
 
 [profile.release]

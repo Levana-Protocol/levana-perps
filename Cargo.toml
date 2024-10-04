@@ -19,6 +19,7 @@ members = [
     # Code used by the smart contracts
     "packages/msg",
     "packages/shared",
+    "packages/perpswap",
 
     # Code used for testing the smart contracts off chain
     "packages/multi_test",

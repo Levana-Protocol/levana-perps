@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Context, Result};
-use msg::contracts::{
+use perpswap::contracts::{
     factory::entry::MarketsResp,
     market::{
         deferred_execution::{DeferredExecId, ListDeferredExecsResp},
@@ -15,18 +15,18 @@ use msg::contracts::{
         position::{PositionId, PositionsResp},
     },
 };
-use shared::{namespace::FACTORY_MARKET_LAST_ADDED, time::Timestamp};
+use perpswap::{namespace::FACTORY_MARKET_LAST_ADDED, time::Timestamp};
 
 pub(crate) const SIX_HOURS_IN_SECONDS: u64 = 6 * 60 * 60;
 
 impl<'a> State<'a> {
-    pub(crate) fn to_token(&self, token: &msg::token::Token) -> Result<Token> {
+    pub(crate) fn to_token(&self, token: &perpswap::token::Token) -> Result<Token> {
         let token = match token {
-            msg::token::Token::Cw20 { addr, .. } => {
+            perpswap::token::Token::Cw20 { addr, .. } => {
                 let addr = addr.validate(self.api)?;
                 Token::Cw20(addr)
             }
-            msg::token::Token::Native { denom, .. } => Token::Native(denom.clone()),
+            perpswap::token::Token::Native { denom, .. } => Token::Native(denom.clone()),
         };
         Ok(token)
     }
@@ -67,7 +67,7 @@ impl<'a> State<'a> {
         let factory = &self.config.factory;
         let MarketsResp { markets } = self.querier.query_wasm_smart(
             factory,
-            &msg::contracts::factory::entry::QueryMsg::Markets {
+            &perpswap::contracts::factory::entry::QueryMsg::Markets {
                 start_after,
                 limit: Some(30),
             },
@@ -155,7 +155,7 @@ impl<'a> State<'a> {
             return Ok((info, true));
         }
 
-        let msg::contracts::factory::entry::MarketInfoResponse {
+        let perpswap::contracts::factory::entry::MarketInfoResponse {
             market_addr,
             position_token: _,
             liquidity_token_lp: _,
@@ -164,7 +164,7 @@ impl<'a> State<'a> {
             .querier
             .query_wasm_smart(
                 &self.config.factory,
-                &msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                &perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                     market_id: market_id.clone(),
                 },
             )
@@ -175,11 +175,11 @@ impl<'a> State<'a> {
                 )
             })?;
 
-        let status: msg::contracts::market::entry::StatusResp = self
+        let status: perpswap::contracts::market::entry::StatusResp = self
             .querier
             .query_wasm_smart(
                 &market_addr,
-                &msg::contracts::market::entry::QueryMsg::Status { price: None },
+                &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
             )
             .with_context(|| format!("Unable to load market status from contract {market_addr}"))?;
 
@@ -237,7 +237,7 @@ impl<'a> State<'a> {
         &self,
         storage: &mut dyn Storage,
         token: &Token,
-    ) -> Result<msg::token::Token> {
+    ) -> Result<perpswap::token::Token> {
         let market = crate::state::MARKETS_TOKEN
             .prefix(token.clone())
             .range(storage, None, None, cosmwasm_std::Order::Ascending)
@@ -284,7 +284,7 @@ impl<'a> State<'a> {
         let Resp { tokens } = self.querier.query_wasm_smart(
             market_addr,
             &MarketQueryMsg::NftProxy {
-                nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
+                nft_msg: perpswap::contracts::position_token::entry::QueryMsg::Tokens {
                     owner: self.my_addr.as_ref().into(),
                     start_after,
                     limit: None,

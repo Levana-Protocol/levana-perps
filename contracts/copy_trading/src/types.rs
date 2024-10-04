@@ -3,13 +3,13 @@ use std::fmt::Display;
 use cosmwasm_std::{StdError, StdResult};
 use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
-use msg::contracts::copy_trading;
-use msg::contracts::market::{
+use perpswap::contracts::copy_trading;
+use perpswap::contracts::market::{
     deferred_execution::DeferredExecId,
     order::OrderId,
     position::{PositionId, PositionQueryResponse},
 };
-use shared::{number::Usd, time::Timestamp};
+use perpswap::{number::Usd, time::Timestamp};
 
 use crate::prelude::*;
 
@@ -20,7 +20,7 @@ pub(crate) struct MarketInfo {
     /// Market address
     pub(crate) addr: Addr,
     /// Token used by the market
-    pub(crate) token: msg::token::Token,
+    pub(crate) token: perpswap::token::Token,
 }
 
 pub(crate) struct State<'a> {
@@ -71,17 +71,17 @@ pub enum ProcessingStatus {
     /// Not started Yet
     NotStarted,
     /// The last seen position id. Should be passed to
-    /// [msg::contracts::position_token::entry::QueryMsg::Tokens]
+    /// [perpswap::contracts::position_token::entry::QueryMsg::Tokens]
     OpenPositions(Option<String>),
     /// The latest deferred exec item we're waiting on. Should be
     /// passed to
-    /// [msg::contracts::market::entry::QueryMsg::ListDeferredExecs]
+    /// [perpswap::contracts::market::entry::QueryMsg::ListDeferredExecs]
     Deferred(Option<DeferredExecId>),
     /// Last seen limit order. Should be passed to
-    /// [msg::contracts::market::entry::QueryMsg::LimitOrders]
+    /// [perpswap::contracts::market::entry::QueryMsg::LimitOrders]
     LimitOrder(Option<OrderId>),
     /// Last seen limit order. Should be passed to
-    /// [msg::contracts::market::entry::QueryMsg::LimitOrderHistory]
+    /// [perpswap::contracts::market::entry::QueryMsg::LimitOrderHistory]
     LimitOrderHistory(Option<String>),
     /// Calculation reset required because a position was opened
     ResetRequired,
