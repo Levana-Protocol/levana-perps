@@ -499,7 +499,11 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
         .collateral
         .checked_add(total_open_position_collateral)?;
     let total_shares = totals.shares;
-    let one_share_value = total_collateral.checked_div_dec(total_shares.into_decimal256())?;
+    let one_share_value = if total_shares.is_zero() || total_collateral.is_zero() {
+        Collateral::one()
+    } else {
+        total_collateral.checked_div_dec(total_shares.into_decimal256())?
+    };
     let queue_id = get_current_queue_element(storage)?;
     let token_value = LpTokenValue {
         value: OneLpTokenValue(one_share_value),
