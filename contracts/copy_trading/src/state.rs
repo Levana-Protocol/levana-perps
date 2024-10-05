@@ -1,4 +1,6 @@
-use msg::contracts::market::deferred_execution::DeferredExecId;
+use msg::contracts::market::{
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, position::PositionId,
+};
 use shared::time::Timestamp;
 
 use crate::{
@@ -71,3 +73,26 @@ pub(crate) const MARKET_LOADER_STATUS: Item<MarketLoaderStatus> = Item::new("mar
 /// Deferred exec status stored in the reply entrypoint
 pub(crate) const REPLY_DEFERRED_EXEC_ID: Item<Option<DeferredExecId>> =
     Item::new("reply-deferred-exec-id");
+
+/// Last closed position
+pub(crate) const LAST_CLOSED_POSITION_CURSOR: Map<MarketId, ClosedPositionCursor> =
+    Map::new("last-closed-position-cursor");
+
+/// Open positions by the contract
+pub(crate) const OPEN_POSITIONS: Map<&(MarketId, PositionId), ()> = Map::new("open-positions");
+
+/// Closed positions by the contract
+pub(crate) const CLOSED_POSITIONS: Map<&(MarketId, PositionId), ()> = Map::new("closed-positions");
+
+// Algorithm
+// Populate OPEN_POSITIONS in the deferred exec handler.
+// Now in the get_work algorithm, if lp token computation is required. Then check the current token balance and TOTALS variable.
+// If they are same, return to compute LP token computation.
+// If not, that means Rebalance {token} is required.
+
+// Algorithm for Rebalance {token}
+// find all market ids for that token
+// go through open_positions variable, check if position id has changed.
+
+// It is essential, that we pay comission by checking pnl. If not, reducing a possition collateral will increase the balance and a leader can get money without doing any work!
+// another alternative is to store the closed cursor. Basically query using ClosedPositionHistory market endpoint.

@@ -94,9 +94,7 @@ fn get_work_from_dec_queue(
                 }
                 None => {
                     // For this token, the value was never in the store.
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
 
@@ -127,18 +125,14 @@ fn get_work_from_dec_queue(
                     });
                 }
                 if !work.processing_status.is_validated() {
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
             // We have gone through all the markets here and looks
             // like all the market has been validated. The only part
             // remaining to be done here is computation of lp token
             // value.
-            Ok(WorkResp::HasWork {
-                work_description: WorkDescription::ComputeLpTokenValue { token },
-            })
+            check_balance_work(storage, state, &token)
         }
         RequiresToken::NoToken {} => {
             if status == ProcessingStatus::InProgress {
@@ -230,9 +224,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 }
                 None => {
                     // For this token, the value was never in the store.
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
 
@@ -263,18 +255,14 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     });
                 }
                 if !work.processing_status.is_validated() {
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
             // We have gone through all the markets here and looks
             // like all the market has been validated. The only part
             // remaining to be done here is computation of lp token
             // value.
-            Ok(WorkResp::HasWork {
-                work_description: WorkDescription::ComputeLpTokenValue { token },
-            })
+            check_balance_work(storage, state, &token)
         }
         RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
             work_description: WorkDescription::ProcessQueueItem {
@@ -297,12 +285,13 @@ pub(crate) fn process_queue_item(
                 .context("PENDING_QUEUE_ITEMS load failed")?;
             match queue_item.item.clone() {
                 IncQueueItem::Deposit { funds, token } => {
+                    let token_value = state.load_lp_token_value(storage, &token)?;
+                    let new_shares = token_value.collateral_to_shares(funds)?;
                     let mut totals = crate::state::TOTALS
                         .may_load(storage, &token)
                         .context("Could not load TOTALS")?
                         .unwrap_or_default();
-                    let token_value = state.load_lp_token_value(storage, &token)?;
-                    let new_shares = totals.add_collateral(funds, token_value)?;
+                    totals.shares = totals.shares.checked_add(new_shares.raw())?;
                     crate::state::TOTALS.save(storage, &token, &totals)?;
                     let wallet_info = WalletInfo {
                         token,
@@ -389,7 +378,6 @@ pub(crate) fn process_queue_item(
                     let funds = token_value.shares_to_collateral(shares)?;
                     let token = state.get_first_full_token_info(storage, &wallet_info.token)?;
                     let withdraw_msg = token.into_transfer_msg(&wallet_info.wallet, funds)?;
-
                     let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;
                     let contract_token = state.to_token(&token)?;
                     let mut totals = crate::state::TOTALS
@@ -538,5 +526,41 @@ pub(crate) fn process_queue_item(
                 },
             }
         }
+    }
+}
+
+pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -> Result<WorkResp> {
+    let market_token = state.get_first_full_token_info(storage, token)?;
+    let contract_balance = market_token.query_balance(&state.querier, &state.my_addr)?;
+    let totals = crate::state::TOTALS
+        .may_load(storage, &token)?
+        .unwrap_or_default();
+    if totals.collateral == contract_balance {
+        Ok(WorkResp::HasWork {
+            work_description: WorkDescription::ComputeLpTokenValue {
+                token: token.clone(),
+            },
+        })
+    } else {
+        // Now there are multiple reasons why it would be
+        // unbalanced. There could have been multiple deposits or
+        // multiple positions closed.
+        // This check is merly an optimization.
+        let (queue_id, queue_item) = get_current_processed_inc_queue_id(storage)?;
+        if let Some(queue_item) = queue_item {
+            match queue_item.item {
+                IncQueueItem::Deposit { funds, token } => {
+                    // let new_contract_balance = contract_balance.checked_add(funds.raw())?;
+                    // if new_contract_balance ==
+                }
+            }
+            // let new_contract_balance = contract_balance.checked_add(queue_item.item)
+        }
+
+        Ok(WorkResp::HasWork {
+            work_description: WorkDescription::Rebalance {
+                token: token.clone(),
+            },
+        })
     }
 }

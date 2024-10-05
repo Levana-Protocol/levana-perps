@@ -345,7 +345,8 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
         WorkDescription::HandleDeferredExecId {} => {
             let response = handle_deferred_exec_id(storage, &state)?;
             Ok(response)
-        }
+        },
+        WorkDescription::Rebalance { token } => todo!(),
     }
 }
 
@@ -432,11 +433,19 @@ fn deposit(
     let queue_id = QueuePositionId::IncQueuePositionId(inc_queue_id);
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = IncQueuePosition {
-        item: copy_trading::IncQueueItem::Deposit { funds, token },
+        item: copy_trading::IncQueueItem::Deposit { funds, token: token.clone() },
         wallet: sender,
         status: copy_trading::ProcessingStatus::NotProcessed,
     };
     crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
+    // We modify the total nows, but allocate share to the wallet in
+    // later step as part of queue processing
+    let mut totals = crate::state::TOTALS
+                        .may_load(storage, &token)
+                        .context("Could not load TOTALS")?
+                        .unwrap_or_default();
+    totals.add_collateral2(funds)?;
+    crate::state::TOTALS.save(storage, &token, &totals)?;
     Ok(Response::new().add_event(
         Event::new("deposit")
             .add_attribute("collateral", funds.to_string())
@@ -539,10 +548,12 @@ fn validate_single_market(
     let mut total_open_positions = 0u64;
     let mut total_orders = 0u64;
     let mut tokens_start_after = None;
+    let mut iteration = 0;
     // todo: need to break if query limit exeeded
     loop {
         // We have to iterate again entirely, because a position can
         // close.
+        iteration += 1;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
@@ -592,8 +603,13 @@ fn process_single_market(
         .may_load(storage, &market.id)
         .context("Could not load MARKET_WORK_INFO")?
         .unwrap_or_default();
+    // todo: this needs to be fixed properly when batching is implemented
+    // Initialize it to empty before starting
+    market_work = MarketWorkInfo::default();
     let mut tokens_start_after = None;
+    let mut iteration= 0;
     loop {
+        iteration += 1;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens

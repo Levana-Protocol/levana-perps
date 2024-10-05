@@ -10,7 +10,7 @@ use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
         deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
-        entry::{LimitOrdersResp, PositionsQueryFeeApproach},
+        entry::{ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp, PositionsQueryFeeApproach},
         order::OrderId,
         position::{PositionId, PositionsResp},
     },
@@ -309,7 +309,7 @@ impl<'a> State<'a> {
         let PositionsResp {
             positions,
             pending_close,
-            closed: _,
+            closed,
         } = self.querier.query_wasm_smart(
             market_addr,
             &MarketQueryMsg::Positions {
@@ -320,13 +320,21 @@ impl<'a> State<'a> {
             },
         )?;
         // todo: Change this to Error
+        println!("pos: {positions:?}");
         assert!(pending_close.is_empty());
+        assert!(closed.is_empty(), "Closed is not empty");
         let start_after = positions.last().cloned().map(|item| item.id);
         Ok(OpenPositionsResp {
             positions,
             start_after,
         })
     }
+
+    // pub(crate) fn query_closed_position(&self, cursor: Option<ClosedPositionCursor>) -> Result<ClosedPositionsResp> {
+    //     let copy_trading = self.my_addr;
+    //     // let result = self.querier.query_wasm_smart(copy_trading, &MarketQueryMsg::ClosedPositionHistory { owner: (), cursor: (), limit: (), order: () })
+    //     todo!()
+    // }
 
     pub(crate) fn load_orders(
         &self,
@@ -401,6 +409,14 @@ impl Totals {
         self.collateral = self.collateral.checked_add(funds.raw())?;
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
+    }
+
+    pub(crate) fn add_collateral2(
+        &mut self,
+        funds: NonZero<Collateral>,
+    ) -> Result<()> {
+        self.collateral = self.collateral.checked_add(funds.raw())?;
+        Ok(())
     }
 
     /// Returns the collateral removed from the pool
