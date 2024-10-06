@@ -4,8 +4,8 @@ use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::copy_trading::{
-        DecQueuePositionId, IncQueueItem, IncQueuePositionId, QueueItem, QueuePositionId,
-        WorkDescription, WorkResp,
+        DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem,
+        QueueItemStatus, QueuePositionId, WorkDescription, WorkResp,
     },
     shared::number::{Collateral, NonZero},
 };
@@ -38,12 +38,15 @@ fn deposit() {
 
     assert_eq!(
         item,
-        &QueueItem::IncCollaleteral {
-            item: IncQueueItem::Deposit {
-                funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
-                token,
+        &QueueItemStatus {
+            item: QueueItem::IncCollaleteral {
+                item: IncQueueItem::Deposit {
+                    funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
+                    token,
+                },
+                id: IncQueuePositionId::new(0)
             },
-            id: IncQueuePositionId::new(0)
+            status: ProcessingStatus::NotProcessed
         }
     );
     assert!(response.inc_processed_till.is_none())
@@ -152,6 +155,12 @@ fn do_actual_deposit() {
     let another_trader = market.clone_trader(1).unwrap();
     let balance = market.query_copy_trading_balance(&another_trader).unwrap();
     assert!(balance.balance.is_empty());
+
+    let queue_resp = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    assert_eq!(queue_resp.items.len(), 1);
+    assert_eq!(queue_resp.items[0].status, ProcessingStatus::Finished);
 }
 
 #[test]
@@ -245,6 +254,15 @@ fn do_withdraw() {
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
+
+    let queue_resp = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    assert_eq!(queue_resp.items.len(), 3);
+    assert!(queue_resp
+        .items
+        .iter()
+        .all(|item| item.status == ProcessingStatus::Finished));
 }
 
 #[test]
