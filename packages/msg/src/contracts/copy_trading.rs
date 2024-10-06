@@ -196,6 +196,17 @@ pub enum ProcessingStatus {
     Failed(FailedReason),
 }
 
+impl ProcessingStatus {
+    /// Did the processing fail ?
+    pub fn failed(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => true,
+        }
+    }
+}
+
 /// Failure reason on why queue processing failed
 #[derive(Error, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub enum FailedReason {
@@ -212,6 +223,14 @@ pub enum FailedReason {
     FundLessThanMinChain {
         /// Requested collateral
         funds: NonZero<Collateral>,
+    },
+    /// Wallet does not have enough shares
+    #[error("Shares not available. Requested {requested}, but only available {available}")]
+    NotEnoughShares {
+        /// Available shares
+        available: LpToken,
+        /// Requested shares
+        requested: LpToken,
     },
 }
 
