@@ -53,6 +53,10 @@ decimal-places = 18
 denom = "factory/neutron1k6hr0f83e7un2wjf29cspk7j69jrnskk65k3ek2nj9dztrlzpj6q00rtsa/udatom"
 decimal-places = 6
 
+[neutron-mainnet.assets.amATOM]
+denom = "factory/neutron1shwxlkpdjd8h5wdtrykypwd2v62z5glr95yp0etdcspkkjwm5meq82ndxs/amatom"
+decimal-places = 6
+
 [stargaze-testnet]
 tracker = "stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3"
 faucet = "stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6"
