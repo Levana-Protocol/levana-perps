@@ -552,8 +552,6 @@ fn deposit(
         status: copy_trading::ProcessingStatus::NotProcessed,
     };
     crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
-    // We modify the total nows, but allocate share to the wallet in
-    // later step as part of queue processing
     let mut pending_deposits = crate::state::PENDING_DEPOSITS
         .may_load(storage, &token)
         .context("Could not load TOTALS")?
