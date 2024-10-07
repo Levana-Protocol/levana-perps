@@ -141,7 +141,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             message,
             collateral,
         } => {
-            state.config.check_leader(&sender)?;
+            state.config.ensure_leader(&sender)?;
             funds.require_none()?;
             execute_leader_msg(storage, &state, market_id, message, collateral)
         }
@@ -385,9 +385,9 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         Some(deferred_exec_id) => deferred_exec_id,
         None => bail!("Impossible: Work handle unable to find deferred exec id"),
     };
-    let (queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
-    let mut queue_item = match queue_item {
-        Some(queue_item) => queue_item,
+    let queue_item = get_current_processed_dec_queue_id(storage)?;
+    let (queue_id, mut queue_item) = match queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
         None => bail!("Impossible: Work handle not able to find queue item"),
     };
 
@@ -423,7 +423,6 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             executed,
             crank_price,
         } => {
-            // todo: Confirm with lvn-rusty-dragon on when this failure can happen
             queue_item.status =
                 copy_trading::ProcessingStatus::Failed(FailedReason::DeferredExecFailure {
                     reason,

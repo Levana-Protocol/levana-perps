@@ -66,7 +66,7 @@ impl Config {
     }
 
     /// Check leader
-    pub fn check_leader(&self, sender: &Addr) -> anyhow::Result<()> {
+    pub fn ensure_leader(&self, sender: &Addr) -> anyhow::Result<()> {
         if self.leader != sender {
             bail!("Unautorized access, only {} allowed", self.leader)
         }

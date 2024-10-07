@@ -62,6 +62,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 // todo: add events
             }
         };
+    } else {
+        bail!("Got unknown reply id {}", msg.id)
     }
     Ok(Response::new().add_event(Event::new("reply")))
 }

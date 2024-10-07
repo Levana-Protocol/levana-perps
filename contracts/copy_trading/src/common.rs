@@ -480,43 +480,48 @@ pub(crate) fn get_next_dec_queue_id(storage: &mut dyn Storage) -> Result<DecQueu
 /// Get queue element from Dec queue to process currently
 pub(crate) fn get_current_processed_dec_queue_id(
     storage: &dyn Storage,
-) -> Result<(DecQueuePositionId, Option<DecQueuePosition>)> {
+) -> Result<Option<(DecQueuePositionId, DecQueuePosition)>> {
     let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
     let queue_id = match queue_id {
         Some(queue_id) => queue_id.next(),
         None => DecQueuePositionId::new(0),
     };
     let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
-
-    Ok((queue_id, queue_item))
+    match queue_item {
+        Some(queue_item) => Ok(Some((queue_id, queue_item))),
+        None => Ok(None),
+    }
 }
 
 /// Get queue element from Inc queue to process currently
 pub(crate) fn get_current_processed_inc_queue_id(
     storage: &dyn Storage,
-) -> Result<(IncQueuePositionId, Option<IncQueuePosition>)> {
+) -> Result<Option<(IncQueuePositionId, IncQueuePosition)>> {
     let queue_id = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
     let queue_id = match queue_id {
         Some(queue_id) => queue_id.next(),
         None => IncQueuePositionId::new(0),
     };
     let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE.may_load(storage, &queue_id)?;
-
-    Ok((queue_id, queue_item))
+    match queue_item {
+        Some(queue_item) => Ok(Some((queue_id, queue_item))),
+        None => Ok(None),
+    }
 }
 
 /// Get current queue element id that needs to be processed. Before
 /// calling this function ensure that there is atleast one pending
 /// element in the queue to be processed.
 pub(crate) fn get_current_queue_element(storage: &dyn Storage) -> Result<QueuePositionId> {
-    let (queue_id, queue_item) = get_current_processed_inc_queue_id(storage)?;
-    if queue_item.is_some() {
-        Ok(QueuePositionId::IncQueuePositionId(queue_id))
-    } else {
-        let (queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
-        if queue_item.is_some() {
-            return Ok(QueuePositionId::DecQueuePositionId(queue_id));
+    let inc_queue = get_current_processed_inc_queue_id(storage)?;
+    match inc_queue {
+        Some((queue_id, _)) => Ok(QueuePositionId::IncQueuePositionId(queue_id)),
+        None => {
+            let dec_queue = get_current_processed_dec_queue_id(storage)?;
+            match dec_queue {
+                Some((queue_id, _)) => Ok(QueuePositionId::DecQueuePositionId(queue_id)),
+                None => bail!("No queue item found to process"),
+            }
         }
-        bail!("No queue item found to process")
     }
 }
