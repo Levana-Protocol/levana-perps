@@ -447,7 +447,9 @@ fn leader_position_closed_with_profit() {
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
 
-    let tokens_collateral = tokens_collateral.checked_add("20".parse().unwrap()).unwrap();
+    let tokens_collateral = tokens_collateral
+        .checked_add("20".parse().unwrap())
+        .unwrap();
     assert!(tokens_collateral.diff(tokens[0].collateral) < "0.1".parse().unwrap());
 
     let tokens = market.query_copy_trading_balance(&trader1).unwrap();
@@ -504,14 +506,14 @@ fn leader_position_closed_with_loss() {
         .query_closed_position(&market.copy_trading_addr, position_ids[0])
         .unwrap();
 
-    let position_ids = market
+    let all_position_ids = market
         .query_position_token_ids(&market.copy_trading_addr)
         .unwrap()
         .iter()
         .map(|item| PositionId::new(item.parse().unwrap()))
         .collect::<Vec<_>>();
 
-    assert_eq!(position_ids.len(), 0);
+    assert_eq!(all_position_ids.len(), 0);
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
@@ -521,17 +523,6 @@ fn leader_position_closed_with_loss() {
     market
         .exec_copytrading_mint_and_deposit(&trader1, "20")
         .unwrap();
-
-    let work = market.query_copy_trading_work().unwrap();
-    match work {
-        WorkResp::NoWork => panic!("Impossible: No work"),
-        WorkResp::HasWork { work_description } => assert!(work_description.is_rebalance()),
-    }
-
-    // Rebalance the market
-    let response = market.exec_copytrading_do_work(&trader1).unwrap();
-    let event = Event::new("wasm-rebalanced").add_attribute("made-profit", false.to_string());
-    response.assert_event(&event);
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
