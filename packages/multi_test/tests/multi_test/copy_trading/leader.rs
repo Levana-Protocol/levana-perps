@@ -446,8 +446,9 @@ fn leader_position_closed_with_profit() {
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
-    assert!(tokens[0].collateral > "217".parse().unwrap());
-    assert!(tokens[0].collateral < "218".parse().unwrap());
+
+    let tokens_collateral = tokens_collateral.checked_add("20".parse().unwrap()).unwrap();
+    assert!(tokens_collateral.diff(tokens[0].collateral) < "0.1".parse().unwrap());
 
     let tokens = market.query_copy_trading_balance(&trader1).unwrap();
     let shares = tokens.balance[0].shares;

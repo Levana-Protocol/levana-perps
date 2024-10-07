@@ -225,7 +225,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     return check_balance_work(storage, state, &token);
                 }
             }
-
             let market_works =
                 crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
             for market_work in market_works {
@@ -236,7 +235,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 if market_token != token {
                     continue;
                 }
-
                 let deferred_execs = state.load_deferred_execs(&market_info.addr, None, Some(1))?;
 
                 let is_pending = deferred_execs
@@ -246,7 +244,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 if is_pending {
                     return Ok(WorkResp::NoWork);
                 }
-
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
@@ -547,7 +544,9 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         .collateral
         .checked_add(pending_deposits)?
         .checked_add(leader_comission)?;
-    if total.approx_eq(contract_balance) {
+    let diff = total.diff(contract_balance);
+    let is_approprimate_same = diff < "0.000001".parse().unwrap();
+    if is_approprimate_same {
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
                 token: token.clone(),
