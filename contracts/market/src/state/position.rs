@@ -173,10 +173,10 @@ impl State<'_> {
         let (min, max) = match (cursor, order) {
             (None, _) => (None, None),
             (Some(cursor), OrderInMessage::Ascending) => {
-                (Some(Bound::inclusive((cursor.time, cursor.position))), None)
+                (Some(Bound::exclusive((cursor.time, cursor.position))), None)
             }
             (Some(cursor), OrderInMessage::Descending) => {
-                (None, Some(Bound::inclusive((cursor.time, cursor.position))))
+                (None, Some(Bound::exclusive((cursor.time, cursor.position))))
             }
         };
 
@@ -194,6 +194,7 @@ impl State<'_> {
                 }
                 Some(res) => {
                     let (key, pos) = res?;
+                    positions.push(pos);
                     // continuations only exist when we reach a limit and break early
                     if positions.len() == limit {
                         // slight optimization, to avoid needless pagination
@@ -206,7 +207,6 @@ impl State<'_> {
                             break None;
                         }
                     }
-                    positions.push(pos);
                 }
             }
         };
