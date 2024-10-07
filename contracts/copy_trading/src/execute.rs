@@ -396,7 +396,6 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             executed,
             crank_price,
         } => {
-            // todo: Confirm with lvn-rusty-dragon on when this failure can happen
             queue_item.status =
                 copy_trading::ProcessingStatus::Failed(FailedReason::DeferredExecFailure {
                     reason,
