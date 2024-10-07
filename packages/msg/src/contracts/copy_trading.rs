@@ -655,7 +655,24 @@ pub enum WorkDescription {
     /// Rebalance
     Rebalance {
         /// Token
-        token: Token
+        token: Token,
+        /// Amount that needs to be balanced
+        amount: NonZero<Collateral>,
+    },
+}
+
+impl WorkDescription {
+    /// Is it the rebalance work ?
+    pub fn is_rebalance(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => false,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => true,
+        }
     }
 }
 

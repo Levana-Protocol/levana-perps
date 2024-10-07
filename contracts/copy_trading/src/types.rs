@@ -368,3 +368,11 @@ impl Display for MarketLoaderStatus {
         }
     }
 }
+
+pub struct LeaderComissision {
+    pub active_collateral: Collateral,
+    pub profit: Collateral,
+    pub commission: Collateral,
+    pub remaining_profit: Collateral,
+    pub remaining_collateral: Collateral,
+}

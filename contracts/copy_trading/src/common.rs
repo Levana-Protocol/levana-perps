@@ -342,7 +342,7 @@ impl<'a> State<'a> {
             &MarketQueryMsg::ClosedPositionHistory {
                 owner: copy_trading.into(),
                 cursor,
-                limit: None,
+                limit: Some(15),
                 order: None,
             },
         )?;
@@ -422,11 +422,6 @@ impl Totals {
         self.collateral = self.collateral.checked_add(funds.raw())?;
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
-    }
-
-    pub(crate) fn add_collateral2(&mut self, funds: NonZero<Collateral>) -> Result<()> {
-        self.collateral = self.collateral.checked_add(funds.raw())?;
-        Ok(())
     }
 
     /// Returns the collateral removed from the pool

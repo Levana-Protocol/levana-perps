@@ -289,8 +289,13 @@ pub(crate) fn process_queue_item(
                         .may_load(storage, &token)
                         .context("Could not load TOTALS")?
                         .unwrap_or_default();
-                    totals.shares = totals.shares.checked_add(new_shares.raw())?;
+                    totals.add_collateral(funds, token_value)?;
                     crate::state::TOTALS.save(storage, &token, &totals)?;
+                    let mut pending_deposits = crate::state::PENDING_DEPOSITS
+                        .may_load(storage, &token)?
+                        .unwrap_or_default();
+                    pending_deposits = pending_deposits.checked_sub(funds.raw())?;
+                    crate::state::PENDING_DEPOSITS.save(storage, &token, &pending_deposits)?;
                     let wallet_info = WalletInfo {
                         token,
                         wallet: queue_item.wallet.clone(),
@@ -532,7 +537,17 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
     let totals = crate::state::TOTALS
         .may_load(storage, &token)?
         .unwrap_or_default();
-    if totals.collateral == contract_balance {
+    let pending_deposits = crate::state::PENDING_DEPOSITS
+        .may_load(storage, &token)?
+        .unwrap_or_default();
+    let leader_comission = crate::state::LEADER_COMMISSION
+        .may_load(storage, &token)?
+        .unwrap_or_default();
+    let total = totals
+        .collateral
+        .checked_add(pending_deposits)?
+        .checked_add(leader_comission)?;
+    if total.approx_eq(contract_balance) {
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
                 token: token.clone(),
@@ -542,9 +557,13 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         // Now there are multiple reasons why it would be
         // unbalanced. Multiple positions could have been liquidated
         // or someone just sent money to this contract.
+        let rebalance_amount = contract_balance.checked_sub(total)?;
+        let rebalance_amount =
+            NonZero::new(rebalance_amount).context("Impossible: rebalance_amount is zero")?;
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::Rebalance {
                 token: token.clone(),
+                amount: rebalance_amount,
             },
         })
     }

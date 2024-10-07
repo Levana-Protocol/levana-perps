@@ -5,13 +5,16 @@ use crate::{
     },
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
-        OneLpTokenValue, ProcessingStatus, State, WalletInfo,
+        DecQueuePosition, IncQueuePosition, LeaderComissision, LpTokenValue, MarketInfo,
+        MarketWorkInfo, OneLpTokenValue, ProcessingStatus, State, WalletInfo,
     },
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use msg::contracts::market::{
+    entry::{ClosedPositionCursor, ExecuteMsg as MarketExecuteMsg},
+    position::ClosedPosition,
+};
 use msg::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
@@ -346,25 +349,116 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
             let response = handle_deferred_exec_id(storage, &state)?;
             Ok(response)
         }
-        WorkDescription::Rebalance { token } => {
-            todo!()
-        }
+        WorkDescription::Rebalance { token, amount } => rebalance(storage, &state, token, amount),
     }
 }
 
-fn rebalance(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
+fn rebalance(
+    storage: &mut dyn Storage,
+    state: &State,
+    token: Token,
+    rebalance_amount: NonZero<Collateral>,
+) -> Result<Response> {
     let markets = state.load_market_ids_with_token(storage, &token)?;
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &token)?
+        .unwrap_or_default();
+    let rebalance_amount = rebalance_amount.raw();
+    let mut check_balance = Collateral::zero();
+    let mut rebalanced = false;
     for market in markets {
+        if check_balance >= rebalance_amount {
+            break;
+        }
         let cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
         loop {
             let closed_positions = state.query_closed_position(&market.addr, cursor.clone())?;
-            // todo: Figure out how to use the api!
-            todo!()
+            let last_closed_position =
+                closed_positions
+                    .positions
+                    .last()
+                    .cloned()
+                    .map(|item| ClosedPositionCursor {
+                        time: item.close_time,
+                        position: item.id,
+                    });
+            if let Some(last_closed_position) = last_closed_position {
+                crate::state::LAST_CLOSED_POSITION_CURSOR.save(
+                    storage,
+                    &market.id,
+                    &last_closed_position,
+                )?
+            }
+            for position in closed_positions.positions {
+                let commission = handle_leader_commission(storage, state, &token, position)?;
+                check_balance = check_balance.checked_add(commission.active_collateral)?;
+                // totals.collateral = totals.collateral.checked_add(commission.remaining_profit)?;
+                totals.collateral = totals
+                    .collateral
+                    .checked_add(commission.remaining_collateral)?;
+                if commission.profit > Collateral::zero() {
+                    // If leader made profit
+                    rebalanced = true;
+                }
+            }
+            if closed_positions.cursor.is_none() {
+                break;
+            }
         }
-
-        todo!()
     }
-    todo!()
+    let mut event = Event::new("rebalanced").add_attribute("status", rebalanced.to_string());
+    if check_balance < rebalance_amount {
+        // We have settled all the markets for all the closed
+        // positions, but we are still not balanced. This means that
+        // the money was sent by someone directly to the contract.
+        let diff = rebalance_amount.checked_sub(check_balance)?;
+        totals.collateral = totals.collateral.checked_add(diff)?;
+        crate::state::TOTALS.save(storage, &token, &totals)?;
+        event = event.add_attribute("gains", diff.to_string());
+    }
+    crate::state::TOTALS.save(storage, &token, &totals)?;
+    let response = Response::new().add_event(event);
+    Ok(response)
+}
+
+fn handle_leader_commission(
+    storage: &mut dyn Storage,
+    state: &State,
+    token: &Token,
+    closed_position: ClosedPosition,
+) -> Result<LeaderComissision> {
+    let made_profit = closed_position.pnl_collateral.is_strictly_positive();
+    if made_profit {
+        let pnl = closed_position
+            .pnl_collateral
+            .try_into_non_negative_value()
+            .context("Impossible: profit is negative")?;
+        let commission = pnl.checked_mul_dec(state.config.commission_rate)?;
+        let remaining_profit = pnl.checked_sub(commission)?;
+        {
+            let leader_comisssion = crate::state::LEADER_COMMISSION
+                .may_load(storage, &token)?
+                .unwrap_or_default();
+            let leader_commission = leader_comisssion.checked_add(commission)?;
+            crate::state::LEADER_COMMISSION.save(storage, &token, &leader_commission)?;
+        }
+        let remaining_collateral = closed_position.active_collateral.checked_sub(commission)?;
+        Ok(LeaderComissision {
+            active_collateral: closed_position.active_collateral,
+            profit: pnl,
+            commission,
+            remaining_profit,
+            remaining_collateral,
+        })
+    } else {
+        Ok(LeaderComissision {
+            active_collateral: closed_position.active_collateral,
+            profit: Collateral::zero(),
+            commission: Collateral::zero(),
+            remaining_profit: Collateral::zero(),
+            remaining_collateral: closed_position.active_collateral,
+        })
+    }
 }
 
 fn reset_stats(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
@@ -459,12 +553,13 @@ fn deposit(
     crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
     // We modify the total nows, but allocate share to the wallet in
     // later step as part of queue processing
-    let mut totals = crate::state::TOTALS
+    let mut pending_deposits = crate::state::PENDING_DEPOSITS
         .may_load(storage, &token)
         .context("Could not load TOTALS")?
         .unwrap_or_default();
-    totals.add_collateral2(funds)?;
-    crate::state::TOTALS.save(storage, &token, &totals)?;
+
+    pending_deposits = pending_deposits.checked_add(funds.raw())?;
+    crate::state::PENDING_DEPOSITS.save(storage, &token, &pending_deposits)?;
     Ok(Response::new().add_event(
         Event::new("deposit")
             .add_attribute("collateral", funds.to_string())
@@ -569,12 +664,10 @@ fn validate_single_market(
     let mut total_open_positions = 0u64;
     let mut total_orders = 0u64;
     let mut tokens_start_after = None;
-    let mut iteration = 0;
     // todo: need to break if query limit exeeded
     loop {
         // We have to iterate again entirely, because a position can
         // close.
-        iteration += 1;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
@@ -620,17 +713,11 @@ fn process_single_market(
     market: &MarketInfo,
 ) -> Result<()> {
     // todo: track count of query operations!
-    let mut market_work = crate::state::MARKET_WORK_INFO
-        .may_load(storage, &market.id)
-        .context("Could not load MARKET_WORK_INFO")?
-        .unwrap_or_default();
     // todo: this needs to be fixed properly when batching is implemented
     // Initialize it to empty before starting
-    market_work = MarketWorkInfo::default();
+    let mut market_work = MarketWorkInfo::default();
     let mut tokens_start_after = None;
-    let mut iteration = 0;
     loop {
-        iteration += 1;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
