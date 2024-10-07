@@ -387,7 +387,7 @@ fn rebalance(
                 crate::state::LAST_CLOSED_POSITION_CURSOR.save(
                     storage,
                     &market.id,
-                    &last_closed_position,
+                    last_closed_position,
                 )?
             }
             cursor = last_closed_position;
@@ -438,10 +438,10 @@ fn handle_leader_commission(
         let remaining_profit = pnl.checked_sub(commission)?;
         {
             let leader_comisssion = crate::state::LEADER_COMMISSION
-                .may_load(storage, &token)?
+                .may_load(storage, token)?
                 .unwrap_or_default();
             let leader_commission = leader_comisssion.checked_add(commission)?;
-            crate::state::LEADER_COMMISSION.save(storage, &token, &leader_commission)?;
+            crate::state::LEADER_COMMISSION.save(storage, token, &leader_commission)?;
         }
         let remaining_collateral = closed_position.active_collateral.checked_sub(commission)?;
         Ok(LeaderComissision {

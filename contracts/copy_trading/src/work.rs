@@ -535,13 +535,13 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
     let market_token = state.get_first_full_token_info(storage, token)?;
     let contract_balance = market_token.query_balance(&state.querier, &state.my_addr)?;
     let totals = crate::state::TOTALS
-        .may_load(storage, &token)?
+        .may_load(storage, token)?
         .unwrap_or_default();
     let pending_deposits = crate::state::PENDING_DEPOSITS
-        .may_load(storage, &token)?
+        .may_load(storage, token)?
         .unwrap_or_default();
     let leader_comission = crate::state::LEADER_COMMISSION
-        .may_load(storage, &token)?
+        .may_load(storage, token)?
         .unwrap_or_default();
     let total = totals
         .collateral
