@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Event};
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::{
@@ -19,7 +19,7 @@ fn leader_opens_attempt_open_incorrect_position() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "200".parse().unwrap());
@@ -76,7 +76,7 @@ fn leader_opens_correct_position() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "200".parse().unwrap());
@@ -149,7 +149,7 @@ fn leader_incorrect_position() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     withdraw_money(&market, &trader, "10");
     withdraw_money(&market, &trader, "10");
 
@@ -210,7 +210,7 @@ fn leader_open_position_compute_token() {
     let lp = market.clone_lp(0).unwrap();
 
     load_markets(&market);
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     withdraw_money(&market, &trader, "10");
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
@@ -249,7 +249,7 @@ fn leader_open_position_compute_token() {
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
 
-    deposit_money(&market, &trader, "50");
+    deposit_money(&market, &trader, "50").unwrap();
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -263,7 +263,8 @@ fn lp_token_value_reduced_after_open() {
     let lp = market.clone_lp(0).unwrap();
 
     load_markets(&market);
-    deposit_money(&market, &trader, "200");
+    let response = deposit_money(&market, &trader, "200").unwrap();
+    response.assert_event(&Event::new("wasm-lp-token").add_attribute("value", "1".to_owned()));
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -286,9 +287,14 @@ fn lp_token_value_reduced_after_open() {
 
     let trader1 = market.clone_trader(1).unwrap();
 
-    deposit_money(&market, &trader1, "20");
+    let response = deposit_money(&market, &trader1, "20").unwrap();
+    println!("response: {:?}", response.events);
+    response.assert_event(
+        &Event::new("wasm-lp-token").add_attribute("value", "1.099799819334094368".to_owned()),
+    );
     let tokens = market.query_copy_trading_balance(&trader1).unwrap();
     let shares = tokens.balance[0].shares;
+    println!("shares: {shares}");
     // Since token value has reduced, he can buy more shares for the same amount
     assert!(shares.raw() > "20".parse().unwrap());
 }
@@ -317,7 +323,7 @@ fn leader_position_closed_with_profit() {
     let lp = market.clone_lp(0).unwrap();
 
     load_markets(&market);
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     withdraw_money(&market, &trader, "10");
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
@@ -352,13 +358,15 @@ fn leader_position_closed_with_profit() {
 
     // We are going to make a profit!
     market.exec_set_price("1.5".try_into().unwrap()).unwrap();
-    market.exec_crank(&lp).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
 
     market
         .query_closed_position(&market.copy_trading_addr, position_ids[0])
         .unwrap();
 
-    market.set_time(levana_perpswap_multi_test::time::TimeJump::Hours(48)).unwrap();
+    market
+        .set_time(levana_perpswap_multi_test::time::TimeJump::Hours(48))
+        .unwrap();
     // Process queue item: Load market after 6 hours.
     market.exec_copytrading_do_work(&trader).unwrap();
 
@@ -375,11 +383,36 @@ fn leader_position_closed_with_profit() {
     assert_eq!(work, WorkResp::NoWork);
 
     let trader1 = market.clone_trader(1).unwrap();
-    deposit_money(&market, &trader1, "20");
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+    let token = market.get_copytrading_token().unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    // Needs to rebalance the market!
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: msg::contracts::copy_trading::WorkDescription::Rebalance { token }
+        }
+    );
+
+    market.exec_copytrading_do_work(&trader1).unwrap();
+
+    // // Compute LP token value
+    // let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    // println!("events: {:#?}", response.events);
+    // // Do the deposit
+    // market.exec_copytrading_do_work(&trader1).unwrap();
+
+    // let work = market.query_copy_trading_work().unwrap();
+    // assert_eq!(work, WorkResp::NoWork);
+
     // let tokens = market.query_copy_trading_balance(&trader1).unwrap();
     // let shares = tokens.balance[0].shares;
     // println!("shares: {shares}");
-    // Since token value has increased, you can buy less shares for the same amount
-    // todo: fix it
+    // // Since token value has increased, you can buy less shares for the same amount
+    // // todo: fix it
     // assert!(shares.raw() < "20".parse().unwrap());
 }

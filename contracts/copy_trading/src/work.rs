@@ -504,7 +504,6 @@ pub(crate) fn process_queue_item(
                                 .save(storage, &queue_pos_id)?;
                             return Ok(response.add_event(event));
                         }
-
                         crate::state::TOTALS.save(storage, &token, &totals)?;
                         let mut token_value = crate::state::LP_TOKEN_VALUE
                             .may_load(storage, &token)?
@@ -543,20 +542,8 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         })
     } else {
         // Now there are multiple reasons why it would be
-        // unbalanced. There could have been multiple deposits or
-        // multiple positions closed.
-        // This check is merly an optimization.
-        let (queue_id, queue_item) = get_current_processed_inc_queue_id(storage)?;
-        if let Some(queue_item) = queue_item {
-            match queue_item.item {
-                IncQueueItem::Deposit { funds, token } => {
-                    // let new_contract_balance = contract_balance.checked_add(funds.raw())?;
-                    // if new_contract_balance ==
-                }
-            }
-            // let new_contract_balance = contract_balance.checked_add(queue_item.item)
-        }
-
+        // unbalanced. Multiple positions could have been liquidated
+        // or someone just sent money to this contract.
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::Rebalance {
                 token: token.clone(),

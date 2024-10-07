@@ -345,9 +345,26 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
         WorkDescription::HandleDeferredExecId {} => {
             let response = handle_deferred_exec_id(storage, &state)?;
             Ok(response)
-        },
-        WorkDescription::Rebalance { token } => todo!(),
+        }
+        WorkDescription::Rebalance { token } => {
+            todo!()
+        }
     }
+}
+
+fn rebalance(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
+    let markets = state.load_market_ids_with_token(storage, &token)?;
+    for market in markets {
+        let cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
+        loop {
+            let closed_positions = state.query_closed_position(&market.addr, cursor.clone())?;
+            // todo: Figure out how to use the api!
+            todo!()
+        }
+
+        todo!()
+    }
+    todo!()
 }
 
 fn reset_stats(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
@@ -433,7 +450,10 @@ fn deposit(
     let queue_id = QueuePositionId::IncQueuePositionId(inc_queue_id);
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = IncQueuePosition {
-        item: copy_trading::IncQueueItem::Deposit { funds, token: token.clone() },
+        item: copy_trading::IncQueueItem::Deposit {
+            funds,
+            token: token.clone(),
+        },
         wallet: sender,
         status: copy_trading::ProcessingStatus::NotProcessed,
     };
@@ -441,9 +461,9 @@ fn deposit(
     // We modify the total nows, but allocate share to the wallet in
     // later step as part of queue processing
     let mut totals = crate::state::TOTALS
-                        .may_load(storage, &token)
-                        .context("Could not load TOTALS")?
-                        .unwrap_or_default();
+        .may_load(storage, &token)
+        .context("Could not load TOTALS")?
+        .unwrap_or_default();
     totals.add_collateral2(funds)?;
     crate::state::TOTALS.save(storage, &token, &totals)?;
     Ok(Response::new().add_event(
@@ -525,6 +545,8 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
     let event = Event::new("lp-token")
         .add_attribute("validation", "success".to_string())
+        .add_attribute("collateral", total_collateral.to_string())
+        .add_attribute("shares", total_shares.to_string())
         .add_attribute("value", token_value.value.to_string());
     Ok(event)
 }
@@ -607,7 +629,7 @@ fn process_single_market(
     // Initialize it to empty before starting
     market_work = MarketWorkInfo::default();
     let mut tokens_start_after = None;
-    let mut iteration= 0;
+    let mut iteration = 0;
     loop {
         iteration += 1;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;

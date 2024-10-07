@@ -10,7 +10,9 @@ use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
         deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
-        entry::{ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp, PositionsQueryFeeApproach},
+        entry::{
+            ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp, PositionsQueryFeeApproach,
+        },
         order::OrderId,
         position::{PositionId, PositionsResp},
     },
@@ -320,7 +322,6 @@ impl<'a> State<'a> {
             },
         )?;
         // todo: Change this to Error
-        println!("pos: {positions:?}");
         assert!(pending_close.is_empty());
         assert!(closed.is_empty(), "Closed is not empty");
         let start_after = positions.last().cloned().map(|item| item.id);
@@ -330,11 +331,23 @@ impl<'a> State<'a> {
         })
     }
 
-    // pub(crate) fn query_closed_position(&self, cursor: Option<ClosedPositionCursor>) -> Result<ClosedPositionsResp> {
-    //     let copy_trading = self.my_addr;
-    //     // let result = self.querier.query_wasm_smart(copy_trading, &MarketQueryMsg::ClosedPositionHistory { owner: (), cursor: (), limit: (), order: () })
-    //     todo!()
-    // }
+    pub(crate) fn query_closed_position(
+        &self,
+        market_addr: &Addr,
+        cursor: Option<ClosedPositionCursor>,
+    ) -> Result<ClosedPositionsResp> {
+        let copy_trading = self.my_addr.clone();
+        let result = self.querier.query_wasm_smart(
+            market_addr,
+            &MarketQueryMsg::ClosedPositionHistory {
+                owner: copy_trading.into(),
+                cursor,
+                limit: None,
+                order: None,
+            },
+        )?;
+        Ok(result)
+    }
 
     pub(crate) fn load_orders(
         &self,
@@ -411,10 +424,7 @@ impl Totals {
         Ok(new_shares)
     }
 
-    pub(crate) fn add_collateral2(
-        &mut self,
-        funds: NonZero<Collateral>,
-    ) -> Result<()> {
+    pub(crate) fn add_collateral2(&mut self, funds: NonZero<Collateral>) -> Result<()> {
         self.collateral = self.collateral.checked_add(funds.raw())?;
         Ok(())
     }

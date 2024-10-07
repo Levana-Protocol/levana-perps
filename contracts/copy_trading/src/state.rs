@@ -52,6 +52,9 @@ pub(crate) const LAST_PROCESSED_DEC_QUEUE_ID: Item<DecQueuePositionId> =
 /// Total collateral information
 pub(crate) const TOTALS: Map<&Token, Totals> = Map::new("totals");
 
+/// Total collateral information
+pub(crate) const PENDING_DEPOSITS: Map<&Token, Collateral> = Map::new("pending-deposits");
+
 /// LpToken Value
 pub(crate) const LP_TOKEN_VALUE: Map<&Token, LpTokenValue> = Map::new("lp-token-value");
 
@@ -75,7 +78,7 @@ pub(crate) const REPLY_DEFERRED_EXEC_ID: Item<Option<DeferredExecId>> =
     Item::new("reply-deferred-exec-id");
 
 /// Last closed position
-pub(crate) const LAST_CLOSED_POSITION_CURSOR: Map<MarketId, ClosedPositionCursor> =
+pub(crate) const LAST_CLOSED_POSITION_CURSOR: Map<&MarketId, ClosedPositionCursor> =
     Map::new("last-closed-position-cursor");
 
 /// Open positions by the contract

@@ -652,6 +652,11 @@ pub enum WorkDescription {
     },
     /// Handle deferred exec id
     HandleDeferredExecId {},
+    /// Rebalance
+    Rebalance {
+        /// Token
+        token: Token
+    }
 }
 
 /// Queue position id that needs to be processed
