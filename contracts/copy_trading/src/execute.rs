@@ -358,9 +358,9 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         Some(deferred_exec_id) => deferred_exec_id,
         None => bail!("Impossible: Work handle unable to find deferred exec id"),
     };
-    let (queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
-    let mut queue_item = match queue_item {
-        Some(queue_item) => queue_item,
+    let queue_item = get_current_processed_dec_queue_id(storage)?;
+    let (queue_id, mut queue_item) = match queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
         None => bail!("Impossible: Work handle not able to find queue item"),
     };
 

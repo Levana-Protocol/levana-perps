@@ -21,9 +21,9 @@ fn get_deferred_work(
     state: &State,
     deferred_exec_id: DeferredExecId,
 ) -> Result<WorkResp> {
-    let (_queue_id, queue_item) = get_current_processed_dec_queue_id(storage)?;
-    let queue_item = match queue_item {
-        Some(queue_item) => queue_item,
+    let queue_item = get_current_processed_dec_queue_id(storage)?;
+    let (_queue_id, queue_item) = match queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
         None => bail!("Impossible: Work handle not able to find queue item"),
     };
     let market_id = match queue_item.item.clone() {
@@ -51,15 +51,11 @@ fn get_deferred_work(
 
 fn get_work_from_dec_queue(
     queue_id: DecQueuePositionId,
-    queue_item: Option<DecQueuePosition>,
+    queue_item: DecQueuePosition,
     storage: &dyn Storage,
     state: &State,
 ) -> Result<WorkResp> {
     let queue_id = QueuePositionId::DecQueuePositionId(queue_id);
-    let queue_item = match queue_item {
-        Some(queue_item) => queue_item,
-        None => return Ok(WorkResp::NoWork),
-    };
     let status = queue_item.status;
     let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
@@ -194,16 +190,18 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
         }
     }
 
-    let (next_inc_queue_position, inc_queue_item) = get_current_processed_inc_queue_id(storage)?;
-    // We always prioritize queue items that increases our collateral
-    let queue_item = match inc_queue_item {
-        Some(inc_queue_item) => inc_queue_item,
+    let inc_queue_item = get_current_processed_inc_queue_id(storage)?;
+    let (next_inc_queue_position, queue_item) = match inc_queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
         None => {
-            let (next_dec_queue_position, dec_queue_item) =
-                get_current_processed_dec_queue_id(storage)?;
-            let work =
-                get_work_from_dec_queue(next_dec_queue_position, dec_queue_item, storage, state)?;
-            return Ok(work);
+            let dec_queue = get_current_processed_dec_queue_id(storage)?;
+            match dec_queue {
+                Some((queue_id, queue_item)) => {
+                    let work = get_work_from_dec_queue(queue_id, queue_item, storage, state)?;
+                    return Ok(work);
+                }
+                None => return Ok(WorkResp::NoWork),
+            }
         }
     };
 
