@@ -296,3 +296,79 @@ fn position_close_history() {
         .run();
     }
 }
+
+#[test]
+fn position_close_history_limit_1_perp_4165() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    let (pos1, _) = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "5",
+            DirectionToBase::Long,
+            "2.5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    market.set_time(TimeJump::Blocks(5)).unwrap();
+    let (pos2, _) = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "5",
+            DirectionToBase::Long,
+            "2.5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    market.set_time(TimeJump::Blocks(5)).unwrap();
+    let (pos3, _) = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "5",
+            DirectionToBase::Long,
+            "2.5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    market.set_time(TimeJump::Blocks(5)).unwrap();
+
+    market.exec_close_position(&trader, pos1, None).unwrap();
+    market.exec_close_position(&trader, pos3, None).unwrap();
+    market.exec_close_position(&trader, pos2, None).unwrap();
+
+    let resp1 = market
+        .query_closed_positions(&trader, None, Some(1), Some(OrderInMessage::Ascending))
+        .unwrap();
+    assert_eq!(resp1.positions[0].id, pos1);
+    assert_eq!(resp1.cursor.clone().unwrap().position, pos1);
+    let resp2 = market
+        .query_closed_positions(
+            &trader,
+            resp1.cursor,
+            Some(1),
+            Some(OrderInMessage::Ascending),
+        )
+        .unwrap();
+    assert_eq!(resp2.positions[0].id, pos3);
+    assert_eq!(resp2.cursor.clone().unwrap().position, pos3);
+    let resp3 = market
+        .query_closed_positions(
+            &trader,
+            resp2.cursor,
+            Some(1),
+            Some(OrderInMessage::Ascending),
+        )
+        .unwrap();
+    assert_eq!(resp3.positions[0].id, pos2);
+    assert_eq!(resp3.cursor, None);
+}
