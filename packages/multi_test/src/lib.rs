@@ -370,11 +370,14 @@ pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
 }
 
 pub(crate) fn contract_copy_trading() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        copy_trading::instantiate,
-        copy_trading::execute,
-        copy_trading::query,
-    ))
+    Box::new(
+        LocalContractWrapper::new(
+            copy_trading::instantiate,
+            copy_trading::execute,
+            copy_trading::query,
+        )
+        .with_reply(copy_trading::reply),
+    )
 }
 
 // struct to satisfy the `Contract` trait

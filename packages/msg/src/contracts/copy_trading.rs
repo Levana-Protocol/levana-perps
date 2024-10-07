@@ -2,13 +2,14 @@
 
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
-use super::market::entry::ExecuteMsg as MarketExecuteMsg;
-use anyhow::anyhow;
+use super::market::entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert};
+use anyhow::{anyhow, bail};
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
     number::{Collateral, LpToken, NonZero, Usd},
-    storage::{MarketId, RawAddr},
+    price::{PriceBaseInQuote, PricePoint, TakeProfitTrader},
+    storage::{DirectionToBase, LeverageToBase, MarketId, RawAddr},
     time::Timestamp,
 };
 use thiserror::Error;
@@ -63,6 +64,14 @@ impl Config {
             Ok(())
         }
     }
+
+    /// Check leader
+    pub fn ensure_leader(&self, sender: &Addr) -> anyhow::Result<()> {
+        if self.leader != sender {
+            bail!("Unautorized access, only {} allowed", self.leader)
+        }
+        Ok(())
+    }
 }
 
 /// Updates to configuration values.
@@ -114,6 +123,8 @@ pub enum ExecuteMsg {
         market_id: MarketId,
         /// Message
         message: Box<MarketExecuteMsg>,
+        /// Collateral to use for the action
+        collateral: Option<NonZero<Collateral>>,
     },
     /// Perform queue work
     DoWork {},
@@ -192,6 +203,8 @@ pub enum ProcessingStatus {
     NotProcessed,
     /// Successfully finished processing
     Finished,
+    /// In progress
+    InProgress,
     /// Failed during processing
     Failed(FailedReason),
 }
@@ -203,6 +216,37 @@ impl ProcessingStatus {
             ProcessingStatus::NotProcessed => false,
             ProcessingStatus::Finished => false,
             ProcessingStatus::Failed(_) => true,
+            ProcessingStatus::InProgress => false,
+        }
+    }
+
+    /// Is any status pending ?
+    pub fn pending(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => true,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => false,
+            ProcessingStatus::InProgress => true,
+        }
+    }
+
+    /// Did the status finish ?
+    pub fn finish(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => true,
+            ProcessingStatus::Failed(_) => false,
+            ProcessingStatus::InProgress => false,
+        }
+    }
+
+    /// Is any status currently in progres ?
+    pub fn in_progress(&self) -> bool {
+        match self {
+            ProcessingStatus::NotProcessed => false,
+            ProcessingStatus::Finished => false,
+            ProcessingStatus::Failed(_) => false,
+            ProcessingStatus::InProgress => true,
         }
     }
 }
@@ -232,6 +276,24 @@ pub enum FailedReason {
         /// Requested shares
         requested: LpToken,
     },
+    /// Received error from Market contract
+    #[error("{market_id} result in error: {message}")]
+    MarketError {
+        /// Market ID which result in error
+        market_id: MarketId,
+        /// Error message
+        message: String,
+    },
+    /// Deferred exec failure
+    #[error("Deferred exec failure at {executed} because of: {reason}")]
+    DeferredExecFailure {
+        /// Reason it didn't apply successfully
+        reason: String,
+        /// Timestamp when it failed execution
+        executed: Timestamp,
+        /// Price point when it was cranked, if applicable
+        crank_price: Option<PricePoint>,
+    },
 }
 
 /// Queue Item
@@ -247,7 +309,7 @@ pub enum QueueItem {
     /// Item that will lead to decrease of collateral
     DecCollateral {
         /// Item type
-        item: DecQueueItem,
+        item: Box<DecQueueItem>,
         /// Queue position id
         id: DecQueuePositionId,
     },
@@ -275,8 +337,36 @@ pub enum DecQueueItem {
         /// Token type
         token: Token,
     },
-    /// Open Position etc. etc.
-    OpenPosition {},
+    /// Market action items
+    MarketItem {
+        /// Market id
+        id: MarketId,
+        /// Market token
+        token: Token,
+        /// Market item
+        item: Box<DecMarketItem>,
+    },
+}
+
+/// Queue item that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum DecMarketItem {
+    /// Open position
+    OpenPosition {
+        /// Collateral for the position
+        collateral: NonZero<Collateral>,
+        /// Assertion that the price has not moved too far
+        slippage_assert: Option<SlippageAssert>,
+        /// Leverage of new position
+        leverage: LeverageToBase,
+        /// Direction of new position
+        direction: DirectionToBase,
+        /// Stop loss price of new position
+        stop_loss_override: Option<PriceBaseInQuote>,
+        /// Take profit price of new position
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
+    },
 }
 
 /// Token required for the queue item
@@ -304,7 +394,13 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::OpenPosition {} => RequiresToken::NoToken {},
+            DecQueueItem::MarketItem { item, .. } => match *item {
+                DecMarketItem::OpenPosition { .. } => {
+                    // For opening a position, we don't require LP
+                    // token value to be computed.
+                    RequiresToken::NoToken {}
+                }
+            },
         }
     }
 }
@@ -554,6 +650,8 @@ pub enum WorkDescription {
     /// Rebalance for case when someone sends collateral directly to
     /// the contract without getting LpTokens
     Rebalance {},
+    /// Handle deferred exec id
+    HandleDeferredExecId {},
 }
 
 /// Queue position id that needs to be processed

@@ -1,15 +1,15 @@
 use crate::{
     prelude::*,
     types::{
-        MarketInfo, MarketLoaderStatus, OneLpTokenValue, OpenPositionsResp, PositionCollateral,
-        State, TokenResp, Totals,
+        DecQueuePosition, IncQueuePosition, MarketInfo, MarketLoaderStatus, OneLpTokenValue,
+        OpenPositionsResp, PositionCollateral, State, TokenResp, Totals,
     },
 };
 use anyhow::{bail, Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
-        deferred_execution::{DeferredExecId, ListDeferredExecsResp},
+        deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
         entry::{LimitOrdersResp, PositionsQueryFeeApproach},
         order::OrderId,
         position::{PositionId, PositionsResp},
@@ -99,6 +99,8 @@ impl<'a> State<'a> {
                                 // loaded market in this contract ?
                                 last_seen
                             } else {
+                                crate::state::LAST_MARKET_ADD_CHECK
+                                    .save(storage, &Timestamp::into(self.env.block.time.into()))?;
                                 return Ok(());
                             }
                         } else {
@@ -343,6 +345,17 @@ impl<'a> State<'a> {
         Ok(result)
     }
 
+    pub(crate) fn get_deferred_exec(
+        &self,
+        market_addr: &Addr,
+        id: DeferredExecId,
+    ) -> Result<GetDeferredExecResp> {
+        let result = self
+            .querier
+            .query_wasm_smart(market_addr, &MarketQueryMsg::GetDeferredExec { id })?;
+        Ok(result)
+    }
+
     pub(crate) fn load_deferred_execs(
         &self,
         market_addr: &Addr,
@@ -436,4 +449,53 @@ pub(crate) fn get_next_dec_queue_id(storage: &mut dyn Storage) -> Result<DecQueu
     };
     crate::state::LAST_INSERTED_DEC_QUEUE_ID.save(storage, &queue_id)?;
     Ok(queue_id)
+}
+
+/// Get queue element from Dec queue to process currently
+pub(crate) fn get_current_processed_dec_queue_id(
+    storage: &dyn Storage,
+) -> Result<Option<(DecQueuePositionId, DecQueuePosition)>> {
+    let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
+    let queue_id = match queue_id {
+        Some(queue_id) => queue_id.next(),
+        None => DecQueuePositionId::new(0),
+    };
+    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
+    match queue_item {
+        Some(queue_item) => Ok(Some((queue_id, queue_item))),
+        None => Ok(None),
+    }
+}
+
+/// Get queue element from Inc queue to process currently
+pub(crate) fn get_current_processed_inc_queue_id(
+    storage: &dyn Storage,
+) -> Result<Option<(IncQueuePositionId, IncQueuePosition)>> {
+    let queue_id = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
+    let queue_id = match queue_id {
+        Some(queue_id) => queue_id.next(),
+        None => IncQueuePositionId::new(0),
+    };
+    let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE.may_load(storage, &queue_id)?;
+    match queue_item {
+        Some(queue_item) => Ok(Some((queue_id, queue_item))),
+        None => Ok(None),
+    }
+}
+
+/// Get current queue element id that needs to be processed. Before
+/// calling this function ensure that there is atleast one pending
+/// element in the queue to be processed.
+pub(crate) fn get_current_queue_element(storage: &dyn Storage) -> Result<QueuePositionId> {
+    let inc_queue = get_current_processed_inc_queue_id(storage)?;
+    match inc_queue {
+        Some((queue_id, _)) => Ok(QueuePositionId::IncQueuePositionId(queue_id)),
+        None => {
+            let dec_queue = get_current_processed_dec_queue_id(storage)?;
+            match dec_queue {
+                Some((queue_id, _)) => Ok(QueuePositionId::DecQueuePositionId(queue_id)),
+                None => bail!("No queue item found to process"),
+            }
+        }
+    }
 }

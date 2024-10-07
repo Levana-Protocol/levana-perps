@@ -2368,13 +2368,11 @@ impl PerpsMarket {
     pub fn query_copy_trading_queue_status(
         &self,
         wallet: RawAddr,
-        start_after: Option<msg::contracts::copy_trading::QueuePositionId>,
-        limit: Option<u32>,
     ) -> Result<msg::contracts::copy_trading::QueueResp> {
         self.query_copy_trading(&CopyTradingQueryMsg::QueueStatus {
             address: wallet,
-            start_after,
-            limit,
+            start_after: None,
+            limit: None,
         })
     }
 
@@ -2478,6 +2476,32 @@ impl PerpsMarket {
             }
             Token::Native { denom, .. } => Ok(msg::contracts::copy_trading::Token::Native(denom)),
         }
+    }
+
+    pub fn exec_copy_trading_open_position(
+        &self,
+        amount: &str,
+        direction: DirectionToBase,
+        take_profit: &str,
+    ) -> Result<AppResponse> {
+        let amount = amount.parse()?;
+        let market_id = self.id.clone();
+        let leverage = "7".parse().unwrap();
+        let msg = Box::new(MarketExecuteMsg::OpenPosition {
+            slippage_assert: None,
+            leverage,
+            direction,
+            max_gains: None,
+            stop_loss_override: None,
+            take_profit: Some(TakeProfitTrader::Finite(take_profit.parse().unwrap())),
+        });
+        let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
+            market_id,
+            message: msg,
+            collateral: Some(amount),
+        };
+        let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+        self.exec_copytrading(&leader, wasm_msg)
     }
 
     pub fn exec_copytrading_mint_and_deposit(
