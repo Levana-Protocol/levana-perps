@@ -1,37 +1,91 @@
 use anyhow::bail;
-use cosmwasm_std::CosmosMsg;
-use perpswap::contracts::copy_trading;
+use cosmwasm_std::SubMsg;
+use perpswap::contracts::{
+    copy_trading,
+    market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
+};
 
 use crate::{
-    common::SIX_HOURS_IN_SECONDS,
+    common::{
+        get_current_processed_dec_queue_id, get_current_processed_inc_queue_id,
+        SIX_HOURS_IN_SECONDS,
+    },
     prelude::*,
-    types::{State, WalletInfo},
+    reply::REPLY_ID_OPEN_POSITION,
+    types::{DecQueuePosition, State, WalletInfo},
 };
+use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+
+fn get_deferred_work(
+    storage: &dyn Storage,
+    state: &State,
+    deferred_exec_id: DeferredExecId,
+) -> Result<WorkResp> {
+    let queue_item = get_current_processed_dec_queue_id(storage)?;
+    let (_queue_id, queue_item) = match queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
+        None => bail!("Impossible: Work handle not able to find queue item"),
+    };
+    let market_id = match queue_item.item.clone() {
+        DecQueueItem::MarketItem { id, .. } => id,
+        _ => bail!("Impossible: Deferred work handler got non market item"),
+    };
+    let market_addr = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS state is empty")?
+        .addr;
+    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let status = match response {
+        GetDeferredExecResp::Found { item } => item,
+        GetDeferredExecResp::NotFound {} => {
+            bail!("Impossible: Deferred exec id not found")
+        }
+    };
+    if status.status.is_pending() {
+        return Ok(WorkResp::NoWork);
+    }
+    Ok(WorkResp::HasWork {
+        work_description: WorkDescription::HandleDeferredExecId {},
+    })
+}
 
 fn get_work_from_dec_queue(
     queue_id: DecQueuePositionId,
+    queue_item: DecQueuePosition,
     storage: &dyn Storage,
     state: &State,
 ) -> Result<WorkResp> {
-    let queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
-        .key(&queue_id)
-        .may_load(storage)?;
-    let queue_item = match queue_item {
-        Some(queue_item) => queue_item.item,
-        None => return Ok(WorkResp::NoWork),
-    };
+    let queue_id = QueuePositionId::DecQueuePositionId(queue_id);
+    let status = queue_item.status;
+    let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
     match requires_token {
         RequiresToken::Token { token } => {
             let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
             match lp_token_value {
                 Some(lp_token_value) => {
-                    if lp_token_value.status.valid() {
+                    if lp_token_value.status.valid(&queue_id) {
+                        if status == ProcessingStatus::InProgress {
+                            let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                                .may_load(storage)?
+                                .flatten();
+                            if let Some(deferred_exec_id) = deferred_exec_id {
+                                return get_deferred_work(storage, state, deferred_exec_id);
+                            }
+                        }
                         return Ok(WorkResp::HasWork {
-                            work_description: WorkDescription::ProcessQueueItem {
-                                id: QueuePositionId::DecQueuePositionId(queue_id),
-                            },
+                            work_description: WorkDescription::ProcessQueueItem { id: queue_id },
                         });
+                    } else {
+                        // LP token is invalid. But if we have
+                        // deferred exec id, best to handle it
+                        // before we try to compute lp token value.
+                        let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                            .may_load(storage)?
+                            .flatten();
+                        if let Some(deferred_exec_id) = deferred_exec_id {
+                            return get_deferred_work(storage, state, deferred_exec_id);
+                        }
                     }
                 }
                 None => {
@@ -41,6 +95,7 @@ fn get_work_from_dec_queue(
                     });
                 }
             }
+
             let market_works =
                 crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
             for market_work in market_works {
@@ -81,11 +136,19 @@ fn get_work_from_dec_queue(
                 work_description: WorkDescription::ComputeLpTokenValue { token },
             })
         }
-        RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
-            work_description: WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::DecQueuePositionId(queue_id),
-            },
-        }),
+        RequiresToken::NoToken {} => {
+            if status == ProcessingStatus::InProgress {
+                let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                    .may_load(storage)?
+                    .flatten();
+                if let Some(deferred_exec_id) = deferred_exec_id {
+                    return get_deferred_work(storage, state, deferred_exec_id);
+                }
+            }
+            Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ProcessQueueItem { id: queue_id },
+            })
+        }
     }
 }
 
@@ -127,28 +190,22 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
         }
     }
 
-    let inc_queue = crate::state::LAST_PROCESSED_INC_QUEUE_ID.may_load(storage)?;
-    let dec_queue = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
-    let next_inc_queue_position = match inc_queue {
-        Some(queue_position) => queue_position.next(),
-        None => IncQueuePositionId::new(0),
-    };
-    let next_dec_queue_position = match dec_queue {
-        Some(queue_position) => queue_position.next(),
-        None => DecQueuePositionId::new(0),
-    };
-    let queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
-        .key(&next_inc_queue_position)
-        .may_load(storage)?;
-
-    let queue_item = match queue_item {
-        Some(queue_item) => queue_item.item,
+    let inc_queue_item = get_current_processed_inc_queue_id(storage)?;
+    let (next_inc_queue_position, queue_item) = match inc_queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
         None => {
-            let work = get_work_from_dec_queue(next_dec_queue_position, storage, state)?;
-            return Ok(work);
+            let dec_queue = get_current_processed_dec_queue_id(storage)?;
+            match dec_queue {
+                Some((queue_id, queue_item)) => {
+                    let work = get_work_from_dec_queue(queue_id, queue_item, storage, state)?;
+                    return Ok(work);
+                }
+                None => return Ok(WorkResp::NoWork),
+            }
         }
     };
 
+    let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
 
     match requires_token {
@@ -156,7 +213,12 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
             let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
             match lp_token_value {
                 Some(lp_token_value) => {
-                    if lp_token_value.status.valid() {
+                    if lp_token_value
+                        .status
+                        .valid(&QueuePositionId::IncQueuePositionId(
+                            next_inc_queue_position,
+                        ))
+                    {
                         return Ok(WorkResp::HasWork {
                             work_description: WorkDescription::ProcessQueueItem {
                                 id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
@@ -221,14 +283,15 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
 }
 
 pub(crate) fn process_queue_item(
-    id: QueuePositionId,
+    queue_pos_id: QueuePositionId,
     storage: &mut dyn Storage,
     state: &State,
-) -> Result<(Event, Option<CosmosMsg>)> {
-    match id {
-        QueuePositionId::IncQueuePositionId(id) => {
+    response: Response,
+) -> Result<Response> {
+    match queue_pos_id {
+        QueuePositionId::IncQueuePositionId(queue_pos_id) => {
             let mut queue_item = crate::state::COLLATERAL_INCREASE_QUEUE
-                .may_load(storage, &id)?
+                .may_load(storage, &queue_pos_id)?
                 .context("PENDING_QUEUE_ITEMS load failed")?;
             match queue_item.item.clone() {
                 IncQueueItem::Deposit { funds, token } => {
@@ -250,22 +313,27 @@ pub(crate) fn process_queue_item(
                     };
                     queue_item.status = copy_trading::ProcessingStatus::Finished;
                     crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
-                    crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &id)?;
-                    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &id, &queue_item)?;
+                    crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &queue_pos_id)?;
+                    crate::state::COLLATERAL_INCREASE_QUEUE.save(
+                        storage,
+                        &queue_pos_id,
+                        &queue_item,
+                    )?;
                     let event = Event::new("deposit")
                         .add_attribute("funds", funds.to_string())
                         .add_attribute("shares", new_shares.to_string());
-                    Ok((event, None))
+                    let response = response.add_event(event);
+                    Ok(response)
                 }
             }
         }
-        QueuePositionId::DecQueuePositionId(id) => {
+        QueuePositionId::DecQueuePositionId(queue_pos_id) => {
             let mut queue_item = crate::state::COLLATERAL_DECREASE_QUEUE
-                .may_load(storage, &id)?
+                .may_load(storage, &queue_pos_id)?
                 .context("COLLATERAL_DECREASE_QUEUE load failed")?;
             match queue_item.item.clone() {
                 DecQueueItem::Withdrawal { tokens, token } => {
-                    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &id)?;
+                    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_pos_id)?;
                     let shares = tokens;
                     let wallet_info = WalletInfo {
                         token: token.clone(),
@@ -291,10 +359,11 @@ pub(crate) fn process_queue_item(
                                 event = event.add_attribute("failed", true.to_string());
                                 crate::state::COLLATERAL_DECREASE_QUEUE.save(
                                     storage,
-                                    &id,
+                                    &queue_pos_id,
                                     &queue_item,
                                 )?;
-                                return Ok((event, None));
+                                let response = Response::new().add_event(event);
+                                return Ok(response);
                             }
                             actual_shares
                         }
@@ -307,10 +376,11 @@ pub(crate) fn process_queue_item(
                             event = event.add_attribute("failed", true.to_string());
                             crate::state::COLLATERAL_DECREASE_QUEUE.save(
                                 storage,
-                                &id,
+                                &queue_pos_id,
                                 &queue_item,
                             )?;
-                            return Ok((event, None));
+                            let response = Response::new().add_event(event);
+                            return Ok(response);
                         }
                     };
                     let token_value = state.load_lp_token_value(storage, &wallet_info.token)?;
@@ -324,9 +394,25 @@ pub(crate) fn process_queue_item(
                         .may_load(storage, &contract_token)?
                         .context("TOTALS is empty")?;
                     if funds.raw() > totals.collateral {
-                        bail!("Not enough collateral")
+                        queue_item.status = copy_trading::ProcessingStatus::Failed(
+                            FailedReason::NotEnoughCollateral {
+                                available: totals.collateral,
+                                requested: funds,
+                            },
+                        );
+                        crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                            storage,
+                            &queue_pos_id,
+                            &queue_item,
+                        )?;
+                        let event = event
+                            .add_attribute("failed", true.to_string())
+                            .add_attribute("reason", "not-enough-collateral");
+                        let response = Response::new().add_event(event);
+                        return Ok(response);
                     } else {
                         totals.collateral = totals.collateral.checked_sub(funds.raw())?;
+                        totals.shares = totals.shares.checked_sub(shares.raw())?;
                     };
                     let mut pending_store_update = || -> std::result::Result<(), _> {
                         if remaining_shares.is_zero() {
@@ -359,10 +445,95 @@ pub(crate) fn process_queue_item(
                             None
                         }
                     };
-                    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &id, &queue_item)?;
-                    Ok((event, withdraw_msg))
+                    let response = response.add_event(event);
+                    let response = match withdraw_msg {
+                        Some(withdraw_msg) => response.add_message(withdraw_msg),
+                        None => response,
+                    };
+                    crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                        storage,
+                        &queue_pos_id,
+                        &queue_item,
+                    )?;
+                    Ok(response)
                 }
-                DecQueueItem::OpenPosition {} => todo!(),
+                DecQueueItem::MarketItem { id, token, item } => match *item {
+                    DecMarketItem::OpenPosition {
+                        slippage_assert,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                        collateral,
+                    } => {
+                        let id = crate::state::MARKETS
+                            .may_load(storage, &id)?
+                            .context("MARKETS store is empty")?;
+                        let msg = id.token.into_market_execute_msg(
+                            &id.addr,
+                            collateral.raw(),
+                            MarketExecuteMsg::OpenPosition {
+                                slippage_assert,
+                                leverage,
+                                direction,
+                                max_gains: None,
+                                stop_loss_override,
+                                take_profit,
+                            },
+                        )?;
+                        let mut totals = crate::state::TOTALS
+                            .may_load(storage, &token)?
+                            .context("TOTALS store is empty")?;
+
+                        let event = Event::new("open-position")
+                            .add_attribute("direction", direction.as_str())
+                            .add_attribute("leverage", leverage.to_string())
+                            .add_attribute("collateral", collateral.to_string())
+                            .add_attribute("market", id.id.as_str());
+                        let mut event = if let Some(stop_loss_override) = stop_loss_override {
+                            event
+                                .add_attribute("stop_loss_override", stop_loss_override.to_string())
+                        } else {
+                            event
+                        };
+                        if totals.collateral >= collateral.raw() {
+                            totals.collateral = totals.collateral.checked_sub(collateral.raw())?;
+                        } else {
+                            event = event.add_attribute("failure", true.to_string());
+                            queue_item.status =
+                                ProcessingStatus::Failed(FailedReason::NotEnoughCollateral {
+                                    available: totals.collateral,
+                                    requested: collateral,
+                                });
+                            crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                                storage,
+                                &queue_pos_id,
+                                &queue_item,
+                            )?;
+                            crate::state::LAST_PROCESSED_DEC_QUEUE_ID
+                                .save(storage, &queue_pos_id)?;
+                            return Ok(response.add_event(event));
+                        }
+
+                        crate::state::TOTALS.save(storage, &token, &totals)?;
+                        let mut token_value = crate::state::LP_TOKEN_VALUE
+                            .may_load(storage, &token)?
+                            .context("LP_TOKEN_VALUE store is empty")?;
+                        token_value.set_outdated();
+                        crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
+                        queue_item.status = ProcessingStatus::InProgress;
+                        crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                            storage,
+                            &queue_pos_id,
+                            &queue_item,
+                        )?;
+                        // We use reply aways so that we also handle the error case
+                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_OPEN_POSITION);
+                        let response = response.add_event(event);
+                        let response = response.add_submessage(sub_msg);
+                        Ok(response)
+                    }
+                },
             }
         }
     }

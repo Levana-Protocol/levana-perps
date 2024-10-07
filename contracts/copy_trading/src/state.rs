@@ -1,3 +1,4 @@
+use perpswap::contracts::market::deferred_execution::DeferredExecId;
 use perpswap::time::Timestamp;
 
 use crate::{
@@ -66,3 +67,7 @@ pub(crate) const LAST_MARKET_ADD_CHECK: Item<Timestamp> = Item::new("last-market
 
 /// Status of the market loader
 pub(crate) const MARKET_LOADER_STATUS: Item<MarketLoaderStatus> = Item::new("market-loader-status");
+
+/// Deferred exec status stored in the reply entrypoint
+pub(crate) const REPLY_DEFERRED_EXEC_ID: Item<Option<DeferredExecId>> =
+    Item::new("reply-deferred-exec-id");

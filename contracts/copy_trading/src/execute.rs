@@ -1,5 +1,8 @@
 use crate::{
-    common::{get_next_dec_queue_id, get_next_inc_queue_id},
+    common::{
+        get_current_processed_dec_queue_id, get_current_queue_element, get_next_dec_queue_id,
+        get_next_inc_queue_id,
+    },
     prelude::*,
     types::{
         DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
@@ -8,7 +11,12 @@ use crate::{
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-use perpswap::contracts::copy_trading;
+
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::{
+    copy_trading,
+    market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
+};
 use perpswap::time::Timestamp;
 
 #[must_use]
@@ -129,7 +137,139 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             do_work(state, storage)
         }
+        ExecuteMsg::LeaderMsg {
+            market_id,
+            message,
+            collateral,
+        } => {
+            state.config.ensure_leader(&sender)?;
+            funds.require_none()?;
+            execute_leader_msg(storage, &state, market_id, message, collateral)
+        }
         _ => panic!("Not implemented yet"),
+    }
+}
+
+#[allow(deprecated)]
+fn execute_leader_msg(
+    storage: &mut dyn Storage,
+    state: &State,
+    market_id: MarketId,
+    message: Box<MarketExecuteMsg>,
+    collateral: Option<NonZero<Collateral>>,
+) -> Result<Response> {
+    let not_supported_response = |message: &str| {
+        let response = Response::new().add_event(
+            Event::new("execute-leader-msg")
+                .add_attribute("message", message.to_string())
+                .add_attribute("unsupported", true.to_string()),
+        );
+        Ok(response)
+    };
+    let market_info = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS store is empty")?;
+    let token = state.to_token(&market_info.token)?;
+    match *message {
+        MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
+        // implement
+        MarketExecuteMsg::Receive { .. } => todo!(),
+        MarketExecuteMsg::OpenPosition {
+            slippage_assert,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit,
+        } => {
+            let collateral = match collateral {
+                Some(collateral) => collateral,
+                None => bail!("No supplied collateral for opening position"),
+            };
+            if max_gains.is_some() {
+                bail!("max_gains is deprecated, use take_profit instead")
+            }
+            if take_profit.is_none() {
+                bail!("take profit is not specified")
+            }
+            let dec_queue_id = get_next_dec_queue_id(storage)?;
+            let leader = state.config.leader.clone();
+            crate::state::WALLET_QUEUE_ITEMS.save(
+                storage,
+                (&leader, QueuePositionId::DecQueuePositionId(dec_queue_id)),
+                &(),
+            )?;
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::OpenPosition {
+                        collateral,
+                        slippage_assert,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                storage,
+                &dec_queue_id,
+                &queue_position,
+            )?;
+            Ok(Response::new().add_event(
+                Event::new("open-position")
+                    .add_attribute("queue-id", dec_queue_id.to_string())
+                    .add_attribute("collateral", collateral.to_string()),
+            ))
+        }
+        // decrea coll
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { .. } => todo!(),
+        // dec collater
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactSize { .. } => todo!(),
+        // increase coll
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => todo!(),
+        // increas
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => todo!(),
+        // no impact on collateral. only impatcs notional size.
+        MarketExecuteMsg::UpdatePositionLeverage { .. } => todo!(),
+        // no impact. todo: look through the codebase.
+        MarketExecuteMsg::UpdatePositionMaxGains { .. } => todo!(),
+        //
+        MarketExecuteMsg::UpdatePositionTakeProfitPrice { .. } => todo!(),
+        // no impact
+        MarketExecuteMsg::UpdatePositionStopLossPrice { .. } => todo!(),
+        // no impact.
+        MarketExecuteMsg::SetTriggerOrder { .. } => todo!(),
+        // reduces collateral
+        MarketExecuteMsg::PlaceLimitOrder { .. } => todo!(),
+        // increse collateral
+        MarketExecuteMsg::CancelLimitOrder { .. } => todo!(),
+        // increase or leave it exactly same.
+        MarketExecuteMsg::ClosePosition { .. } => todo!(),
+        MarketExecuteMsg::DepositLiquidity { .. } => not_supported_response("deposit-liqudiity"),
+        MarketExecuteMsg::ReinvestYield { .. } => not_supported_response("reinvest yield"),
+        MarketExecuteMsg::WithdrawLiquidity { .. } => not_supported_response("withdraw-liquidity"),
+        MarketExecuteMsg::ClaimYield {} => not_supported_response("claim-yield"),
+        MarketExecuteMsg::StakeLp { .. } => not_supported_response("stake-lp"),
+        MarketExecuteMsg::UnstakeXlp { .. } => not_supported_response("unstake-xlp"),
+        MarketExecuteMsg::StopUnstakingXlp {} => not_supported_response("stop-unstaking-xlp"),
+        MarketExecuteMsg::CollectUnstakedLp {} => not_supported_response("collect-unstaked-lp"),
+        MarketExecuteMsg::Crank { .. } => not_supported_response("crank"),
+        MarketExecuteMsg::NftProxy { .. } => not_supported_response("nft-proxy"),
+        MarketExecuteMsg::LiquidityTokenProxy { .. } => {
+            not_supported_response("liquidity-token-proxy")
+        }
+        MarketExecuteMsg::TransferDaoFees {} => not_supported_response("transfer-dao-fees"),
+        MarketExecuteMsg::CloseAllPositions {} => not_supported_response("close-all-positions"),
+        MarketExecuteMsg::ProvideCrankFunds {} => not_supported_response("provide-crank-funds"),
+        MarketExecuteMsg::SetManualPrice { .. } => not_supported_response("set-manual-price"),
+        MarketExecuteMsg::PerformDeferredExec { .. } => {
+            not_supported_response("perform-deferred-exec")
+        }
     }
 }
 
@@ -181,7 +321,7 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
     let res = Response::new()
         .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
-    let (event, msg) = match desc {
+    match desc {
         WorkDescription::LoadMarket {} => {
             state.batched_stored_market_info(storage)?;
             let status = crate::state::MARKET_LOADER_STATUS
@@ -189,23 +329,88 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
                 .unwrap_or_default();
             let event =
                 Event::new("market-loader-status").add_attribute("value", status.to_string());
-            (event, None)
+            let res = res.add_event(event);
+            Ok(res)
         }
         WorkDescription::ComputeLpTokenValue { token } => {
             let event = compute_lp_token_value(storage, &state, token)?;
-            (event, None)
+            let res = res.add_event(event);
+            Ok(res)
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
-        WorkDescription::ProcessQueueItem { id } => process_queue_item(id, storage, &state)?,
+        WorkDescription::ProcessQueueItem { id } => {
+            let res = process_queue_item(id, storage, &state, res)?;
+            Ok(res)
+        }
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
+        WorkDescription::HandleDeferredExecId {} => {
+            let response = handle_deferred_exec_id(storage, &state)?;
+            Ok(response)
+        }
+    }
+}
+
+fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<Response> {
+    let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+        .may_load(storage)?
+        .flatten();
+    let deferred_exec_id = match deferred_exec_id {
+        Some(deferred_exec_id) => deferred_exec_id,
+        None => bail!("Impossible: Work handle unable to find deferred exec id"),
     };
-    let response = res.add_event(event);
-    let response = match msg {
-        Some(msg) => response.add_message(msg),
-        None => response,
+    let queue_item = get_current_processed_dec_queue_id(storage)?;
+    let (queue_id, mut queue_item) = match queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
+        None => bail!("Impossible: Work handle not able to find queue item"),
     };
-    Ok(response)
+
+    assert!(queue_item.status.in_progress());
+    let market_id = match queue_item.item.clone() {
+        DecQueueItem::MarketItem { id, .. } => id,
+        _ => bail!("Impossible: Deferred work handler got non market item"),
+    };
+    let market_addr = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS state is empty")?
+        .addr;
+    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let status = match response {
+        GetDeferredExecResp::Found { item } => item,
+        GetDeferredExecResp::NotFound {} => {
+            bail!("Impossible: Deferred exec id not found")
+        }
+    };
+    match status.status {
+        DeferredExecStatus::Pending => bail!("Impossible: Deferred exec status is pending"),
+        DeferredExecStatus::Success { .. } => {
+            queue_item.status = copy_trading::ProcessingStatus::Finished;
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+            crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
+            crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
+            Ok(Response::new().add_event(
+                Event::new("handle-deferred-exec-id").add_attribute("success", true.to_string()),
+            ))
+        }
+        DeferredExecStatus::Failure {
+            reason,
+            executed,
+            crank_price,
+        } => {
+            queue_item.status =
+                copy_trading::ProcessingStatus::Failed(FailedReason::DeferredExecFailure {
+                    reason,
+                    executed,
+                    crank_price,
+                });
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+            crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
+            crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
+            Ok(Response::new().add_event(
+                Event::new("handle-deferred-exec-id").add_attribute("success", false.to_string()),
+            ))
+        }
+    }
 }
 
 fn deposit(
@@ -234,16 +439,19 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALUE")?;
+    let queue_id = get_current_queue_element(storage)?;
     let token_value = match token_value {
         Some(token_value) => token_value,
         None => {
             // The value is not yet stored which means no deposit has
             // happened yet. In this case, the initial value of the
             // token would be one.
+
             let token_value = LpTokenValue {
                 value: OneLpTokenValue(Collateral::one()),
                 status: crate::types::LpTokenStatus::Valid {
                     timestamp: state.env.block.time.into(),
+                    queue_id,
                 },
             };
             crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
@@ -251,7 +459,7 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
         }
     };
 
-    if token_value.status.valid() {
+    if token_value.status.valid(&queue_id) {
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
     // todo: track operations
@@ -282,13 +490,20 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
         .collateral
         .checked_add(total_open_position_collateral)?;
     let total_shares = totals.shares;
-    let one_share_value = total_collateral.checked_div_dec(total_shares.into_decimal256())?;
+    let one_share_value = if total_shares.is_zero() || total_collateral.is_zero() {
+        Collateral::one()
+    } else {
+        total_collateral.checked_div_dec(total_shares.into_decimal256())?
+    };
+    let queue_id = get_current_queue_element(storage)?;
     let token_value = LpTokenValue {
         value: OneLpTokenValue(one_share_value),
         status: crate::types::LpTokenStatus::Valid {
             timestamp: Timestamp::from(state.env.block.time),
+            queue_id,
         },
     };
+
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
     let event = Event::new("lp-token")
         .add_attribute("validation", "success".to_string())
@@ -314,11 +529,11 @@ fn validate_single_market(
         .unwrap_or_default();
     let mut total_open_positions = 0u64;
     let mut total_orders = 0u64;
+    let mut tokens_start_after = None;
     // todo: need to break if query limit exeeded
     loop {
         // We have to iterate again entirely, because a position can
         // close.
-        let mut tokens_start_after = None;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
@@ -334,8 +549,8 @@ fn validate_single_market(
         crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
         return Ok(ValidationStatus::Failed);
     }
+    let mut orders_start_after = None;
     loop {
-        let mut orders_start_after = None;
         let orders = state.load_orders(&market.addr, orders_start_after)?;
         orders_start_after = orders.next_start_after;
         // todo: optimize if empty orders
@@ -368,8 +583,8 @@ fn process_single_market(
         .may_load(storage, &market.id)
         .context("Could not load MARKET_WORK_INFO")?
         .unwrap_or_default();
+    let mut tokens_start_after = None;
     loop {
-        let mut tokens_start_after = None;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
         // todo: optimize if empty tokens
@@ -389,8 +604,8 @@ fn process_single_market(
     }
     // todo: do not save here, if we are saving below
     crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
+    let mut orders_start_after = None;
     loop {
-        let mut orders_start_after = None;
         let orders = state.load_orders(&market.addr, orders_start_after)?;
         orders_start_after = orders.next_start_after;
         // todo: optimize if empty orders
