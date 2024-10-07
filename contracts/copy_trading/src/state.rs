@@ -1,6 +1,4 @@
-use msg::contracts::market::{
-    deferred_execution::DeferredExecId, entry::ClosedPositionCursor,
-};
+use msg::contracts::market::{deferred_execution::DeferredExecId, entry::ClosedPositionCursor};
 use shared::time::Timestamp;
 
 use crate::{
