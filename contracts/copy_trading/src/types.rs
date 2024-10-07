@@ -369,10 +369,17 @@ impl Display for MarketLoaderStatus {
     }
 }
 
+/// Leader commission type
+#[derive(Debug)]
 pub struct LeaderComissision {
+    /// Active collateral of the closed position
     pub active_collateral: Collateral,
+    /// Total profit made in that closed position
     pub profit: Collateral,
+    /// Total comission that leader got from the closed position
     pub commission: Collateral,
+    /// This is the difference between pnl and comission
     pub remaining_profit: Collateral,
+    /// This is the difference between active collateral and commission
     pub remaining_collateral: Collateral,
 }

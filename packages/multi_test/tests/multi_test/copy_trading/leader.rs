@@ -5,7 +5,10 @@ use msg::{
         copy_trading::{DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp},
         market::position::PositionId,
     },
-    shared::{number::Collateral, storage::DirectionToBase},
+    shared::{
+        number::{Collateral, UnsignedDecimal},
+        storage::DirectionToBase,
+    },
 };
 
 use crate::copy_trading::{deposit_money, load_markets, withdraw_money};
@@ -371,14 +374,18 @@ fn leader_position_closed_with_profit() {
         .query_closed_position(&market.copy_trading_addr, position_ids[0])
         .unwrap();
 
-    let position_ids = market
+    let all_position_ids = market
         .query_position_token_ids(&market.copy_trading_addr)
         .unwrap()
         .iter()
         .map(|item| PositionId::new(item.parse().unwrap()))
         .collect::<Vec<_>>();
 
-    assert_eq!(position_ids.len(), 0);
+    let closed_position = market
+        .query_closed_position(&market.copy_trading_addr, position_ids[0])
+        .unwrap();
+
+    assert_eq!(all_position_ids.len(), 0);
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
@@ -395,6 +402,19 @@ fn leader_position_closed_with_profit() {
         WorkResp::HasWork { work_description } => assert!(work_description.is_rebalance()),
     }
 
+    let closed_position_active_collateral = closed_position.active_collateral;
+    let leader_comission = closed_position
+        .pnl_collateral
+        .try_into_non_negative_value()
+        .unwrap()
+        .checked_mul_dec("0.1".parse().unwrap())
+        .unwrap();
+    let diff = closed_position_active_collateral
+        .checked_sub(leader_comission)
+        .unwrap();
+    let tokens_collateral: Collateral = "170".parse().unwrap();
+    let tokens_collateral = tokens_collateral.checked_add(diff).unwrap();
+
     // Rebalance the market
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
     let event = Event::new("wasm-rebalanced").add_attribute("made-profit", true.to_string());
@@ -402,8 +422,7 @@ fn leader_position_closed_with_profit() {
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
-    assert!(tokens[0].collateral > "197".parse().unwrap());
-    assert!(tokens[0].collateral < "198".parse().unwrap());
+    assert!(tokens[0].collateral.diff(tokens_collateral) < "0.1".parse().unwrap());
 
     // Compute lp token value
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
@@ -515,8 +534,8 @@ fn leader_position_closed_with_loss() {
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
-    assert!(tokens[0].collateral > "170".parse().unwrap());
-    assert!(tokens[0].collateral < "171".parse().unwrap());
+
+    assert!(tokens[0].collateral.diff("170".parse().unwrap()) < "0.1".parse().unwrap());
 
     // Compute lp token value
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
@@ -540,8 +559,7 @@ fn leader_position_closed_with_loss() {
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
-    assert!(tokens[0].collateral > "190".parse().unwrap());
-    assert!(tokens[0].collateral < "191".parse().unwrap());
+    assert!(tokens[0].collateral.diff("190".parse().unwrap()) < "0.1".parse().unwrap());
 
     let tokens = market.query_copy_trading_balance(&trader1).unwrap();
     let shares = tokens.balance[0].shares;
