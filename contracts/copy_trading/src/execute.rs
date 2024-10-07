@@ -367,11 +367,12 @@ fn rebalance(
     let mut check_balance = Collateral::zero();
     let mut rebalanced = false;
     for market in markets {
-        if check_balance >= rebalance_amount {
+        if check_balance.approx_eq(rebalance_amount) {
             break;
         }
-        let cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
+        let mut cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
         loop {
+            // todo: Batch this operations
             let closed_positions = state.query_closed_position(&market.addr, cursor.clone())?;
             let last_closed_position =
                 closed_positions
@@ -382,17 +383,17 @@ fn rebalance(
                         time: item.close_time,
                         position: item.id,
                     });
-            if let Some(last_closed_position) = last_closed_position {
+            if let Some(ref last_closed_position) = last_closed_position {
                 crate::state::LAST_CLOSED_POSITION_CURSOR.save(
                     storage,
                     &market.id,
                     &last_closed_position,
                 )?
             }
+            cursor = last_closed_position;
             for position in closed_positions.positions {
                 let commission = handle_leader_commission(storage, state, &token, position)?;
                 check_balance = check_balance.checked_add(commission.active_collateral)?;
-                // totals.collateral = totals.collateral.checked_add(commission.remaining_profit)?;
                 totals.collateral = totals
                     .collateral
                     .checked_add(commission.remaining_collateral)?;
@@ -406,11 +407,11 @@ fn rebalance(
             }
         }
     }
-    let mut event = Event::new("rebalanced").add_attribute("status", rebalanced.to_string());
+    let mut event = Event::new("rebalanced").add_attribute("made-profit", rebalanced.to_string());
     if check_balance < rebalance_amount {
-        // We have settled all the markets for all the closed
-        // positions, but we are still not balanced. This means that
-        // the money was sent by someone directly to the contract.
+        // We have settled all the markets's closed positions, but we
+        // are still not balanced. This means that the money was sent
+        // by someone directly to the contract.
         let diff = rebalance_amount.checked_sub(check_balance)?;
         totals.collateral = totals.collateral.checked_add(diff)?;
         crate::state::TOTALS.save(storage, &token, &totals)?;
