@@ -141,7 +141,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             message,
             collateral,
         } => {
-            state.config.check_leader(&sender)?;
+            state.config.ensure_leader(&sender)?;
             funds.require_none()?;
             execute_leader_msg(storage, &state, market_id, message, collateral)
         }
