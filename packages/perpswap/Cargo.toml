@@ -25,7 +25,6 @@ chrono = { version = "0.4.31", optional = true, default-features = false, featur
 enum-iterator = "1.2"
 once_cell = "1.17"
 component = "0.1.1"
-rust-analyzer = "0.0.1"
 
 [features]
 debug_log = []
