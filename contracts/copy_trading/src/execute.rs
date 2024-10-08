@@ -443,7 +443,7 @@ fn handle_leader_commission(
         closed_position.pnl_collateral,
         &state.config.commission_rate,
     )?;
-    if commission.0 > Collateral::zero() {
+    if !commission.0.is_zero() {
         let leader_comisssion = crate::state::LEADER_COMMISSION
             .may_load(storage, token)?
             .unwrap_or_default();
