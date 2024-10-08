@@ -16,7 +16,7 @@ use cosmos::{Address, CosmosNetwork};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
 
-use msg::contracts::market::liquidity::LiquidityStats;
+use perpswap::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{contracts::Factory, PerpsNetwork};
 use reqwest::Client;
 use perpswap::storage::{LpToken, MarketId, Signed, UnsignedDecimal};

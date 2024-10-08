@@ -3,7 +3,7 @@ use anyhow::Context;
 use cosmwasm_std::{Binary, Order, Uint128};
 use cw_storage_plus::{Bound, Map};
 use cw_utils::Expiration;
-use msg::contracts::cw20::{
+use perpswap::contracts::cw20::{
     entry::{
         AllAccountsResponse, AllAllowancesResponse, AllSpenderAllowancesResponse, AllowanceInfo,
         AllowanceResponse, BalanceResponse, DownloadLogoResponse, EmbeddedLogo, InstantiateMsg,

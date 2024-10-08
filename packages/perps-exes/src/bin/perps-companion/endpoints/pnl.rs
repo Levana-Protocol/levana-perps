@@ -14,7 +14,7 @@ use axum_extra::TypedHeader;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use headers::Host;
-use msg::{
+use perpswap::{
     contracts::market::{
         entry::QueryMsg,
         position::{PositionId, PositionsResp},

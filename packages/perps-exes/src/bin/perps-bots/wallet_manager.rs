@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Cosmos, HasAddress, TxBuilder, Wallet,
 };
-use msg::{
+use perpswap::{
     contracts::{cw20::Cw20Coin, market::entry::StatusResp},
     prelude::{Collateral, UnsignedDecimal},
 };

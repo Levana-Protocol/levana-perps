@@ -9,13 +9,13 @@ use cosmos::{Address, Contract, Cosmos};
 use cosmwasm_std::Addr;
 use csv::WriterBuilder;
 use itertools::{EitherOrBoth, Itertools};
-use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
-use msg::contracts::market::entry::{
+use perpswap::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use perpswap::contracts::market::entry::{
     LpAction, LpActionHistoryResp, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     TraderActionHistoryResp,
 };
-use msg::contracts::market::position::{PositionId, PositionsResp};
-use msg::prelude::{
+use perpswap::contracts::market::position::{PositionId, PositionsResp};
+use perpswap::prelude::{
     DirectionToBase, FactoryQueryMsg, MarketQueryMsg, OrderInMessage, RawAddr, Signed,
 };
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
@@ -572,13 +572,13 @@ impl IntoResponse for Error {
 mod tests {
     use crate::endpoints::export::{generate_csv, get_action_records};
     use cosmwasm_std::Addr;
-    use msg::contracts::market::config::Config;
-    use msg::contracts::market::entry::{
+    use perpswap::contracts::market::config::Config;
+    use perpswap::contracts::market::entry::{
         Fees, LpAction, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     };
-    use msg::contracts::market::position::PositionId;
-    use msg::contracts::market::spot_price::SpotPriceConfig;
-    use msg::token::Token;
+    use perpswap::contracts::market::position::PositionId;
+    use perpswap::contracts::market::spot_price::SpotPriceConfig;
+    use perpswap::token::Token;
     use perpswap::market_type::MarketType;
     use perpswap::number::{Collateral, Signed};
     use perpswap::prelude::{DirectionToBase, Timestamp};

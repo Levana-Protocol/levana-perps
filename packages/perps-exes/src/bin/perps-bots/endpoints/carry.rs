@@ -9,7 +9,7 @@ use axum::{
 };
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
-use msg::prelude::{MarketId, MarketType, UnsignedDecimal};
+use perpswap::prelude::{MarketId, MarketType, UnsignedDecimal};
 use perps_exes::PositionsInfo;
 
 use super::RestApp;

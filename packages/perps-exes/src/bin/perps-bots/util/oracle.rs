@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Contract};
 use cosmwasm_std::Uint256;
-use msg::{
+use perpswap::{
     contracts::market::{
         entry::OraclePriceResp,
         spot_price::{PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},

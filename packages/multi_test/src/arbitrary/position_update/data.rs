@@ -1,8 +1,8 @@
 use std::{fmt::Debug, rc::Rc};
 
 use cosmwasm_std::Addr;
-use msg::contracts::market::{entry::SlippageAssert, position::PositionId};
-use msg::prelude::*;
+use perpswap::contracts::market::{entry::SlippageAssert, position::PositionId};
+use perpswap::prelude::*;
 
 use crate::market_wrapper::PerpsMarket;
 

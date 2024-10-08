@@ -1,4 +1,4 @@
-use msg::{prelude::*, token::Token};
+use perpswap::{prelude::*, token::Token};
 
 pub trait TokenExt {
     fn convert_u128<T: UnsignedDecimal>(&self, value: u128) -> NonZero<T>;

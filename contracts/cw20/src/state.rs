@@ -3,7 +3,7 @@ mod cw20;
 mod trading_competition;
 
 use cosmwasm_std::{Api, Deps, DepsMut, Env, Storage};
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,
