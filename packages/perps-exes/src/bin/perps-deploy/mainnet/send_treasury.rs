@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::CosmosMsg;
+use perps_exes::{config::MainnetFactories, contracts::Factory};
 use perpswap::{
     contracts::market::entry::{QueryMsg, StatusResp},
     token::Token,
 };
-use perps_exes::{config::MainnetFactories, contracts::Factory};
 
 use crate::util::add_cosmos_msg;
 use cosmos::Address;

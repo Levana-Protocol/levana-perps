@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use perpswap::prelude::*;
 use perps_exes::contracts::MarketContract;
+use perpswap::prelude::*;
 
 use crate::{
     config::BotConfigMainnet,

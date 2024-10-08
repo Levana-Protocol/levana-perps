@@ -5,6 +5,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 use super::context::Context;
 use cw_multi_test::AppResponse;
+use multi_test::{market_wrapper::PerpsMarket, time::TimeJump};
 use perpswap::{
     bridge::{
         BridgeToClientMsg, BridgeToClientWrapper, ClientToBridgeMsg, ClientToBridgeWrapper,
@@ -12,7 +13,6 @@ use perpswap::{
     },
     prelude::*,
 };
-use multi_test::{market_wrapper::PerpsMarket, time::TimeJump};
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 
 impl Context {

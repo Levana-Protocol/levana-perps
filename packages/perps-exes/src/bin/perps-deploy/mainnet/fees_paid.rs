@@ -4,13 +4,13 @@ use anyhow::Result;
 use backon::{ConstantBuilder, Retryable};
 use cosmos::Address;
 use cosmwasm_std::OverflowError;
-use perpswap::contracts::market::position::PositionId;
 use parking_lot::Mutex;
 use perps_exes::{
     config::MainnetFactories,
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, Signed, Usd},
 };
+use perpswap::contracts::market::position::PositionId;
 use perpswap::prelude::*;
 use perpswap::storage::MarketId;
 use tokio::task::JoinSet;

@@ -17,6 +17,13 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress, TxBuilder};
+use perps_exes::{
+    config::{ChainConfig, MainnetFactories},
+    contracts::Factory,
+    prelude::MarketContract,
+    pyth::get_oracle_update_msg,
+    PerpsNetwork,
+};
 use perpswap::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
     position::{
@@ -25,18 +32,11 @@ use perpswap::contracts::market::{
     },
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
-use perps_exes::{
-    config::{ChainConfig, MainnetFactories},
-    contracts::Factory,
-    prelude::MarketContract,
-    pyth::get_oracle_update_msg,
-    PerpsNetwork,
-};
-use reqwest::Url;
-use serde_json::json;
 use perpswap::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
+use reqwest::Url;
+use serde_json::json;
 use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]

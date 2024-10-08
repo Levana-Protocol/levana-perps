@@ -22,10 +22,10 @@ use perpswap::{
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
 
+use perpswap::storage::{MarketId, MarketType};
 use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use perpswap::storage::{MarketId, MarketType};
 
 use crate::{
     app::App,

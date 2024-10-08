@@ -2,8 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use cosmos::Address;
 use itertools::Itertools;
-use perpswap::prelude::*;
 use perps_exes::PerpsNetwork;
+use perpswap::prelude::*;
 
 use crate::cli::Opt;
 

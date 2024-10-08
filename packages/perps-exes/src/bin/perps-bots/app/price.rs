@@ -14,6 +14,8 @@ use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, CosmosTxResponse, HasAddress,
     TxBuilder, TxMessage, Wallet,
 };
+use perps_exes::pyth::get_oracle_update_msg;
+use perpswap::storage::MarketId;
 use perpswap::{
     contracts::market::{
         crank::CrankWorkInfo,
@@ -21,8 +23,6 @@ use perpswap::{
     },
     prelude::*,
 };
-use perps_exes::pyth::get_oracle_update_msg;
-use perpswap::storage::MarketId;
 use tokio::task::JoinSet;
 
 use crate::{

@@ -13,8 +13,8 @@ use anyhow::Result;
 use async_channel::RecvError;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use parking_lot::Mutex;
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use perpswap::storage::MarketId;
 
 // For high gas, we only care about whether there is a current work item.

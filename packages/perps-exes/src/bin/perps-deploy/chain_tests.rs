@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
 use anyhow::{bail, ensure, Context, Result};
-use perpswap::contracts::market::entry::SlippageAssert;
-use perpswap::prelude::*;
 use multi_test::response::CosmosResponseExt;
 use perps_exes::{PerpApp, UpdatePositionCollateralImpact::Leverage};
+use perpswap::contracts::market::entry::SlippageAssert;
+use perpswap::prelude::*;
 
 pub async fn test_funding_market(perp_app: &PerpApp) -> Result<()> {
     tracing::info!("Testing that we can fund the market");

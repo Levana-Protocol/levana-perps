@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use perpswap::{contracts::tracker::entry::ContractResp, prelude::*};
 use perps_exes::prelude::MarketContract;
+use perpswap::{contracts::tracker::entry::ContractResp, prelude::*};
 
 use perps_exes::contracts::{Factory, MarketInfo};
 

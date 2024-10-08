@@ -16,10 +16,10 @@ use cosmos::{Address, CosmosNetwork};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
 
-use perpswap::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{contracts::Factory, PerpsNetwork};
-use reqwest::Client;
+use perpswap::contracts::market::liquidity::LiquidityStats;
 use perpswap::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
+use reqwest::Client;
 use tokio::task::JoinSet;
 
 use crate::{app::App, types::ContractEnvironment};

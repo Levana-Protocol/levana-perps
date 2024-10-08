@@ -9,6 +9,7 @@ use cosmos::{Address, Contract, Cosmos};
 use cosmwasm_std::Addr;
 use csv::WriterBuilder;
 use itertools::{EitherOrBoth, Itertools};
+use perps_exes::prelude::{Collateral, UnsignedDecimal};
 use perpswap::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use perpswap::contracts::market::entry::{
     LpAction, LpActionHistoryResp, LpActionKind, PositionAction, PositionActionKind, StatusResp,
@@ -18,10 +19,9 @@ use perpswap::contracts::market::position::{PositionId, PositionsResp};
 use perpswap::prelude::{
     DirectionToBase, FactoryQueryMsg, MarketQueryMsg, OrderInMessage, RawAddr, Signed,
 };
-use perps_exes::prelude::{Collateral, UnsignedDecimal};
 
-use serde::Serialize;
 use perpswap::storage::MarketId;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -578,11 +578,11 @@ mod tests {
     };
     use perpswap::contracts::market::position::PositionId;
     use perpswap::contracts::market::spot_price::SpotPriceConfig;
-    use perpswap::token::Token;
     use perpswap::market_type::MarketType;
     use perpswap::number::{Collateral, Signed};
     use perpswap::prelude::{DirectionToBase, Timestamp};
     use perpswap::storage::MarketId;
+    use perpswap::token::Token;
     use std::collections::HashMap;
     use std::str::FromStr;
 

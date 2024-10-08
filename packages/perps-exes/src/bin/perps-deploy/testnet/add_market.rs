@@ -1,5 +1,5 @@
-use perpswap::prelude::*;
 use perps_exes::contracts::Factory;
+use perpswap::prelude::*;
 use perpswap::storage::MarketId;
 
 use crate::instantiate::AddMarketParams;

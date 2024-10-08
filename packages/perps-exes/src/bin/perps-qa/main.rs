@@ -8,9 +8,9 @@ use crate::cli::Cmd;
 use anyhow::Result;
 use clap::Parser;
 use cosmos::Coin;
+use perps_exes::prelude::*;
 use perpswap::contracts::market::entry::StatusResp;
 use perpswap::contracts::market::{entry::SlippageAssert, liquidity::LiquidityStats};
-use perps_exes::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {

@@ -1,6 +1,6 @@
 use cosmos::{HasAddress, HasAddressHrp, SeedPhrase};
-use perpswap::prelude::*;
 use perps_exes::{PerpApp, PerpsNetwork};
+use perpswap::prelude::*;
 
 use std::{
     process::{Child, Command, Stdio},

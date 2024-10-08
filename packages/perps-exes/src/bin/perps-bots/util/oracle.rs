@@ -3,6 +3,8 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Contract};
 use cosmwasm_std::Uint256;
+use parking_lot::RwLock;
+use perps_exes::pyth::fetch_json_with_retry;
 use perpswap::{
     contracts::market::{
         entry::OraclePriceResp,
@@ -10,8 +12,6 @@ use perpswap::{
     },
     prelude::*,
 };
-use parking_lot::RwLock;
-use perps_exes::pyth::fetch_json_with_retry;
 use pyth_sdk_cw::PriceIdentifier;
 
 use crate::app::App;
