@@ -354,6 +354,10 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
     }
 }
 
+// Rebalance is done when contract balance is not same as the one
+// internally tracked by it. This could occur for a variety of
+// reasons like Positions got liquidated, someone sent free money to this
+// contract etc.
 fn rebalance(
     storage: &mut dyn Storage,
     state: &State,
@@ -461,7 +465,7 @@ fn handle_leader_commission(
             remaining_collateral,
         })
     } else {
-        hwm.add_loss(closed_position.pnl_collateral);
+        hwm.add_loss(closed_position.pnl_collateral)?;
         Ok(LeaderComissision {
             active_collateral: closed_position.active_collateral,
             profit: Collateral::zero(),

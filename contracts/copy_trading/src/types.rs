@@ -404,13 +404,6 @@ impl Commission {
 }
 
 impl HighWaterMark {
-    fn current_same_as_hwm(&self) -> bool {
-        match self.current.try_into_non_negative_value() {
-            Some(current) => current == self.cumulative_profit,
-            None => false,
-        }
-    }
-
     fn in_loss(&self) -> bool {
         match self.current.try_into_non_negative_value() {
             Some(current) => self.cumulative_profit > current,
@@ -428,16 +421,14 @@ impl HighWaterMark {
                     if new_current > self.cumulative_profit {
                         let diff = new_current.checked_sub(self.cumulative_profit)?;
                         self.cumulative_profit = self.cumulative_profit.checked_add(diff)?;
-                        let commission = diff.checked_mul_dec(*rate)?;
-                        commission
+                        diff.checked_mul_dec(*rate)?
                     } else {
                         Collateral::zero()
                     }
                 } else {
                     self.current = new_current_signed;
                     self.cumulative_profit = self.cumulative_profit.checked_add(profit)?;
-                    let commission = profit.checked_mul_dec(*rate)?;
-                    commission
+                    profit.checked_mul_dec(*rate)?
                 }
             }
             None => {
