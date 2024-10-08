@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::async_trait;
-use msg::{contracts::market::entry::StatusResp, prelude::*};
+use perpswap::{contracts::market::entry::StatusResp, prelude::*};
 
 use crate::{
     util::markets::Market,

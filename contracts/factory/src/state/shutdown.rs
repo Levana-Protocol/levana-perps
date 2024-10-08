@@ -1,11 +1,11 @@
 use cosmwasm_std::{Addr, MessageInfo, Order, Storage};
 use cw_storage_plus::Map;
-use msg::{
+use perpswap::namespace;
+use perpswap::prelude::*;
+use perpswap::{
     contracts::factory::entry::ShutdownStatus,
     shutdown::{ShutdownEffect, ShutdownImpact, ShutdownWallet},
 };
-use shared::namespace;
-use shared::prelude::*;
 
 use super::{
     auth::{get_kill_switch, get_wind_down},

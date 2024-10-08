@@ -1,11 +1,11 @@
 use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
-use msg::prelude::MarketExecuteMsg;
 use perps_exes::{
     config::MainnetFactories,
     contracts::Factory,
     prelude::{Collateral, MarketContract},
 };
+use perpswap::prelude::MarketExecuteMsg;
 
 #[derive(clap::Parser)]
 pub(super) struct RewardsOpts {

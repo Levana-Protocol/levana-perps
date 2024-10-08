@@ -1,7 +1,7 @@
 use std::ops::{Mul, Sub};
 
 use crate::prelude::*;
-use shared::{compat::calc_notional_size, storage::PricePoint};
+use perpswap::{compat::calc_notional_size, storage::PricePoint};
 
 pub(crate) struct TakeProfitToCounterCollateral<'a> {
     pub(crate) take_profit_trader: TakeProfitTrader,

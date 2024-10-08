@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use msg::{contracts::market::entry::StatusResp, prelude::*};
 use perps_exes::PerpApp;
+use perpswap::{contracts::market::entry::StatusResp, prelude::*};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {

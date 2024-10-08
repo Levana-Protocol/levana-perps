@@ -3,7 +3,7 @@ use std::{error::Error, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use cosmos::{Address, CosmosNetwork};
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 use tracing_subscriber::{
     fmt, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };

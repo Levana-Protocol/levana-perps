@@ -1,10 +1,10 @@
 use anyhow::Result;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, CodeId, Contract, HasAddress, HasAddressHrp, HasCosmos, Wallet};
-use msg::contracts::factory::entry::{CodeIds, FactoryOwnerResp, MarketsResp, QueryMsg};
-use msg::contracts::market::entry::NewMarketParams;
-use msg::prelude::*;
-use msg::shutdown::{ShutdownEffect, ShutdownImpact};
+use perpswap::contracts::factory::entry::{CodeIds, FactoryOwnerResp, MarketsResp, QueryMsg};
+use perpswap::contracts::market::entry::NewMarketParams;
+use perpswap::prelude::*;
+use perpswap::shutdown::{ShutdownEffect, ShutdownImpact};
 
 #[derive(Clone)]
 pub struct Factory(Contract);
@@ -222,7 +222,7 @@ impl Factory {
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::factory::entry::ExecuteMsg::AddMarket { new_market },
+                perpswap::contracts::factory::entry::ExecuteMsg::AddMarket { new_market },
             )
             .await
     }

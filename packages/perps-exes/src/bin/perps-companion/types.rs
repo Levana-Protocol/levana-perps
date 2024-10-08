@@ -7,7 +7,7 @@ use anyhow::Result;
 use cosmos::CosmosNetwork;
 use cosmwasm_std::Decimal256;
 use perps_exes::PerpsNetwork;
-use shared::storage::{DirectionToBase, Signed};
+use perpswap::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Deserialize, sqlx::Type)]

@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 // not really a failable test
 // more of a demo to show how we can

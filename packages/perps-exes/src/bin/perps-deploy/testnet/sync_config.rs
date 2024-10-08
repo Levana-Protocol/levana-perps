@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 use cosmwasm_std::Addr;
-use msg::contracts::market::config::{Config, ConfigUpdate};
 use perps_exes::{
     config::{ChainConfig, ConfigUpdateAndBorrowFee, MarketConfigUpdates, PriceConfig},
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, MarketId},
 };
+use perpswap::contracts::market::config::{Config, ConfigUpdate};
 
 use crate::spot_price_config::get_spot_price_config;
 
@@ -69,7 +69,7 @@ async fn go(
             .get(&market_id)
             .with_context(|| format!("No market config update found for {market_id}"))?;
         let default_config = Config::new(
-            msg::contracts::market::spot_price::SpotPriceConfig::Manual {
+            perpswap::contracts::market::spot_price::SpotPriceConfig::Manual {
                 admin: Addr::unchecked("ignored"),
             },
         );

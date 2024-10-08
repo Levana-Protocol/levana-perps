@@ -14,7 +14,7 @@ use cosmwasm_std::{
     Coin, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response, Storage,
 };
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
         ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance, GasAllowanceResp,
@@ -22,8 +22,8 @@ use msg::contracts::{
         NextTradingIndexResponse, OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
     },
 };
+use perpswap::prelude::*;
 use semver::Version;
-use shared::prelude::*;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:faucet";
@@ -163,7 +163,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                             Some(i) => format!("Levana Faucet CW20 {name} #{i}"),
                             None => format!("Levana Faucet CW20 {name}"),
                         },
-                        &msg::contracts::cw20::entry::InstantiateMsg {
+                        &perpswap::contracts::cw20::entry::InstantiateMsg {
                             name: name.clone(),
                             symbol: name,
                             decimals: 6,
@@ -185,7 +185,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                         .context("CW20 not found")?;
                     ctx.response.add_execute_submessage_oneshot(
                         cw20,
-                        &msg::contracts::cw20::entry::ExecuteMsg::SetMarket { addr: market },
+                        &perpswap::contracts::cw20::entry::ExecuteMsg::SetMarket { addr: market },
                     )?;
                 }
                 OwnerMsg::SetCw20CodeId { cw20_code_id } => {
@@ -197,7 +197,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                         let address = state.api.addr_validate(&address)?;
                         ctx.response.add_execute_submessage_oneshot(
                             &cw20,
-                            &msg::contracts::cw20::entry::ExecuteMsg::Mint {
+                            &perpswap::contracts::cw20::entry::ExecuteMsg::Mint {
                                 recipient: address.into(),
                                 amount,
                             },

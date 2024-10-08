@@ -1,6 +1,6 @@
 use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::{contracts::market::config::ConfigUpdate, prelude::*};
+use perpswap::{contracts::market::config::ConfigUpdate, prelude::*};
 
 fn enable_crank_fee(market: &PerpsMarket) -> anyhow::Result<()> {
     market.exec_set_config(ConfigUpdate {

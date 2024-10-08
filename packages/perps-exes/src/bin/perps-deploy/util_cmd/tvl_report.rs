@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use anyhow::Result;
 use cosmos::{Coin, HasAddress};
 use cosmwasm_std::Decimal256;
-use msg::token::Token;
 use perps_exes::{
     config::MainnetFactories,
     contracts::Factory,
     prelude::{Collateral, MarketContract, MarketId, MarketType, UnsignedDecimal, Usd},
 };
+use perpswap::token::Token;
 
 #[derive(clap::Parser)]
 pub(super) struct TvlReportOpt {

@@ -1,4 +1,4 @@
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::PositionsQueryFeeApproach,
     position::{PositionId, PositionsResp},
 };
@@ -57,7 +57,7 @@ impl<'a> State<'a> {
             return Ok((info, true));
         }
 
-        let msg::contracts::factory::entry::MarketInfoResponse {
+        let perpswap::contracts::factory::entry::MarketInfoResponse {
             market_addr,
             position_token: _,
             liquidity_token_lp: _,
@@ -66,7 +66,7 @@ impl<'a> State<'a> {
             .querier
             .query_wasm_smart(
                 &self.config.factory,
-                &msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                &perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                     market_id: market_id.clone(),
                 },
             )
@@ -77,11 +77,11 @@ impl<'a> State<'a> {
                 )
             })?;
 
-        let status: msg::contracts::market::entry::StatusResp = self
+        let status: perpswap::contracts::market::entry::StatusResp = self
             .querier
             .query_wasm_smart(
                 &market_addr,
-                &msg::contracts::market::entry::QueryMsg::Status { price: None },
+                &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
             )
             .with_context(|| format!("Unable to load market status from contract {market_addr}"))?;
 
@@ -182,7 +182,7 @@ impl PositionsInfo {
         let Resp { tokens } = state.querier.query_wasm_smart(
             &market.addr,
             &MarketQueryMsg::NftProxy {
-                nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
+                nft_msg: perpswap::contracts::position_token::entry::QueryMsg::Tokens {
                     owner: state.my_addr.as_ref().into(),
                     start_after: None,
                     limit: None,
@@ -231,7 +231,7 @@ impl PositionsInfo {
 
 #[cfg(test)]
 mod tests {
-    use shared::number::{Collateral, UnsignedDecimal};
+    use perpswap::number::{Collateral, UnsignedDecimal};
 
     use crate::{PositionsInfo, Totals};
 

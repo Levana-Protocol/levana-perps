@@ -3,7 +3,7 @@ use crate::{
     arbitrary::helpers::token_range_u128, extensions::*, market_wrapper::PerpsMarket,
     time::TimeJump, PerpsApp,
 };
-use msg::prelude::{DirectionToBase, LpToken, UnsignedDecimal};
+use perpswap::prelude::{DirectionToBase, LpToken, UnsignedDecimal};
 use proptest::prelude::*;
 use std::{cell::RefCell, rc::Rc};
 

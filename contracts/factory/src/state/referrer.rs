@@ -2,11 +2,11 @@ use crate::state::*;
 use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_storage_plus::Map;
-use msg::contracts::factory::entry::{
+use perpswap::contracts::factory::entry::{
     make_referee_count_key, make_referrer_key, ListRefereeCountResp, ListRefereeCountStartAfter,
     ListRefereesResp, RefereeCount,
 };
-use shared::namespace;
+use perpswap::namespace;
 
 /// Key is a tuple of (referrer, referee)
 const REFEREES_REVERSE_MAP: Map<(&Addr, &Addr), ()> = Map::new(namespace::REFEREES_REVERSE_MAP);

@@ -1,6 +1,6 @@
 use cosmos::{Address, SeedPhrase};
-use msg::{contracts::market::position::PositionId, prelude::*};
 use perps_exes::{build_version, PerpsNetwork, UpdatePositionCollateralImpact};
+use perpswap::{contracts::market::position::PositionId, prelude::*};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 #[derive(clap::Parser)]

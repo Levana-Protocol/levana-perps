@@ -4,16 +4,16 @@ use anyhow::{Context, Result};
 use cosmos::{
     error::WalletError, Address, AddressHrp, Cosmos, HasAddress, HasAddressHrp, SeedPhrase, Wallet,
 };
-use msg::{
-    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
-    prelude::*,
-};
 use perps_exes::{
     config::{
         ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
         MarketPriceFeedConfig, PriceConfig,
     },
     PerpsNetwork,
+};
+use perpswap::{
+    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
+    prelude::*,
 };
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};

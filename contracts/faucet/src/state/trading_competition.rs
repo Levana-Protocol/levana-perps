@@ -1,5 +1,5 @@
 use crate::state::*;
-use msg::contracts::faucet::entry::FaucetAsset;
+use perpswap::contracts::faucet::entry::FaucetAsset;
 
 use super::tokens::TOKEN_INFO;
 

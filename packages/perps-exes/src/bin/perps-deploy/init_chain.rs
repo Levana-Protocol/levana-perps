@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmos::ContractAdmin;
-use msg::contracts::faucet::entry::GasAllowance;
 use perps_exes::PerpsNetwork;
+use perpswap::contracts::faucet::entry::GasAllowance;
 
 use crate::cli::Opt;
 use crate::store_code::CW20;
@@ -62,7 +62,7 @@ pub(crate) async fn go(
             wallet,
             "Levana Perps Tracker",
             vec![],
-            msg::contracts::tracker::entry::InstantiateMsg {},
+            perpswap::contracts::tracker::entry::InstantiateMsg {},
             ContractAdmin::Sender,
         )
         .await?;
@@ -73,7 +73,7 @@ pub(crate) async fn go(
             wallet,
             "Levana Perps Faucet",
             vec![],
-            msg::contracts::faucet::entry::InstantiateMsg {
+            perpswap::contracts::faucet::entry::InstantiateMsg {
                 tap_limit: Some(tap_limit),
                 cw20_code_id: cw20_code_id.get_code_id(),
                 gas_allowance: Some(GasAllowance {

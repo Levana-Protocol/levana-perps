@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Cosmos, HasAddress, Wallet};
-use msg::{contracts::market::entry::StatusResp, prelude::*};
 use perps_exes::{config::TraderConfig, prelude::*};
+use perpswap::contracts::market::entry::StatusResp;
 use rand::Rng;
 
 use crate::{
@@ -72,11 +72,11 @@ impl EnsureCollateral<'_> {
             .get_collateral_balance(self.status, self.wallet.get_address())
             .await?;
         let cw20 = match &self.status.collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places: _,
             } => addr.as_str().parse()?,
-            msg::token::Token::Native { .. } => anyhow::bail!("Native not supported"),
+            perpswap::token::Token::Native { .. } => anyhow::bail!("Native not supported"),
         };
         if balance < self.min {
             self.testnet

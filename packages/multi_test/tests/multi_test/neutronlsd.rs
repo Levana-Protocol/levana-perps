@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
 use levana_perpswap_multi_test::{config::DEFAULT_MARKET, market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::Number;
+use perpswap::prelude::Number;
 
 #[test]
 fn different_collateral_price() {
     let market = PerpsMarket::new_custom(
         PerpsApp::new_cell().unwrap(),
         "wstETH_USD".parse().unwrap(),
-        msg::token::TokenInit::Native {
+        perpswap::token::TokenInit::Native {
             denom: "wstETH".to_owned(),
             decimal_places: 18,
         },
@@ -25,10 +25,10 @@ fn different_collateral_price() {
             &trader,
             "1",
             "5",
-            msg::prelude::DirectionToBase::Long,
+            perpswap::prelude::DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("4000".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("4000".parse().unwrap()),
         )
         .unwrap();
     market
@@ -55,7 +55,7 @@ fn min_collateral() {
     let market = PerpsMarket::new_custom(
         PerpsApp::new_cell().unwrap(),
         "stATOM_USD".parse().unwrap(),
-        msg::token::TokenInit::Native {
+        perpswap::token::TokenInit::Native {
             denom: "stATOM".to_owned(),
             decimal_places: 6,
         },
@@ -72,10 +72,10 @@ fn min_collateral() {
             &trader,
             "1",
             "5",
-            msg::prelude::DirectionToBase::Long,
+            perpswap::prelude::DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::PosInfinity,
+            perpswap::prelude::TakeProfitTrader::PosInfinity,
         )
         .unwrap();
 
@@ -87,10 +87,10 @@ fn min_collateral() {
             &trader,
             "1",
             "5",
-            msg::prelude::DirectionToBase::Long,
+            perpswap::prelude::DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::PosInfinity,
+            perpswap::prelude::TakeProfitTrader::PosInfinity,
         )
         .unwrap_err();
 }
@@ -100,7 +100,7 @@ fn collateral_price_doesnt_liquidate() {
     let market = PerpsMarket::new_custom(
         PerpsApp::new_cell().unwrap(),
         "wstETH_USD".parse().unwrap(),
-        msg::token::TokenInit::Native {
+        perpswap::token::TokenInit::Native {
             denom: "wstETH".to_owned(),
             decimal_places: 18,
         },
@@ -117,10 +117,10 @@ fn collateral_price_doesnt_liquidate() {
             &trader,
             "1",
             "5",
-            msg::prelude::DirectionToBase::Long,
+            perpswap::prelude::DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("4000".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("4000".parse().unwrap()),
         )
         .unwrap();
     market

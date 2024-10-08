@@ -1,6 +1,6 @@
 use crate::state::*;
 use cosmwasm_std::QueryResponse;
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::{Cw20ReceiveMsg, ReceiverExecuteMsg},
     factory::entry::{MarketInfoResponse, QueryMsg as FactoryQueryMsg},
     liquidity_token::entry::{
@@ -8,7 +8,7 @@ use msg::contracts::{
     },
     market::entry::{ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg},
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 const MARKET_ID: Item<MarketId> = Item::new(namespace::MARKET_ID);
 

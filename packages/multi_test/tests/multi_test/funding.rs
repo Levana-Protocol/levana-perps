@@ -1,9 +1,9 @@
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::market::config::{defaults::ConfigDefaults, ConfigUpdate};
-use msg::contracts::market::position::PositionId;
-use msg::prelude::*;
+use perpswap::contracts::market::config::{defaults::ConfigDefaults, ConfigUpdate};
+use perpswap::contracts::market::position::PositionId;
+use perpswap::prelude::*;
 
 #[test]
 fn funding_rates_typical() {

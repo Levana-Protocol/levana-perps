@@ -1,6 +1,6 @@
 use anyhow::bail;
 use cosmwasm_std::Reply;
-use msg::contracts::{copy_trading, market::deferred_execution::DeferredExecId};
+use perpswap::contracts::{copy_trading, market::deferred_execution::DeferredExecId};
 
 use crate::{prelude::*, types::State};
 

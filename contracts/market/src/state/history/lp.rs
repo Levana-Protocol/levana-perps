@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::{LpAction, LpActionHistoryResp, LpActionKind, LpHistorySummary},
     history::events::{LpActionEvent, LpDepositEvent, LpYieldEvent},
 };
-use shared::storage::push_to_monotonic_multilevel_map;
+use perpswap::storage::push_to_monotonic_multilevel_map;
 
 const LP_HISTORY_SUMMARY: Map<&Addr, LpHistorySummary> = Map::new(namespace::LP_HISTORY_SUMMARY);
 const LP_HISTORY_BY_ADDRESS: Map<(&Addr, u64), LpAction> =

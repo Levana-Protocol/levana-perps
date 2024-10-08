@@ -9,7 +9,7 @@ use figment::{
     providers::{Env, Format, Toml},
     Figment,
 };
-use msg::{
+use perpswap::{
     contracts::market::{
         config::{defaults::ConfigDefaults, ConfigUpdate},
         entry::InitialPrice,

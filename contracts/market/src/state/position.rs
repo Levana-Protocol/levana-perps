@@ -2,11 +2,11 @@ pub(crate) mod liquifund;
 
 use cosmwasm_std::Order;
 mod open;
-use msg::contracts::market::{
+pub(crate) use open::*;
+use perpswap::contracts::market::{
     entry::{ClosedPositionCursor, ClosedPositionsResp, PositionsQueryFeeApproach},
     position::events::{PositionSaveEvent, PositionSaveReason},
 };
-pub(crate) use open::*;
 pub(crate) mod close;
 mod cw721;
 pub(crate) mod take_profit;
@@ -16,7 +16,9 @@ mod validate;
 use crate::constants::DEFAULT_CLOSED_POSITION_HISTORY_LIMIT;
 use crate::prelude::*;
 use cw_storage_plus::PrefixBound;
-use msg::contracts::market::position::{ClosedPosition, LiquidationReason, PositionOrPendingClose};
+use perpswap::contracts::market::position::{
+    ClosedPosition, LiquidationReason, PositionOrPendingClose,
+};
 
 pub(super) const OPEN_POSITIONS: Map<PositionId, Position> = Map::new(namespace::OPEN_POSITIONS);
 pub(super) const LAST_POSITION_ID: Item<PositionId> = Item::new(namespace::LAST_POSITION_ID);

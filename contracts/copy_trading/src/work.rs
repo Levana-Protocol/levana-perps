@@ -1,6 +1,6 @@
 use anyhow::bail;
 use cosmwasm_std::SubMsg;
-use msg::contracts::{
+use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
 };
@@ -14,7 +14,7 @@ use crate::{
     reply::REPLY_ID_OPEN_POSITION,
     types::{DecQueuePosition, State, WalletInfo},
 };
-use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
 fn get_deferred_work(
     storage: &dyn Storage,

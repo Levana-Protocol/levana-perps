@@ -4,9 +4,9 @@ use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt, PerpsApp,
 };
-use msg::contracts::market::entry::{PositionsQueryFeeApproach, StatusResp};
-use msg::contracts::market::{config::ConfigUpdate, position::events::PositionUpdateEvent};
-use msg::prelude::*;
+use perpswap::contracts::market::entry::{PositionsQueryFeeApproach, StatusResp};
+use perpswap::contracts::market::{config::ConfigUpdate, position::events::PositionUpdateEvent};
+use perpswap::prelude::*;
 
 #[test]
 fn position_misc_debug_divide_by_zero() {
@@ -116,7 +116,7 @@ fn position_misc_short_1() {
 
 #[test]
 fn version_and_meta() {
-    use msg::contracts::market::entry::QueryMsg::Version;
+    use perpswap::contracts::market::entry::QueryMsg::Version;
 
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let market_version: ContractVersion = market.query(&Version {}).unwrap();
@@ -124,7 +124,7 @@ fn version_and_meta() {
     assert!(!market_version.version.is_empty());
 
     let status: StatusResp = market
-        .query(&msg::contracts::market::entry::QueryMsg::Status { price: None })
+        .query(&perpswap::contracts::market::entry::QueryMsg::Status { price: None })
         .unwrap();
     assert!(!status.base.is_empty());
     assert!(!status.quote.is_empty());

@@ -4,7 +4,7 @@ use levana_perpswap_multi_test::{
     response::CosmosResponseExt,
     PerpsApp,
 };
-use msg::shared::storage::DirectionToBase;
+use perpswap::storage::DirectionToBase;
 
 #[test]
 fn crank_price_2854() {

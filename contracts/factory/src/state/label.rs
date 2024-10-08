@@ -1,4 +1,4 @@
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 /// Suffix attached to all contracts deployed by the factory
 const LABEL_SUFFIX: Item<String> = Item::new(namespace::LABEL_SUFFIX);

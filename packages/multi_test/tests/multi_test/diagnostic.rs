@@ -2,7 +2,7 @@ use anyhow::Context;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, return_unless_market_collateral_base, PerpsApp,
 };
-use msg::bridge::ClientToBridgeWrapper;
+use perpswap::bridge::ClientToBridgeWrapper;
 
 #[test]
 fn diagnostic_log_take_profit_less_than_collateral() {

@@ -13,9 +13,9 @@ use anyhow::Result;
 use async_channel::RecvError;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use parking_lot::Mutex;
-use shared::storage::MarketId;
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::storage::MarketId;
 
 // For high gas, we only care about whether there is a current work item.
 // We don't need a queue of historical work items to process

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
-use msg::contracts::tracker::entry::ExecuteMsg;
-use msg::contracts::tracker::events::{InstantiateEvent, MigrateEvent, NewCodeIdEvent};
+use perpswap::contracts::tracker::entry::ExecuteMsg;
+use perpswap::contracts::tracker::events::{InstantiateEvent, MigrateEvent, NewCodeIdEvent};
 
 use crate::state::{
     CodeIdInfo, ContractInfo, ADMINS, CODE_BY_HASH, CODE_BY_ID, CONTRACT_BY_ADDR,

@@ -13,7 +13,7 @@
 use crate::prelude::*;
 use cosmwasm_std::{Binary, BlockInfo, Order, QueryResponse};
 use cw_utils::Expiration;
-use msg::contracts::position_token::{
+use perpswap::contracts::position_token::{
     entry::{
         AllNftInfoResponse, ApprovalResponse, ApprovalsResponse, ExecuteMsg, NftContractInfo,
         NftInfoResponse, NumTokensResponse, OperatorsResponse, OwnerOfResponse, QueryMsg,

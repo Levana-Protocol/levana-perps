@@ -4,7 +4,7 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 #[test]
 fn oracle_open_position() {

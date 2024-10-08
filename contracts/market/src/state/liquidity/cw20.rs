@@ -15,7 +15,7 @@ use crate::prelude::*;
 use cosmwasm_std::{Binary, Order, QueryResponse, Uint128};
 use cw_storage_plus::{Bound, Map};
 use cw_utils::Expiration;
-use msg::{
+use perpswap::{
     contracts::{
         cw20::{
             entry::{

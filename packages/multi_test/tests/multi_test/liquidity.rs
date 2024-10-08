@@ -11,14 +11,14 @@ use levana_perpswap_multi_test::config::{SpotPriceKind, TokenKind, DEFAULT_MARKE
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
-use msg::contracts::liquidity_token::LiquidityTokenKind;
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::entry::PositionsQueryFeeApproach;
-use msg::contracts::market::liquidity::LiquidityStats;
-use msg::contracts::market::position::{LiquidationReason, PositionCloseReason};
-use msg::prelude::*;
-use msg::token::TokenInit;
+use perpswap::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::entry::PositionsQueryFeeApproach;
+use perpswap::contracts::market::liquidity::LiquidityStats;
+use perpswap::contracts::market::position::{LiquidationReason, PositionCloseReason};
+use perpswap::prelude::*;
+use perpswap::token::TokenInit;
 
 #[test]
 fn liquidity_deposit_new_user() {
@@ -795,7 +795,9 @@ fn drain_all_liquidity_perp_705() {
     for _ in 0..100 {
         market.exec_crank_single(&crank).unwrap();
         let crank_stats = market.query_crank_stats().unwrap();
-        if crank_stats == Some(msg::contracts::market::crank::CrankWorkInfo::ResetLpBalances {}) {
+        if crank_stats
+            == Some(perpswap::contracts::market::crank::CrankWorkInfo::ResetLpBalances {})
+        {
             found_reset = true;
             break;
         }
@@ -1509,7 +1511,7 @@ fn max_liquidity() {
 
     market
         .exec_set_config(ConfigUpdate {
-            max_liquidity: Some(msg::contracts::market::config::MaxLiquidity::Usd {
+            max_liquidity: Some(perpswap::contracts::market::config::MaxLiquidity::Usd {
                 amount: "1000".parse().unwrap(),
             }),
             ..Default::default()
@@ -1531,7 +1533,7 @@ fn max_liquidity() {
 
     market
         .exec_set_config(ConfigUpdate {
-            max_liquidity: Some(msg::contracts::market::config::MaxLiquidity::Usd {
+            max_liquidity: Some(perpswap::contracts::market::config::MaxLiquidity::Usd {
                 amount: "2000".parse().unwrap(),
             }),
             ..Default::default()

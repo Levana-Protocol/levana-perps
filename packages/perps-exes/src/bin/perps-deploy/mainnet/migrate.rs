@@ -1,8 +1,8 @@
 use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
-use msg::prelude::*;
 use perps_exes::contracts::{ConfiguredCodeIds, Factory};
+use perpswap::prelude::*;
 
 use crate::{cli::Opt, util::add_cosmos_msg};
 
@@ -125,7 +125,7 @@ async fn go(
             msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                 contract_addr: factory.get_address_string(),
                 new_code_id: factory_code_id,
-                msg: to_json_binary(&msg::contracts::factory::entry::MigrateMsg {})?,
+                msg: to_json_binary(&perpswap::contracts::factory::entry::MigrateMsg {})?,
             }));
         }
     }
@@ -146,7 +146,7 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: market.get_address_string(),
                     new_code_id: market_code_id,
-                    msg: to_json_binary(&msg::contracts::market::entry::MigrateMsg {})?,
+                    msg: to_json_binary(&perpswap::contracts::market::entry::MigrateMsg {})?,
                 }));
             }
         }
@@ -157,7 +157,9 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: lp.get_address_string(),
                     new_code_id: liquidity_token_code_id,
-                    msg: to_json_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
+                    msg: to_json_binary(
+                        &perpswap::contracts::liquidity_token::entry::MigrateMsg {},
+                    )?,
                 }));
             }
             let info = xlp.info().await?;
@@ -165,7 +167,9 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: xlp.get_address_string(),
                     new_code_id: liquidity_token_code_id,
-                    msg: to_json_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
+                    msg: to_json_binary(
+                        &perpswap::contracts::liquidity_token::entry::MigrateMsg {},
+                    )?,
                 }));
             }
         }
@@ -176,7 +180,9 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: pos.get_address_string(),
                     new_code_id: position_token_code_id,
-                    msg: to_json_binary(&msg::contracts::position_token::entry::MigrateMsg {})?,
+                    msg: to_json_binary(
+                        &perpswap::contracts::position_token::entry::MigrateMsg {},
+                    )?,
                 }));
             }
         }

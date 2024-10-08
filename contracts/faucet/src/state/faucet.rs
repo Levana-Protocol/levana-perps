@@ -2,15 +2,15 @@ use crate::state::*;
 use anyhow::Result;
 use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg, Uint128};
 use cw_storage_plus::{Item, Map};
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::entry::{ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse},
     faucet::{
         entry::{FaucetAsset, TappersResp},
         events::TapEvent,
     },
 };
-use msg::prelude::*;
-use shared::namespace;
+use perpswap::namespace;
+use perpswap::prelude::*;
 
 const LAST_TAP_TIMESTAMP: Map<&Addr, Timestamp> = Map::new(namespace::LAST_TAP_TIMESTAMP);
 const CW20_TOKEN_INFO: Map<&Addr, TokenInfoResponse> = Map::new(namespace::CW20_TOKEN_INFO);

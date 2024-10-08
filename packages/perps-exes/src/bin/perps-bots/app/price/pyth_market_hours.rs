@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use cosmos::Address;
 use dashmap::DashMap;
 use itertools::Itertools;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::Config,
     spot_price::{PythConfig, PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData},
 };

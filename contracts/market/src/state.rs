@@ -23,8 +23,8 @@ use crate::prelude::*;
 use cosmwasm_std::{Addr, Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Response, Storage};
 use cw2::ContractVersion;
 use cw_storage_plus::Item;
-use msg::token::Token;
 use once_cell::unsync::OnceCell;
+use perpswap::token::Token;
 use std::collections::HashMap;
 
 use self::config::load_config;

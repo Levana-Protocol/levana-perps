@@ -2,11 +2,11 @@ use std::{fs::File, path::PathBuf};
 
 use cosmos::{Address, HasAddress};
 use csv::Writer;
-use msg::prelude::*;
 use perps_exes::{
     config::{MainnetFactories, MainnetFactory},
     contracts::Factory,
 };
+use perpswap::prelude::*;
 
 #[derive(clap::Parser)]
 pub(super) struct ListContractsOpt {

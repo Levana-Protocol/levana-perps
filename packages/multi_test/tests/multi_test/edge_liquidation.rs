@@ -1,6 +1,6 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::{
+use perpswap::{
     contracts::market::config::ConfigUpdate,
     prelude::{DirectionToBase, PriceBaseInQuote},
 };

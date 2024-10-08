@@ -1,4 +1,4 @@
-use msg::contracts::faucet::entry::GasAllowance;
+use perpswap::contracts::faucet::entry::GasAllowance;
 
 use super::*;
 

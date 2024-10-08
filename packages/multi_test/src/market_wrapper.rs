@@ -20,30 +20,31 @@ use cosmwasm_std::{
     StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
-use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
-use msg::contracts::copy_trading::{
+use perpswap::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
+use perpswap::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::copy_trading::{
     Config as CopyTradingConfig, ExecuteMsg as CopyTradingExecuteMsg,
     QueryMsg as CopyTradingQueryMsg,
 };
-use msg::contracts::countertrade::{
+use perpswap::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
 };
-use msg::contracts::cw20::entry::{
+use perpswap::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
 };
-use msg::contracts::factory::entry::{
+use perpswap::contracts::factory::entry::{
     CopyTradingResp, ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereeCountResp,
     ListRefereesResp, MarketInfoResponse, QueryMsg as FactoryQueryMsg, RefereeCount,
     ShutdownStatus,
 };
-use msg::contracts::liquidity_token::LiquidityTokenKind;
-use msg::contracts::market::crank::CrankWorkInfo;
-use msg::contracts::market::deferred_execution::{
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::market::crank::CrankWorkInfo;
+use perpswap::contracts::market::deferred_execution::{
     DeferredExecExecutedEvent, DeferredExecId, DeferredExecQueuedEvent, DeferredExecStatus,
     DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
 };
-use msg::contracts::market::entry::{
+use perpswap::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
     LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, PositionActionHistoryResp,
@@ -51,11 +52,11 @@ use msg::contracts::market::entry::{
     SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary,
     TraderActionHistoryResp,
 };
-use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::{
+use perpswap::contracts::market::position::{ClosedPosition, PositionsResp};
+use perpswap::contracts::market::spot_price::{
     SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeedDataInit, SpotPriceFeedInit,
 };
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
         ExecuteMsg as MarketExecuteMsg, ExecuteOwnerMsg as MarketExecuteOwnerMsg,
@@ -64,22 +65,21 @@ use msg::contracts::market::{
     liquidity::LiquidityStats,
     position::{PositionId, PositionQueryResponse},
 };
-use msg::contracts::position_token::{
+use perpswap::contracts::position_token::{
     entry::{
         ExecuteMsg as Cw721ExecuteMsg, NftInfoResponse, OwnerOfResponse, QueryMsg as Cw721QueryMsg,
         TokensResponse,
     },
     Metadata as Cw721Metadata,
 };
-use msg::prelude::*;
-use msg::shared::compat::BackwardsCompatTakeProfit;
+use perpswap::prelude::*;
 
 use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
-use msg::constants::event_key;
-use msg::contracts::market::order::OrderId;
-use msg::shared::cosmwasm::OrderInMessage;
-use msg::shutdown::{ShutdownEffect, ShutdownImpact};
-use msg::token::{Token, TokenInit};
+use perpswap::constants::event_key;
+use perpswap::contracts::market::order::OrderId;
+use perpswap::cosmwasm::OrderInMessage;
+use perpswap::shutdown::{ShutdownEffect, ShutdownImpact};
+use perpswap::token::{Token, TokenInit};
 use rand::rngs::ThreadRng;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -207,7 +207,7 @@ impl PerpsMarket {
         let factory_addr = app.borrow().factory_addr.clone();
         let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
 
-        let copy_trading_msg = msg::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
+        let copy_trading_msg = perpswap::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams {
                 name: "Multi test copy trading pool #1".to_owned(),
                 description: "Multi test copy trading description".to_owned(),
@@ -235,8 +235,8 @@ impl PerpsMarket {
 
         let copy_trading_addr = Addr::unchecked(copy_trading_addr);
 
-        let market_msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-            new_market: msg::contracts::market::entry::NewMarketParams {
+        let market_msg = perpswap::contracts::factory::entry::ExecuteMsg::AddMarket {
+            new_market: perpswap::contracts::market::entry::NewMarketParams {
                 market_id: id.clone(),
                 token: token_init,
                 config: Some(ConfigUpdate {
@@ -2368,7 +2368,7 @@ impl PerpsMarket {
     pub fn query_copy_trading_queue_status(
         &self,
         wallet: RawAddr,
-    ) -> Result<msg::contracts::copy_trading::QueueResp> {
+    ) -> Result<perpswap::contracts::copy_trading::QueueResp> {
         self.query_copy_trading(&CopyTradingQueryMsg::QueueStatus {
             address: wallet,
             start_after: None,
@@ -2376,13 +2376,13 @@ impl PerpsMarket {
         })
     }
 
-    pub fn query_copy_trading_work(&self) -> Result<msg::contracts::copy_trading::WorkResp> {
+    pub fn query_copy_trading_work(&self) -> Result<perpswap::contracts::copy_trading::WorkResp> {
         self.query_copy_trading(&CopyTradingQueryMsg::HasWork {})
     }
 
     pub fn query_copy_trading_leader_tokens(
         &self,
-    ) -> Result<msg::contracts::copy_trading::LeaderStatusResp> {
+    ) -> Result<perpswap::contracts::copy_trading::LeaderStatusResp> {
         self.query_copy_trading(&CopyTradingQueryMsg::LeaderStatus {
             start_after: None,
             limit: None,
@@ -2392,7 +2392,7 @@ impl PerpsMarket {
     pub fn query_copy_trading_balance(
         &self,
         wallet: &Addr,
-    ) -> Result<msg::contracts::copy_trading::BalanceResp> {
+    ) -> Result<perpswap::contracts::copy_trading::BalanceResp> {
         self.query_copy_trading(&CopyTradingQueryMsg::Balance {
             address: wallet.into(),
             start_after: None,
@@ -2417,11 +2417,11 @@ impl PerpsMarket {
     pub fn query_countertrade_balances(
         &self,
         user_addr: &Addr,
-    ) -> Result<Vec<msg::contracts::countertrade::MarketBalance>> {
+    ) -> Result<Vec<perpswap::contracts::countertrade::MarketBalance>> {
         let mut start_after = None;
         let mut res = vec![];
         loop {
-            let msg::contracts::countertrade::BalanceResp {
+            let perpswap::contracts::countertrade::BalanceResp {
                 mut markets,
                 next_start_after,
             } = self.query_countertrade(&CountertradeQueryMsg::Balance {
@@ -2439,11 +2439,11 @@ impl PerpsMarket {
 
     pub fn query_countertrade_markets(
         &self,
-    ) -> Result<Vec<msg::contracts::countertrade::MarketStatus>> {
+    ) -> Result<Vec<perpswap::contracts::countertrade::MarketStatus>> {
         let mut start_after = None;
         let mut res = vec![];
         loop {
-            let msg::contracts::countertrade::MarketsResp {
+            let perpswap::contracts::countertrade::MarketsResp {
                 mut markets,
                 next_start_after,
             } = self.query_countertrade(&CountertradeQueryMsg::Markets {
@@ -2461,20 +2461,22 @@ impl PerpsMarket {
     pub fn query_countertrade_market_id(
         &self,
         market_id: MarketId,
-    ) -> Result<msg::contracts::countertrade::MarketStatus> {
+    ) -> Result<perpswap::contracts::countertrade::MarketStatus> {
         let result = self.query_countertrade_markets()?;
         let res = result.into_iter().find(|item| item.id == market_id);
         res.context("Market id {market_id} not found")
     }
 
-    pub fn get_copytrading_token(&self) -> Result<msg::contracts::copy_trading::Token> {
+    pub fn get_copytrading_token(&self) -> Result<perpswap::contracts::copy_trading::Token> {
         let token = self.token.clone();
         match token {
             Token::Cw20 { addr, .. } => {
                 let cw20 = addr.validate(self.app().api())?;
-                Ok(msg::contracts::copy_trading::Token::Cw20(cw20))
+                Ok(perpswap::contracts::copy_trading::Token::Cw20(cw20))
             }
-            Token::Native { denom, .. } => Ok(msg::contracts::copy_trading::Token::Native(denom)),
+            Token::Native { denom, .. } => {
+                Ok(perpswap::contracts::copy_trading::Token::Native(denom))
+            }
         }
     }
 
@@ -2616,7 +2618,7 @@ impl PerpsMarket {
 
     pub fn exec_countertrade_update_config(
         &self,
-        update: msg::contracts::countertrade::ConfigUpdate,
+        update: perpswap::contracts::countertrade::ConfigUpdate,
     ) -> Result<AppResponse> {
         let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         self.exec_countertrade(&owner, &CountertradeExecuteMsg::UpdateConfig(update))
