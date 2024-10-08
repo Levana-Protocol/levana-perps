@@ -426,7 +426,7 @@ impl HighWaterMark {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::Decimal256;
-    use shared::number::Collateral;
+    use perpswap::number::Collateral;
 
     use crate::types::HighWaterMark;
 
