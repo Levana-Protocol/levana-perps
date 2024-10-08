@@ -240,7 +240,7 @@ async fn get_tokens_markets(
             .query(perpswap::contracts::market::entry::QueryMsg::Status { price: None })
             .await?;
         match collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places,
             } => tokens.push(Cw20 {
@@ -248,7 +248,7 @@ async fn get_tokens_markets(
                 denom,
                 decimals: decimal_places,
             }),
-            msg::token::Token::Native { .. } => (),
+            perpswap::token::Token::Native { .. } => (),
         }
     }
     Ok((tokens, markets))

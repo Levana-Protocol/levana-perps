@@ -213,13 +213,13 @@ fn has_no_work() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "6",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
     market
@@ -227,13 +227,13 @@ fn has_no_work() {
             &trader,
             "10",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "4",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
     let status = market.query_status().unwrap();
@@ -286,13 +286,13 @@ fn detects_unbalanced_markets() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "6",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
     market
@@ -300,13 +300,13 @@ fn detects_unbalanced_markets() {
             &trader,
             "10",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "2",
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "2",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
     let status = market.query_status().unwrap();
@@ -355,13 +355,13 @@ fn ignores_unbalanced_insufficient_liquidity() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "6",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
     market
@@ -369,13 +369,13 @@ fn ignores_unbalanced_insufficient_liquidity() {
             &trader,
             "10",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "2",
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "2",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
     let status = market.query_status().unwrap();
@@ -461,7 +461,7 @@ fn closes_extra_positions() {
                 DirectionToBase::Long,
                 None,
                 None,
-                msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+                perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
             )
             .unwrap();
         pos_ids.push(pos_id);
@@ -473,13 +473,13 @@ fn closes_extra_positions() {
             &lp,
             "9",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "6",
-                msg::prelude::MarketType::CollateralIsBase => "4",
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
 
@@ -708,13 +708,13 @@ fn opens_balancing_position() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "6",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
     market
@@ -722,13 +722,13 @@ fn opens_balancing_position() {
             &trader,
             "10",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "2",
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "2",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
     let status = market.query_status().unwrap();
@@ -818,13 +818,13 @@ fn balance_one_sided_market() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "6",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
 
@@ -916,13 +916,13 @@ fn deduct_balance() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "6",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
     market
@@ -930,13 +930,13 @@ fn deduct_balance() {
             &trader,
             "10",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "2",
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "2",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
 
@@ -1022,13 +1022,13 @@ fn update_position_scenario_add_collateral() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "7",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "7",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
 
@@ -1054,13 +1054,13 @@ fn update_position_scenario_add_collateral() {
             "1",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "10",
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "10",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
 
@@ -1136,13 +1136,13 @@ fn update_position_scenario_remove_collateral() {
             "20",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "7",
-                msg::prelude::MarketType::CollateralIsBase => "7",
+                perpswap::prelude::MarketType::CollateralIsQuote => "7",
+                perpswap::prelude::MarketType::CollateralIsBase => "7",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
 
@@ -1174,13 +1174,13 @@ fn update_position_scenario_remove_collateral() {
             "20",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "3",
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "3",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
 
@@ -1245,13 +1245,13 @@ fn do_not_mutate_countertrade_position() {
             "10",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "7",
-                msg::prelude::MarketType::CollateralIsBase => "7",
+                perpswap::prelude::MarketType::CollateralIsQuote => "7",
+                perpswap::prelude::MarketType::CollateralIsBase => "7",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
 
@@ -1284,13 +1284,13 @@ fn do_not_mutate_countertrade_position() {
             "40",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "1",
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "1",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
 
@@ -1356,13 +1356,13 @@ fn update_position_funding_rate_less_than_target_rate() {
             "96",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "7",
-                msg::prelude::MarketType::CollateralIsBase => "8",
+                perpswap::prelude::MarketType::CollateralIsQuote => "7",
+                perpswap::prelude::MarketType::CollateralIsBase => "8",
             },
             DirectionToBase::Long,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
         )
         .unwrap();
 
@@ -1395,13 +1395,13 @@ fn update_position_funding_rate_less_than_target_rate() {
             "48",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "2",
-                msg::prelude::MarketType::CollateralIsBase => "1",
+                perpswap::prelude::MarketType::CollateralIsQuote => "2",
+                perpswap::prelude::MarketType::CollateralIsBase => "1",
             },
             DirectionToBase::Short,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
         )
         .unwrap();
 
@@ -1476,7 +1476,7 @@ fn smart_search_bug_perp_4098() {
 
     let market_type = market.query_status().unwrap().market_type;
     // The test will have to be adapted for a CollateralIsQuote market
-    if market_type == msg::prelude::MarketType::CollateralIsBase {
+    if market_type == perpswap::prelude::MarketType::CollateralIsBase {
         // This scenario will similate the following
         // 1. Open 2 longs.
         // 2. Open 2 shorts. Short is now popular side
@@ -1557,7 +1557,7 @@ fn denom_bug_perp_4149() {
 
     let market_type = market.query_status().unwrap().market_type;
     // The test will have to be adapted for a CollateralIsQuote market
-    if market_type == msg::prelude::MarketType::CollateralIsBase {
+    if market_type == perpswap::prelude::MarketType::CollateralIsBase {
         // We need to find ourselves with a CT short position of notional_size of 1706.878302082123208138
         // Then, we need to close it, and the denom error happens
         //
@@ -1606,13 +1606,13 @@ fn create_position(
             &trader,
             collateral,
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => quote_leverage.as_str(),
-                msg::prelude::MarketType::CollateralIsBase => base_leverage.as_str(),
+                perpswap::prelude::MarketType::CollateralIsQuote => quote_leverage.as_str(),
+                perpswap::prelude::MarketType::CollateralIsBase => base_leverage.as_str(),
             },
             direction,
             None,
             None,
-            msg::prelude::TakeProfitTrader::Finite(tp.parse().unwrap()),
+            perpswap::prelude::TakeProfitTrader::Finite(tp.parse().unwrap()),
         )
         .unwrap();
 

@@ -109,7 +109,7 @@ fn test_copy_trading_pagination() {
     assert!(old_resp.addresses.len() == 15);
     let start_after = old_resp.addresses.last().cloned();
     let resp: CopyTradingResp = market
-        .query_factory(&msg::prelude::FactoryQueryMsg::CopyTrading {
+        .query_factory(&perpswap::prelude::FactoryQueryMsg::CopyTrading {
             start_after: start_after.clone().map(|ct| CopyTradingInfoRaw {
                 leader: ct.leader.0.into(),
                 contract: ct.contract.0.into(),
@@ -157,7 +157,7 @@ fn test_copy_trading_leader_pagination() {
         .any(|item| item.leader.0 != trader.clone()));
     let start_after = old_resp.addresses.last().cloned();
     let resp: CopyTradingResp = market
-        .query_factory(&msg::prelude::FactoryQueryMsg::CopyTradingForLeader {
+        .query_factory(&perpswap::prelude::FactoryQueryMsg::CopyTradingForLeader {
             leader: trader.clone().into(),
             start_after: start_after.clone().map(|ct| ct.contract.0.into()),
             limit: None,

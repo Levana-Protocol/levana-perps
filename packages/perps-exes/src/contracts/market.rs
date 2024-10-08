@@ -110,11 +110,11 @@ impl MarketContract {
             .into_u128(funds.into_decimal256())?
             .context("exec_with_funds: no funds")?;
         let cw20 = match &status.collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places: _,
             } => addr.as_str().parse()?,
-            msg::token::Token::Native { .. } => anyhow::bail!("No support for native"),
+            perpswap::token::Token::Native { .. } => anyhow::bail!("No support for native"),
         };
         let cw20 = self.0.get_cosmos().make_contract(cw20);
         cw20.execute(
@@ -169,11 +169,11 @@ impl MarketContract {
         addr: impl HasAddress,
     ) -> Result<Collateral> {
         let cw20 = match &status.collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places: _,
             } => addr.as_str().parse()?,
-            msg::token::Token::Native { .. } => anyhow::bail!("No support for native"),
+            perpswap::token::Token::Native { .. } => anyhow::bail!("No support for native"),
         };
         let cw20 = self.0.get_cosmos().make_contract(cw20);
         let BalanceResponse { balance } = cw20

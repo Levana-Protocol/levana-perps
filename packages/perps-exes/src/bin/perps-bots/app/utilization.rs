@@ -96,11 +96,11 @@ async fn single_market(
             .get_collateral_balance(&status, worker.wallet.get_address())
             .await?;
         let cw20 = match &status.collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places: _,
             } => addr.as_str().parse()?,
-            msg::token::Token::Native { .. } => anyhow::bail!("Native not supported"),
+            perpswap::token::Token::Native { .. } => anyhow::bail!("Native not supported"),
         };
 
         // Open unpopular positions

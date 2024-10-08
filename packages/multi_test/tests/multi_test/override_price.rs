@@ -13,7 +13,7 @@ fn status() {
     let market = PerpsMarket::new_custom(
         PerpsApp::new_cell().unwrap(),
         "WBTC_BTC".parse().unwrap(),
-        msg::token::TokenInit::Native {
+        perpswap::token::TokenInit::Native {
             denom: "BTC".to_owned(),
             decimal_places: 8,
         },

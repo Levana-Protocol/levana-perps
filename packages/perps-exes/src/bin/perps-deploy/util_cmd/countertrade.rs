@@ -208,7 +208,7 @@ async fn deposit_collateral(
     };
 
     match response.collateral {
-        msg::token::Token::Cw20 { addr, .. } => {
+        perpswap::token::Token::Cw20 { addr, .. } => {
             println!("Cw20 Contract: {addr}");
             let deposit_msg =
                 perpswap::contracts::countertrade::ExecuteMsg::Deposit { market: market_id };
@@ -230,7 +230,7 @@ async fn deposit_collateral(
                 println!("Txhash: {}", response.txhash);
             }
         }
-        msg::token::Token::Native { denom, .. } => {
+        perpswap::token::Token::Native { denom, .. } => {
             println!("Countertrade contract: {contract}");
             let deposit_msg =
                 perpswap::contracts::countertrade::ExecuteMsg::Deposit { market: market_id };
