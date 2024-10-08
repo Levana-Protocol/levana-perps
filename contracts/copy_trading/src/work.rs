@@ -90,9 +90,7 @@ fn get_work_from_dec_queue(
                 }
                 None => {
                     // For this token, the value was never in the store.
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
 
@@ -119,22 +117,18 @@ fn get_work_from_dec_queue(
 
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ResetStats {},
+                        work_description: WorkDescription::ResetStats { token },
                     });
                 }
                 if !work.processing_status.is_validated() {
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
             // We have gone through all the markets here and looks
             // like all the market has been validated. The only part
             // remaining to be done here is computation of lp token
             // value.
-            Ok(WorkResp::HasWork {
-                work_description: WorkDescription::ComputeLpTokenValue { token },
-            })
+            check_balance_work(storage, state, &token)
         }
         RequiresToken::NoToken {} => {
             if status == ProcessingStatus::InProgress {
@@ -228,12 +222,9 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 }
                 None => {
                     // For this token, the value was never in the store.
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
-
             let market_works =
                 crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
             for market_work in market_works {
@@ -244,7 +235,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 if market_token != token {
                     continue;
                 }
-
                 let deferred_execs = state.load_deferred_execs(&market_info.addr, None, Some(1))?;
 
                 let is_pending = deferred_execs
@@ -254,25 +244,20 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 if is_pending {
                     return Ok(WorkResp::NoWork);
                 }
-
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ResetStats {},
+                        work_description: WorkDescription::ResetStats { token },
                     });
                 }
                 if !work.processing_status.is_validated() {
-                    return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ComputeLpTokenValue { token },
-                    });
+                    return check_balance_work(storage, state, &token);
                 }
             }
             // We have gone through all the markets here and looks
             // like all the market has been validated. The only part
             // remaining to be done here is computation of lp token
             // value.
-            Ok(WorkResp::HasWork {
-                work_description: WorkDescription::ComputeLpTokenValue { token },
-            })
+            check_balance_work(storage, state, &token)
         }
         RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
             work_description: WorkDescription::ProcessQueueItem {
@@ -295,13 +280,19 @@ pub(crate) fn process_queue_item(
                 .context("PENDING_QUEUE_ITEMS load failed")?;
             match queue_item.item.clone() {
                 IncQueueItem::Deposit { funds, token } => {
+                    let token_value = state.load_lp_token_value(storage, &token)?;
+                    let new_shares = token_value.collateral_to_shares(funds)?;
                     let mut totals = crate::state::TOTALS
                         .may_load(storage, &token)
                         .context("Could not load TOTALS")?
                         .unwrap_or_default();
-                    let token_value = state.load_lp_token_value(storage, &token)?;
-                    let new_shares = totals.add_collateral(funds, token_value)?;
+                    totals.add_collateral(funds, token_value)?;
                     crate::state::TOTALS.save(storage, &token, &totals)?;
+                    let mut pending_deposits = crate::state::PENDING_DEPOSITS
+                        .may_load(storage, &token)?
+                        .unwrap_or_default();
+                    pending_deposits = pending_deposits.checked_sub(funds.raw())?;
+                    crate::state::PENDING_DEPOSITS.save(storage, &token, &pending_deposits)?;
                     let wallet_info = WalletInfo {
                         token,
                         wallet: queue_item.wallet.clone(),
@@ -387,7 +378,6 @@ pub(crate) fn process_queue_item(
                     let funds = token_value.shares_to_collateral(shares)?;
                     let token = state.get_first_full_token_info(storage, &wallet_info.token)?;
                     let withdraw_msg = token.into_transfer_msg(&wallet_info.wallet, funds)?;
-
                     let remaining_shares = actual_shares.raw().checked_sub(shares.raw())?;
                     let contract_token = state.to_token(&token)?;
                     let mut totals = crate::state::TOTALS
@@ -514,7 +504,6 @@ pub(crate) fn process_queue_item(
                                 .save(storage, &queue_pos_id)?;
                             return Ok(response.add_event(event));
                         }
-
                         crate::state::TOTALS.save(storage, &token, &totals)?;
                         let mut token_value = crate::state::LP_TOKEN_VALUE
                             .may_load(storage, &token)?
@@ -536,5 +525,45 @@ pub(crate) fn process_queue_item(
                 },
             }
         }
+    }
+}
+
+pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -> Result<WorkResp> {
+    let market_token = state.get_first_full_token_info(storage, token)?;
+    let contract_balance = market_token.query_balance(&state.querier, &state.my_addr)?;
+    let totals = crate::state::TOTALS
+        .may_load(storage, token)?
+        .unwrap_or_default();
+    let pending_deposits = crate::state::PENDING_DEPOSITS
+        .may_load(storage, token)?
+        .unwrap_or_default();
+    let leader_comission = crate::state::LEADER_COMMISSION
+        .may_load(storage, token)?
+        .unwrap_or_default();
+    let total = totals
+        .collateral
+        .checked_add(pending_deposits)?
+        .checked_add(leader_comission)?;
+    let diff = total.diff(contract_balance);
+    let is_approximate_same = diff < "0.000001".parse().unwrap();
+    if is_approximate_same {
+        Ok(WorkResp::HasWork {
+            work_description: WorkDescription::ComputeLpTokenValue {
+                token: token.clone(),
+            },
+        })
+    } else {
+        // Now there are multiple reasons why it would be
+        // unbalanced. Multiple positions could have been liquidated
+        // or someone just sent money to this contract.
+        let rebalance_amount = contract_balance.checked_sub(total)?;
+        let rebalance_amount =
+            NonZero::new(rebalance_amount).context("Impossible: rebalance_amount is zero")?;
+        Ok(WorkResp::HasWork {
+            work_description: WorkDescription::Rebalance {
+                token: token.clone(),
+                amount: rebalance_amount,
+            },
+        })
     }
 }

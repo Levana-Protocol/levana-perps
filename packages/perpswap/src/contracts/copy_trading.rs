@@ -646,12 +646,35 @@ pub enum WorkDescription {
         id: QueuePositionId,
     },
     /// Reset market specific statistics
-    ResetStats {},
-    /// Rebalance for case when someone sends collateral directly to
-    /// the contract without getting LpTokens
-    Rebalance {},
+    ResetStats {
+        /// Token
+        token: Token,
+    },
     /// Handle deferred exec id
     HandleDeferredExecId {},
+    /// Rebalance is done when contract balance is not same as the one
+    /// internally tracked by it.
+    Rebalance {
+        /// Token
+        token: Token,
+        /// Amount that needs to be balanced
+        amount: NonZero<Collateral>,
+    },
+}
+
+impl WorkDescription {
+    /// Is it the rebalance work ?
+    pub fn is_rebalance(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => false,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => true,
+        }
+    }
 }
 
 /// Queue position id that needs to be processed

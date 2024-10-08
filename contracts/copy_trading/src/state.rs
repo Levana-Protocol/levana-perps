@@ -1,11 +1,13 @@
-use perpswap::contracts::market::deferred_execution::DeferredExecId;
+use perpswap::contracts::market::{
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor,
+};
 use perpswap::time::Timestamp;
 
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketLoaderStatus,
-        MarketWorkInfo, Totals, WalletInfo,
+        DecQueuePosition, HighWaterMark, IncQueuePosition, LpTokenValue, MarketInfo,
+        MarketLoaderStatus, MarketWorkInfo, Totals, WalletInfo,
     },
 };
 
@@ -50,6 +52,9 @@ pub(crate) const LAST_PROCESSED_DEC_QUEUE_ID: Item<DecQueuePositionId> =
 /// Total collateral information
 pub(crate) const TOTALS: Map<&Token, Totals> = Map::new("totals");
 
+/// Total collateral information
+pub(crate) const PENDING_DEPOSITS: Map<&Token, Collateral> = Map::new("pending-deposits");
+
 /// LpToken Value
 pub(crate) const LP_TOKEN_VALUE: Map<&Token, LpTokenValue> = Map::new("lp-token-value");
 
@@ -71,3 +76,13 @@ pub(crate) const MARKET_LOADER_STATUS: Item<MarketLoaderStatus> = Item::new("mar
 /// Deferred exec status stored in the reply entrypoint
 pub(crate) const REPLY_DEFERRED_EXEC_ID: Item<Option<DeferredExecId>> =
     Item::new("reply-deferred-exec-id");
+
+/// Last closed position
+pub(crate) const LAST_CLOSED_POSITION_CURSOR: Map<&MarketId, ClosedPositionCursor> =
+    Map::new("last-closed-position-cursor");
+
+/// Leader comissision
+pub(crate) const LEADER_COMMISSION: Map<&Token, Collateral> = Map::new("leader-commission");
+
+/// High water mark
+pub(crate) const HIGH_WATER_MARK: Map<&Token, HighWaterMark> = Map::new("high-water-market");

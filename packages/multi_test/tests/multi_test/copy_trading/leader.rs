@@ -1,10 +1,11 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Event};
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use perpswap::{
     contracts::{
         copy_trading::{DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp},
         market::position::PositionId,
     },
+    number::{Collateral, UnsignedDecimal},
     storage::DirectionToBase,
 };
 
@@ -19,7 +20,7 @@ fn leader_opens_attempt_open_incorrect_position() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "200".parse().unwrap());
@@ -76,7 +77,7 @@ fn leader_opens_correct_position() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
     assert_eq!(tokens[0].collateral, "200".parse().unwrap());
@@ -149,7 +150,7 @@ fn leader_incorrect_position() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     withdraw_money(&market, &trader, "10");
     withdraw_money(&market, &trader, "10");
 
@@ -210,7 +211,7 @@ fn leader_open_position_compute_token() {
     let lp = market.clone_lp(0).unwrap();
 
     load_markets(&market);
-    deposit_money(&market, &trader, "200");
+    deposit_money(&market, &trader, "200").unwrap();
     withdraw_money(&market, &trader, "10");
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
@@ -249,7 +250,7 @@ fn leader_open_position_compute_token() {
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
 
-    deposit_money(&market, &trader, "50");
+    deposit_money(&market, &trader, "50").unwrap();
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -263,7 +264,8 @@ fn lp_token_value_reduced_after_open() {
     let lp = market.clone_lp(0).unwrap();
 
     load_markets(&market);
-    deposit_money(&market, &trader, "200");
+    let response = deposit_money(&market, &trader, "200").unwrap();
+    response.assert_event(&Event::new("wasm-lp-token").add_attribute("value", "1".to_owned()));
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -286,7 +288,19 @@ fn lp_token_value_reduced_after_open() {
 
     let trader1 = market.clone_trader(1).unwrap();
 
-    deposit_money(&market, &trader1, "20");
+    let response = deposit_money(&market, &trader1, "20").unwrap();
+    let token_event = response
+        .events
+        .iter()
+        .find(|item| item.ty == "wasm-lp-token")
+        .unwrap();
+    let token_value = token_event
+        .attributes
+        .iter()
+        .find(|item| item.key == "value")
+        .unwrap();
+    assert!(Collateral::one() > token_value.value.parse().unwrap());
+
     let tokens = market.query_copy_trading_balance(&trader1).unwrap();
     let shares = tokens.balance[0].shares;
     // Since token value has reduced, he can buy more shares for the same amount
@@ -308,4 +322,237 @@ fn load_work_after_six_hours() {
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
+}
+
+#[test]
+fn leader_position_closed_with_profit() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200").unwrap();
+    withdraw_money(&market, &trader, "10");
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "190".parse().unwrap());
+
+    // Leader opens a position
+    market
+        .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+        .unwrap();
+
+    // Process queue item: Open the position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    // Process queue item: Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let position_ids = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
+
+    assert_eq!(position_ids.len(), 1);
+
+    withdraw_money(&market, &trader, "10");
+
+    // We are going to make a profit!
+    market.exec_set_price("1.5".try_into().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    market
+        .query_closed_position(&market.copy_trading_addr, position_ids[0])
+        .unwrap();
+
+    let all_position_ids = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
+
+    let closed_position = market
+        .query_closed_position(&market.copy_trading_addr, position_ids[0])
+        .unwrap();
+
+    assert_eq!(all_position_ids.len(), 0);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    match work {
+        WorkResp::NoWork => panic!("Impossible: No work"),
+        WorkResp::HasWork { work_description } => assert!(work_description.is_rebalance()),
+    }
+
+    let closed_position_active_collateral = closed_position.active_collateral;
+    let leader_comission = closed_position
+        .pnl_collateral
+        .try_into_non_negative_value()
+        .unwrap()
+        .checked_mul_dec("0.1".parse().unwrap())
+        .unwrap();
+    let diff = closed_position_active_collateral
+        .checked_sub(leader_comission)
+        .unwrap();
+    let tokens_collateral: Collateral = "170".parse().unwrap();
+    let tokens_collateral = tokens_collateral.checked_add(diff).unwrap();
+
+    // Rebalance the market
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-rebalanced").add_attribute("made-profit", true.to_string());
+    response.assert_event(&event);
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert!(tokens[0].collateral.diff(tokens_collateral) < "0.1".parse().unwrap());
+
+    // Compute lp token value
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let token_event = response
+        .events
+        .iter()
+        .find(|item| item.ty == "wasm-lp-token")
+        .unwrap();
+    let token_value = token_event
+        .attributes
+        .iter()
+        .find(|item| item.key == "value")
+        .unwrap();
+    // Token value has increased
+    assert!(Collateral::one() < token_value.value.parse().unwrap());
+    // Do deposit
+    market.exec_copytrading_do_work(&trader1).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+
+    let tokens_collateral = tokens_collateral
+        .checked_add("20".parse().unwrap())
+        .unwrap();
+    assert!(tokens_collateral.diff(tokens[0].collateral) < "0.1".parse().unwrap());
+
+    let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+    let shares = tokens.balance[0].shares;
+    // Since token value has increased, he can buy less shares for the same amount
+    assert!(shares.raw() < "20".parse().unwrap());
+}
+
+#[test]
+fn leader_position_closed_with_loss() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200").unwrap();
+    withdraw_money(&market, &trader, "10");
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "190".parse().unwrap());
+
+    // Leader opens a position
+    market
+        .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+        .unwrap();
+
+    // Process queue item: Open the position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    // Process queue item: Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let position_ids = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
+
+    assert_eq!(position_ids.len(), 1);
+
+    withdraw_money(&market, &trader, "10");
+
+    // We are going to make a loss!
+    market.exec_set_price("0.5".try_into().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    market
+        .query_closed_position(&market.copy_trading_addr, position_ids[0])
+        .unwrap();
+
+    let all_position_ids = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
+
+    assert_eq!(all_position_ids.len(), 0);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+
+    assert!(tokens[0].collateral.diff("170".parse().unwrap()) < "0.1".parse().unwrap());
+
+    // Compute lp token value
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let token_event = response
+        .events
+        .iter()
+        .find(|item| item.ty == "wasm-lp-token")
+        .unwrap();
+    let token_value = token_event
+        .attributes
+        .iter()
+        .find(|item| item.key == "value")
+        .unwrap();
+    // Token value has increased
+    assert!(Collateral::one() > token_value.value.parse().unwrap());
+    // Do deposit
+    market.exec_copytrading_do_work(&trader1).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert!(tokens[0].collateral.diff("190".parse().unwrap()) < "0.1".parse().unwrap());
+
+    let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+    let shares = tokens.balance[0].shares;
+    // Since token value has decreased, he can buy more shares for the same amount
+    assert!(shares.raw() > "20".parse().unwrap());
 }

@@ -3,6 +3,7 @@ mod leader;
 use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Event};
+use cw_multi_test::AppResponse;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use perpswap::{
     contracts::copy_trading::{
@@ -123,7 +124,11 @@ fn detect_process_queue_item_work() {
     );
 }
 
-pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
+pub(crate) fn deposit_money(
+    market: &PerpsMarket,
+    trader: &Addr,
+    amount: &str,
+) -> anyhow::Result<AppResponse> {
     // Should not have any prior work
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
@@ -144,13 +149,13 @@ pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
     );
 
     // Compute LP token value
-    market.exec_copytrading_do_work(trader).unwrap();
+    let response = market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual deposit
     market.exec_copytrading_do_work(trader).unwrap();
 
-    // Should not find any work now
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
+    Ok(response)
 }
 
 pub(crate) fn withdraw_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
@@ -264,7 +269,7 @@ fn do_withdraw() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "100");
+    deposit_money(&market, &trader, "100").unwrap();
 
     let initial_balance = market.query_copy_trading_balance(&trader).unwrap();
     assert_eq!(initial_balance.balance[0].shares, "100".parse().unwrap());
@@ -357,7 +362,7 @@ fn query_leader_tokens() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "100");
+    deposit_money(&market, &trader, "100").unwrap();
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
@@ -383,7 +388,7 @@ fn withdraw_bug_perp_4159() {
 
     load_markets(&market);
 
-    deposit_money(&market, &trader, "100");
+    deposit_money(&market, &trader, "100").unwrap();
 
     // Issue full withdrawal
     market.exec_copytrading_withdrawal(&trader, "100").unwrap();

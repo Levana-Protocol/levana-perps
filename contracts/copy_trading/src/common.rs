@@ -10,7 +10,9 @@ use perpswap::contracts::{
     factory::entry::MarketsResp,
     market::{
         deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
-        entry::{LimitOrdersResp, PositionsQueryFeeApproach},
+        entry::{
+            ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp, PositionsQueryFeeApproach,
+        },
         order::OrderId,
         position::{PositionId, PositionsResp},
     },
@@ -237,7 +239,7 @@ impl<'a> State<'a> {
 
     pub(crate) fn get_first_full_token_info(
         &self,
-        storage: &mut dyn Storage,
+        storage: &dyn Storage,
         token: &Token,
     ) -> Result<perpswap::token::Token> {
         let market = crate::state::MARKETS_TOKEN
@@ -255,7 +257,7 @@ impl<'a> State<'a> {
 
     pub(crate) fn load_market_ids_with_token(
         &self,
-        storage: &mut dyn Storage,
+        storage: &dyn Storage,
         token: &Token,
     ) -> Result<Vec<MarketInfo>> {
         let markets = crate::state::MARKETS_TOKEN.prefix(token.clone()).range(
@@ -309,7 +311,7 @@ impl<'a> State<'a> {
         let PositionsResp {
             positions,
             pending_close,
-            closed: _,
+            closed,
         } = self.querier.query_wasm_smart(
             market_addr,
             &MarketQueryMsg::Positions {
@@ -321,11 +323,30 @@ impl<'a> State<'a> {
         )?;
         // todo: Change this to Error
         assert!(pending_close.is_empty());
+        assert!(closed.is_empty(), "Closed is not empty");
         let start_after = positions.last().cloned().map(|item| item.id);
         Ok(OpenPositionsResp {
             positions,
             start_after,
         })
+    }
+
+    pub(crate) fn query_closed_position(
+        &self,
+        market_addr: &Addr,
+        cursor: Option<ClosedPositionCursor>,
+    ) -> Result<ClosedPositionsResp> {
+        let copy_trading = self.my_addr.clone();
+        let result = self.querier.query_wasm_smart(
+            market_addr,
+            &MarketQueryMsg::ClosedPositionHistory {
+                owner: copy_trading.into(),
+                cursor,
+                limit: Some(15),
+                order: Some(perpswap::storage::OrderInMessage::Ascending),
+            },
+        )?;
+        Ok(result)
     }
 
     pub(crate) fn load_orders(

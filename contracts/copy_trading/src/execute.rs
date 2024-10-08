@@ -5,14 +5,17 @@ use crate::{
     },
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketWorkInfo,
-        OneLpTokenValue, ProcessingStatus, State, WalletInfo,
+        Commission, DecQueuePosition, HighWaterMark, IncQueuePosition, LeaderComissision,
+        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, State,
+        WalletInfo,
     },
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-
-use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::market::{
+    entry::{ClosedPositionCursor, ExecuteMsg as MarketExecuteMsg},
+    position::ClosedPosition,
+};
 use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
@@ -342,13 +345,144 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
             let res = process_queue_item(id, storage, &state, res)?;
             Ok(res)
         }
-        WorkDescription::ResetStats {} => todo!(),
-        WorkDescription::Rebalance {} => todo!(),
+        WorkDescription::ResetStats { token } => reset_stats(storage, &state, token),
         WorkDescription::HandleDeferredExecId {} => {
             let response = handle_deferred_exec_id(storage, &state)?;
             Ok(response)
         }
+        WorkDescription::Rebalance { token, amount } => rebalance(storage, &state, token, amount),
     }
+}
+
+// Rebalance is done when contract balance is not same as the one
+// internally tracked by it. This could occur for a variety of
+// reasons like Positions got liquidated, someone sent free money to this
+// contract etc.
+fn rebalance(
+    storage: &mut dyn Storage,
+    state: &State,
+    token: Token,
+    rebalance_amount: NonZero<Collateral>,
+) -> Result<Response> {
+    let markets = state.load_market_ids_with_token(storage, &token)?;
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &token)?
+        .unwrap_or_default();
+    let rebalance_amount = rebalance_amount.raw();
+    let mut check_balance = Collateral::zero();
+    let mut rebalanced = false;
+    for market in markets {
+        if check_balance.approx_eq(rebalance_amount) {
+            break;
+        }
+        let mut cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
+        let mut hwm = crate::state::HIGH_WATER_MARK
+            .may_load(storage, &token)?
+            .unwrap_or_default();
+        loop {
+            // todo: Batch this operations
+            let closed_positions = state.query_closed_position(&market.addr, cursor.clone())?;
+            let last_closed_position =
+                closed_positions
+                    .positions
+                    .last()
+                    .cloned()
+                    .map(|item| ClosedPositionCursor {
+                        time: item.close_time,
+                        position: item.id,
+                    });
+            if let Some(ref last_closed_position) = last_closed_position {
+                crate::state::LAST_CLOSED_POSITION_CURSOR.save(
+                    storage,
+                    &market.id,
+                    last_closed_position,
+                )?
+            }
+            cursor = last_closed_position;
+            for position in closed_positions.positions {
+                let commission =
+                    handle_leader_commission(storage, state, &token, position, &mut hwm)?;
+                check_balance = check_balance.checked_add(commission.active_collateral)?;
+                totals.collateral = totals
+                    .collateral
+                    .checked_add(commission.remaining_collateral)?;
+                if commission.profit > Collateral::zero() {
+                    // If leader made profit
+                    rebalanced = true;
+                }
+            }
+            if closed_positions.cursor.is_none() {
+                break;
+            }
+        }
+        crate::state::HIGH_WATER_MARK.save(storage, &token, &hwm)?;
+    }
+    let mut event = Event::new("rebalanced").add_attribute("made-profit", rebalanced.to_string());
+    if check_balance < rebalance_amount {
+        // We have settled all the markets's closed positions, but we
+        // are still not balanced. This means that the money was sent
+        // by someone directly to the contract.
+        let diff = rebalance_amount.checked_sub(check_balance)?;
+        totals.collateral = totals.collateral.checked_add(diff)?;
+        crate::state::TOTALS.save(storage, &token, &totals)?;
+        event = event.add_attribute("gains", diff.to_string());
+    }
+    crate::state::TOTALS.save(storage, &token, &totals)?;
+    let response = Response::new().add_event(event);
+    Ok(response)
+}
+
+fn handle_leader_commission(
+    storage: &mut dyn Storage,
+    state: &State,
+    token: &Token,
+    closed_position: ClosedPosition,
+    hwm: &mut HighWaterMark,
+) -> Result<LeaderComissision> {
+    let commission = hwm.add_pnl(
+        closed_position.pnl_collateral,
+        &state.config.commission_rate,
+    )?;
+    if !commission.0.is_zero() {
+        let leader_comisssion = crate::state::LEADER_COMMISSION
+            .may_load(storage, token)?
+            .unwrap_or_default();
+        let leader_commission = leader_comisssion.checked_add(commission.0)?;
+        crate::state::LEADER_COMMISSION.save(storage, token, &leader_commission)?;
+        let pnl = closed_position
+            .pnl_collateral
+            .try_into_non_negative_value()
+            .context("Impossible: profit is negative")?;
+        let remaining_profit = pnl.checked_sub(commission.0)?;
+        let remaining_collateral = closed_position
+            .active_collateral
+            .checked_sub(commission.0)?;
+        Ok(LeaderComissision {
+            active_collateral: closed_position.active_collateral,
+            profit: pnl,
+            commission,
+            remaining_profit,
+            remaining_collateral,
+        })
+    } else {
+        Ok(LeaderComissision {
+            active_collateral: closed_position.active_collateral,
+            profit: Collateral::zero(),
+            commission: Commission::zero(),
+            remaining_profit: Collateral::zero(),
+            remaining_collateral: closed_position.active_collateral,
+        })
+    }
+}
+
+fn reset_stats(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
+    let markets = state.load_market_ids_with_token(storage, &token)?;
+    let market_work_info = MarketWorkInfo::default();
+    for market in markets {
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work_info)?;
+    }
+    Ok(Response::new()
+        .add_event(Event::new("reset-stats").add_attribute("token", token.to_string())))
 }
 
 fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<Response> {
@@ -423,11 +557,21 @@ fn deposit(
     let queue_id = QueuePositionId::IncQueuePositionId(inc_queue_id);
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = IncQueuePosition {
-        item: copy_trading::IncQueueItem::Deposit { funds, token },
+        item: copy_trading::IncQueueItem::Deposit {
+            funds,
+            token: token.clone(),
+        },
         wallet: sender,
         status: copy_trading::ProcessingStatus::NotProcessed,
     };
     crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
+    let mut pending_deposits = crate::state::PENDING_DEPOSITS
+        .may_load(storage, &token)
+        .context("Could not load TOTALS")?
+        .unwrap_or_default();
+
+    pending_deposits = pending_deposits.checked_add(funds.raw())?;
+    crate::state::PENDING_DEPOSITS.save(storage, &token, &pending_deposits)?;
     Ok(Response::new().add_event(
         Event::new("deposit")
             .add_attribute("collateral", funds.to_string())
@@ -507,6 +651,8 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
     let event = Event::new("lp-token")
         .add_attribute("validation", "success".to_string())
+        .add_attribute("collateral", total_collateral.to_string())
+        .add_attribute("shares", total_shares.to_string())
         .add_attribute("value", token_value.value.to_string());
     Ok(event)
 }
@@ -579,10 +725,9 @@ fn process_single_market(
     market: &MarketInfo,
 ) -> Result<()> {
     // todo: track count of query operations!
-    let mut market_work = crate::state::MARKET_WORK_INFO
-        .may_load(storage, &market.id)
-        .context("Could not load MARKET_WORK_INFO")?
-        .unwrap_or_default();
+    // todo: this needs to be fixed properly when batching is implemented
+    // Initialize it to empty before starting
+    let mut market_work = MarketWorkInfo::default();
     let mut tokens_start_after = None;
     loop {
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
