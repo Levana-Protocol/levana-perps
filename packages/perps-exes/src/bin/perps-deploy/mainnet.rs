@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use chrono::{TimeZone, Utc};
 use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::NewMarketParams,
     spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
 };

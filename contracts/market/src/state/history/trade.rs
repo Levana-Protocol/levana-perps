@@ -2,8 +2,8 @@ use crate::prelude::*;
 use crate::state::{State, StateContext};
 use cosmwasm_std::{Addr, Order, Storage};
 use cw_storage_plus::{Bound, KeyDeserialize, Map, Prefixer, PrimaryKey};
-use msg::contracts::market::entry::TraderActionHistoryResp;
-use msg::contracts::market::{
+use perpswap::contracts::market::entry::TraderActionHistoryResp;
+use perpswap::contracts::market::{
     entry::{PositionAction, PositionActionHistoryResp, PositionActionKind, TradeHistorySummary},
     history::events::{PnlEvent, PositionActionEvent, TradeVolumeEvent},
 };

@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{config::DEFAULT_MARKET, market_wrapper::PerpsMarket, PerpsApp};
-use msg::{
+use perpswap::{
     contracts::market::{
         entry::PriceForQuery,
         position::{LiquidationReason, PositionCloseReason},

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
 use cosmos::HasAddress;
-use msg::contracts::market;
+use perpswap::contracts::market;
 use perps_exes::prelude::MarketContract;
 
 use crate::config::BotConfigTestnet;

@@ -1,5 +1,5 @@
 use cosmos::{HasAddress, HasAddressHrp, SeedPhrase};
-use msg::prelude::*;
+use perpswap::prelude::*;
 use perps_exes::{PerpApp, PerpsNetwork};
 
 use std::{

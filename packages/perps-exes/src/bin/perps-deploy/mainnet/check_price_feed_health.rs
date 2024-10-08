@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasCosmos};
-use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData};
+use perpswap::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData};
 use perps_exes::{
     config::MainnetFactories,
     contracts::{Factory, MarketInfo},

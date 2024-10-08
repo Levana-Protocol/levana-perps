@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use crate::cli::Opt;
 use cosmos::Address;
-use msg::{
+use perpswap::{
     contracts::{cw20::entry::AllAccountsResponse, liquidity_token::LiquidityTokenKind},
     prelude::*,
 };

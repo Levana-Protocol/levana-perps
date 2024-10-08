@@ -1,6 +1,6 @@
 use levana_perpswap_multi_test::return_unless_market_collateral_base;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 #[test]
 fn sanity_open_long_min_values() {

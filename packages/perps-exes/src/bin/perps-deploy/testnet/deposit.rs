@@ -1,5 +1,5 @@
 use anyhow::Result;
-use msg::prelude::*;
+use perpswap::prelude::*;
 use perps_exes::{contracts::Factory, prelude::MarketContract};
 
 use crate::cli::Opt;

@@ -1,7 +1,7 @@
 //! PERP-808
 
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 // Before counterleverage fixes, this test case would fail for collateral-is-quote.
 #[test]

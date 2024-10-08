@@ -4,7 +4,7 @@ use anyhow::Context;
 use comfy_table::{presets::UTF8_FULL, Cell, Table};
 use cosmos::Address;
 use cosmwasm_std::{Binary, Uint128};
-use msg::contracts::{
+use perpswap::contracts::{
     countertrade::{MarketStatus, MarketsResp},
     market::entry::StatusResp,
 };

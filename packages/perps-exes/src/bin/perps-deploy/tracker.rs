@@ -2,8 +2,8 @@ use cosmos::{
     proto::{cosmos::base::abci::v1beta1::TxResponse, cosmwasm::wasm::v1::MsgExecuteContract},
     Address, CodeId, Contract, HasAddress, HasCosmos, TxBuilder, Wallet,
 };
-use msg::contracts::tracker::entry::{CodeIdResp, ContractResp, ExecuteMsg, QueryMsg};
-use msg::prelude::*;
+use perpswap::contracts::tracker::entry::{CodeIdResp, ContractResp, ExecuteMsg, QueryMsg};
+use perpswap::prelude::*;
 use perps_exes::contracts::Factory;
 
 use crate::{cli::Opt, util::get_hash_for_path};

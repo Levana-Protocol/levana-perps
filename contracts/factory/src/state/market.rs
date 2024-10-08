@@ -2,7 +2,7 @@ use crate::state::*;
 use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_storage_plus::{Bound, Item, Map};
-use msg::contracts::factory::entry::{ContractType, MarketsResp, MARKETS_QUERY_LIMIT_DEFAULT};
+use perpswap::contracts::factory::entry::{ContractType, MarketsResp, MARKETS_QUERY_LIMIT_DEFAULT};
 use perpswap::namespace;
 
 use super::all_contracts::ALL_CONTRACTS;

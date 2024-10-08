@@ -3,12 +3,12 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt,
     return_unless_market_collateral_quote, PerpsApp,
 };
-use msg::contracts::market::entry::PositionActionHistoryResp;
-use msg::contracts::market::{
+use perpswap::contracts::market::entry::PositionActionHistoryResp;
+use perpswap::contracts::market::{
     entry::{LpActionKind, PositionActionKind},
     history::events::{LpActionEvent, PositionActionEvent},
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 use std::ops::Neg;
 
 #[test]

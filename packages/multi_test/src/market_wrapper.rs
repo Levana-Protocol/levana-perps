@@ -20,30 +20,31 @@ use cosmwasm_std::{
     StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
-use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
-use msg::contracts::copy_trading::{
+use perpswap::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
+use perpswap::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::copy_trading::{
     Config as CopyTradingConfig, ExecuteMsg as CopyTradingExecuteMsg,
     QueryMsg as CopyTradingQueryMsg,
 };
-use msg::contracts::countertrade::{
+use perpswap::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
 };
-use msg::contracts::cw20::entry::{
+use perpswap::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
 };
-use msg::contracts::factory::entry::{
+use perpswap::contracts::factory::entry::{
     CopyTradingResp, ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereeCountResp,
     ListRefereesResp, MarketInfoResponse, QueryMsg as FactoryQueryMsg, RefereeCount,
     ShutdownStatus,
 };
-use msg::contracts::liquidity_token::LiquidityTokenKind;
-use msg::contracts::market::crank::CrankWorkInfo;
-use msg::contracts::market::deferred_execution::{
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::market::crank::CrankWorkInfo;
+use perpswap::contracts::market::deferred_execution::{
     DeferredExecExecutedEvent, DeferredExecId, DeferredExecQueuedEvent, DeferredExecStatus,
     DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
 };
-use msg::contracts::market::entry::{
+use perpswap::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
     LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, PositionActionHistoryResp,
@@ -51,11 +52,11 @@ use msg::contracts::market::entry::{
     SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary,
     TraderActionHistoryResp,
 };
-use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::{
+use perpswap::contracts::market::position::{ClosedPosition, PositionsResp};
+use perpswap::contracts::market::spot_price::{
     SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeedDataInit, SpotPriceFeedInit,
 };
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
         ExecuteMsg as MarketExecuteMsg, ExecuteOwnerMsg as MarketExecuteOwnerMsg,
@@ -64,14 +65,13 @@ use msg::contracts::market::{
     liquidity::LiquidityStats,
     position::{PositionId, PositionQueryResponse},
 };
-use msg::contracts::position_token::{
+use perpswap::contracts::position_token::{
     entry::{
         ExecuteMsg as Cw721ExecuteMsg, NftInfoResponse, OwnerOfResponse, QueryMsg as Cw721QueryMsg,
         TokensResponse,
     },
     Metadata as Cw721Metadata,
 };
-use perpswap::compat::BackwardsCompatTakeProfit;
 use perpswap::prelude::*;
 
 use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;

@@ -4,13 +4,13 @@ use crate::state::history::trade::trade_volume_usd;
 use crate::state::liquidity::{LiquidityLock, LiquidityUnlock};
 use crate::state::position::get_position;
 use crate::state::position::take_profit::TakeProfitToCounterCollateral;
-use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
-use msg::contracts::market::entry::{PositionActionKind, StopLoss};
-use msg::contracts::market::fees::events::FeeSource;
-use msg::contracts::market::position::events::{
+use perpswap::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
+use perpswap::contracts::market::entry::{PositionActionKind, StopLoss};
+use perpswap::contracts::market::fees::events::FeeSource;
+use perpswap::contracts::market::position::events::{
     calculate_position_collaterals, PositionAttributes, PositionSaveReason, PositionTradingFee,
 };
-use msg::contracts::market::position::{events::PositionUpdateEvent, Position, PositionId};
+use perpswap::contracts::market::position::{events::PositionUpdateEvent, Position, PositionId};
 
 use super::AdjustOpenInterest;
 

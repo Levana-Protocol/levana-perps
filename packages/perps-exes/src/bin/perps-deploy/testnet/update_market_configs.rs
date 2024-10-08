@@ -1,5 +1,5 @@
 use anyhow::Context;
-use msg::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::config::ConfigUpdate;
 use perps_exes::prelude::MarketContract;
 
 use perps_exes::contracts::Factory;

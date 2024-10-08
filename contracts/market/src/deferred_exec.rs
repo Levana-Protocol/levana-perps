@@ -6,14 +6,14 @@
 //
 // The execution branch then goes one step further - applying the changes to the state, using that same struct
 // In order to ensure that the struct is used, we annotate with `#[must_use]` and either `apply()` or `discard()` are called
-use msg::contracts::market::{
+use perpswap::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::market::{
     deferred_execution::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
     },
     entry::SlippageAssert,
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
-use perpswap::compat::BackwardsCompatTakeProfit;
 
 use crate::state::{
     order::{CancelLimitOrderExec, PlaceLimitOrderExec},

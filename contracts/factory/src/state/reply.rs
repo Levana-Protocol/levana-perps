@@ -1,6 +1,6 @@
 use cw_storage_plus::Item;
-use msg::prelude::*;
 use perpswap::namespace;
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 

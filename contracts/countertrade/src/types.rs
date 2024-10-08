@@ -1,4 +1,4 @@
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     deferred_execution::DeferredExecId,
     entry::ClosedPositionCursor,
     position::{PositionId, PositionQueryResponse},

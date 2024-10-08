@@ -2,8 +2,8 @@ use anyhow::Result;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::tracker::entry::{InstantiateMsg, MigrateMsg};
-use msg::contracts::tracker::events::NewTracker;
+use perpswap::contracts::tracker::entry::{InstantiateMsg, MigrateMsg};
+use perpswap::contracts::tracker::events::NewTracker;
 
 use crate::state::ADMINS;
 

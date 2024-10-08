@@ -7,7 +7,7 @@ use cosmwasm_std::{
     Uint128,
 };
 use cw_multi_test::Executor;
-use msg::prelude::*;
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{config::TEST_CONFIG, LocalContractWrapper, PerpsApp};

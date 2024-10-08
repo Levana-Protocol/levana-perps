@@ -1,8 +1,8 @@
 use cosmwasm_std::{Addr, Decimal256};
-use msg::contracts::market::position::{
+use perpswap::contracts::market::position::{
     LiquidationMargin, Position, PositionId, SignedCollateralAndUsd,
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 #[test]
 fn position_data_long() {

@@ -17,7 +17,7 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress, TxBuilder};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
     position::{
         ClosedPosition, LiquidationReason, PositionCloseReason, PositionId, PositionQueryResponse,

@@ -4,11 +4,11 @@ use anyhow::Result;
 use arbitrary::Arbitrary;
 use cosmwasm_std::Addr;
 use libfuzzer_sys::fuzz_target;
-use msg::{
+use multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
+use perpswap::{
     contracts::market::entry::{ExecuteMsg, QueryMsg},
     prelude::*,
 };
-use multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 
 thread_local! {
     static MARKET: PerpsMarket = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();

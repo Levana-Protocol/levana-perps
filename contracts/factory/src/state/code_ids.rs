@@ -1,4 +1,4 @@
-use msg::{contracts::factory::entry::CodeIds, prelude::*};
+use perpswap::{contracts::factory::entry::CodeIds, prelude::*};
 
 use super::{
     liquidity_token::liquidity_token_code_id, market::get_market_code_id,

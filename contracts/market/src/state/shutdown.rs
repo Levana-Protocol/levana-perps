@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmwasm_std::Storage;
 use cw_storage_plus::Item;
-use msg::shutdown::ShutdownImpact;
+use perpswap::shutdown::ShutdownImpact;
 use perpswap::{namespace, prelude::external_map_has};
 
 use super::{State, StateContext};

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{
     error::WalletError, Address, AddressHrp, Cosmos, HasAddress, HasAddressHrp, SeedPhrase, Wallet,
 };
-use msg::{
+use perpswap::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
     prelude::*,
 };

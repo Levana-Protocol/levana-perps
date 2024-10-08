@@ -2,7 +2,7 @@ use crate::state::*;
 use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_storage_plus::Map;
-use msg::contracts::factory::entry::{
+use perpswap::contracts::factory::entry::{
     make_referee_count_key, make_referrer_key, ListRefereeCountResp, ListRefereeCountStartAfter,
     ListRefereesResp, RefereeCount,
 };

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use cosmwasm_std::Addr;
-use msg::contracts::market::config::{Config, ConfigUpdate};
+use perpswap::contracts::market::config::{Config, ConfigUpdate};
 use perps_exes::{
     config::{ChainConfig, ConfigUpdateAndBorrowFee, MarketConfigUpdates, PriceConfig},
     contracts::{Factory, MarketInfo},

@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmwasm_std::{Attribute, Event};
 use cw_multi_test::AppResponse;
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 // for both multi-test's AppResponse and the real low-level TxResponse
 // in both cases we want to be able to do things like `resp.event_first("open-position")`

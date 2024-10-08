@@ -4,7 +4,7 @@ use cosmos::{
     HasContract, HasCosmos, Wallet,
 };
 use cosmwasm_std::Decimal256;
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::Cw20Coin,
     faucet::entry::{
         ExecuteMsg, GetTokenResponse, IsAdminResponse, NextTradingIndexResponse, OwnerMsg,

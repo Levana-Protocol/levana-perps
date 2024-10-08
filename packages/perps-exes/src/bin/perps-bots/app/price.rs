@@ -14,7 +14,7 @@ use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, CosmosTxResponse, HasAddress,
     TxBuilder, TxMessage, Wallet,
 };
-use msg::{
+use perpswap::{
     contracts::market::{
         crank::CrankWorkInfo,
         spot_price::{PythPriceServiceNetwork, SpotPriceConfig},

@@ -11,14 +11,14 @@ use levana_perpswap_multi_test::config::{SpotPriceKind, TokenKind, DEFAULT_MARKE
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
-use msg::contracts::liquidity_token::LiquidityTokenKind;
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::entry::PositionsQueryFeeApproach;
-use msg::contracts::market::liquidity::LiquidityStats;
-use msg::contracts::market::position::{LiquidationReason, PositionCloseReason};
-use msg::prelude::*;
-use msg::token::TokenInit;
+use perpswap::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::entry::PositionsQueryFeeApproach;
+use perpswap::contracts::market::liquidity::LiquidityStats;
+use perpswap::contracts::market::position::{LiquidationReason, PositionCloseReason};
+use perpswap::prelude::*;
+use perpswap::token::TokenInit;
 
 #[test]
 fn liquidity_deposit_new_user() {

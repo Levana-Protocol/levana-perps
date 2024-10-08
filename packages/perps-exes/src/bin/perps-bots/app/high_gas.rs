@@ -13,7 +13,7 @@ use anyhow::Result;
 use async_channel::RecvError;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use parking_lot::Mutex;
 use perpswap::storage::MarketId;
 

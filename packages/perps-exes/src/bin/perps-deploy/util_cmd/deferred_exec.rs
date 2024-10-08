@@ -7,7 +7,7 @@ use std::{
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos, HasCosmos};
-use msg::contracts::market::deferred_execution::{
+use perpswap::contracts::market::deferred_execution::{
     DeferredExecId, DeferredExecStatus, GetDeferredExecResp,
 };
 use parking_lot::Mutex;

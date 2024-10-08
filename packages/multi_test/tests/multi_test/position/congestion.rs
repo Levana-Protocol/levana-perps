@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 // Tests that each position gets its own liquifunding cadence
 #[test]

@@ -22,8 +22,8 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
-use msg::prelude::*;
-use msg::token::Token;
+use perpswap::prelude::*;
+use perpswap::token::Token;
 use rand::rngs::ThreadRng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;

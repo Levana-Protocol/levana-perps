@@ -11,8 +11,8 @@ use crate::state::{
     token::TOKEN,
 };
 use cosmwasm_std::{Env, Order, QuerierWrapper};
-use msg::contracts::market::entry::Fees;
-use msg::contracts::market::{
+use perpswap::contracts::market::entry::Fees;
+use perpswap::contracts::market::{
     entry::{LpInfoResp, UnstakingStatus},
     liquidity::LiquidityStats,
     position::{LiquidationReason, PositionId},

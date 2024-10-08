@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::{LpAction, LpActionHistoryResp, LpActionKind, LpHistorySummary},
     history::events::{LpActionEvent, LpDepositEvent, LpYieldEvent},
 };

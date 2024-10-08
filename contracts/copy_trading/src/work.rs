@@ -14,7 +14,7 @@ use crate::{
     reply::REPLY_ID_OPEN_POSITION,
     types::{DecQueuePosition, State, WalletInfo},
 };
-use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
 fn get_deferred_work(
     storage: &dyn Storage,

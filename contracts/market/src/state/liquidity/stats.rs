@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap};
 use crate::prelude::*;
 use cosmwasm_std::Order;
 use cw_storage_plus::Bound;
-use msg::contracts::market::liquidity::LiquidityStats;
+use perpswap::contracts::market::liquidity::LiquidityStats;
 
 use crate::state::{State, StateContext};
 

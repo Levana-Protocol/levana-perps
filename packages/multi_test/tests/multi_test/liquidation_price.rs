@@ -2,7 +2,7 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
     return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
-use msg::{contracts::market::config::ConfigUpdate, prelude::*};
+use perpswap::{contracts::market::config::ConfigUpdate, prelude::*};
 
 #[test]
 fn liquidation_price() {

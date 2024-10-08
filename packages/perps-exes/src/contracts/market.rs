@@ -5,7 +5,7 @@ use cosmos::{
 
 use backon::{ConstantBuilder, Retryable};
 use cosmwasm_std::to_json_binary;
-use msg::{
+use perpswap::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{

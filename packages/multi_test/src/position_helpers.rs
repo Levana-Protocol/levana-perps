@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
-use msg::contracts::market::position::{ClosedPosition, LiquidationReason, PositionCloseReason};
+use perpswap::contracts::market::position::{
+    ClosedPosition, LiquidationReason, PositionCloseReason,
+};
 
 pub(crate) fn position_liquidated_reason(pos: &ClosedPosition) -> Result<LiquidationReason> {
     assert!(pos.liquidation_margin.is_some());

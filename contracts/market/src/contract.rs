@@ -18,7 +18,7 @@ use crate::prelude::*;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
-use msg::{
+use perpswap::{
     contracts::market::{
         deferred_execution::{DeferredExecId, DeferredExecItem},
         entry::{
@@ -31,7 +31,7 @@ use msg::{
     shutdown::ShutdownImpact,
 };
 
-use msg::contracts::market::entry::LimitOrderResp;
+use perpswap::contracts::market::entry::LimitOrderResp;
 
 use perpswap::price::Price;
 use semver::Version;

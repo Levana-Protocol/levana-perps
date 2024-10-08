@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
-use msg::prelude::*;
+use perpswap::prelude::*;
 use perps_exes::contracts::{ConfiguredCodeIds, Factory};
 
 use crate::{cli::Opt, util::add_cosmos_msg};

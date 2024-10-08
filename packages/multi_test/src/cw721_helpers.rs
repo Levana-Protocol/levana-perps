@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_multi_test::{AppResponse, Executor};
-use msg::contracts::position_token::{
+use perpswap::contracts::position_token::{
     entry::{ExecuteMsg as Cw721ExecuteMsg, QueryMsg as Cw721QueryMsg},
     Metadata,
 };

@@ -7,7 +7,7 @@
 //! * Any collateral that is sent is actually gets used
 
 use cosmwasm_std::{from_json, MessageInfo};
-use msg::token::Token;
+use perpswap::token::Token;
 
 use crate::prelude::*;
 

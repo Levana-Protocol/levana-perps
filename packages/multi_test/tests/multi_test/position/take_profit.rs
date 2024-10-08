@@ -5,9 +5,9 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_max_gains, time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::position::{LiquidationReason, PositionId};
-use msg::prelude::*;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::position::{LiquidationReason, PositionId};
+use perpswap::prelude::*;
 
 #[test]
 fn position_take_profit_long_normal() {

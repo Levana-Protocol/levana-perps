@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use cosmos::proto::cosmwasm::wasm::v1::MsgExecuteContract;
 use cosmos::{Contract, HasAddress};
 use cosmwasm_std::{Binary, Coin};
-use msg::prelude::*;
+use perpswap::prelude::*;
 use pyth_sdk_cw::PriceIdentifier;
 
 pub async fn get_oracle_update_msg(

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
-use msg::prelude::MarketExecuteMsg;
+use perpswap::prelude::MarketExecuteMsg;
 use perps_exes::{
     config::MainnetFactories,
     contracts::Factory,

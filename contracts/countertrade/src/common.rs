@@ -1,4 +1,4 @@
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::PositionsQueryFeeApproach,
     position::{PositionId, PositionsResp},
 };

@@ -1,7 +1,7 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
-use msg::shutdown::{ShutdownEffect, ShutdownImpact};
+use perpswap::prelude::*;
+use perpswap::shutdown::{ShutdownEffect, ShutdownImpact};
 
 #[test]
 fn shutdown_permissions() {

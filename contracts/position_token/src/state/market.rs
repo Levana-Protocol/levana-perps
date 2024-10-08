@@ -1,12 +1,12 @@
 use crate::state::*;
 use cosmwasm_std::QueryResponse;
 use cw_storage_plus::Item;
-use msg::contracts::{
+use perpswap::contracts::{
     factory::entry::{MarketInfoResponse, QueryMsg as FactoryQueryMsg},
     market::entry::{ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg},
     position_token::entry::{ExecuteMsg as NftExecuteMsg, QueryMsg as NftQueryMsg},
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 const MARKET_ID: Item<MarketId> = Item::new(namespace::MARKET_ID);
 

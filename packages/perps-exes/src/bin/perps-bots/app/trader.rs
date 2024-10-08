@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Cosmos, HasAddress, Wallet};
-use msg::{contracts::market::entry::StatusResp, prelude::*};
+use perpswap::{contracts::market::entry::StatusResp, prelude::*};
 use perps_exes::{config::TraderConfig, prelude::*};
 use rand::Rng;
 

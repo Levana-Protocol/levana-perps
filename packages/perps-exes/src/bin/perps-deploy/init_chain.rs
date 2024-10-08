@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cosmos::ContractAdmin;
-use msg::contracts::faucet::entry::GasAllowance;
+use perpswap::contracts::faucet::entry::GasAllowance;
 use perps_exes::PerpsNetwork;
 
 use crate::cli::Opt;

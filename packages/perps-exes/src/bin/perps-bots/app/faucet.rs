@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use cosmos::{proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress};
-use msg::{
+use perpswap::{
     contracts::faucet::entry::{
         ExecuteMsg, FaucetAsset, IneligibleReason, MultitapRecipient, QueryMsg, TapEligibleResponse,
     },

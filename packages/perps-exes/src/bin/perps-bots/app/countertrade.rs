@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
-use msg::contracts::countertrade::HasWorkResp;
+use perpswap::contracts::countertrade::HasWorkResp;
 use perpswap::storage::MarketId;
 
 use crate::{

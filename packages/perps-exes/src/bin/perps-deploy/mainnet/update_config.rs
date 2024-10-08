@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
-use msg::{
+use perpswap::{
     contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
     prelude::MarketExecuteMsg,
 };

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use cosmos::{Coin, HasAddress};
 use cosmwasm_std::Decimal256;
-use msg::token::Token;
+use perpswap::token::Token;
 use perps_exes::{
     config::MainnetFactories,
     contracts::Factory,

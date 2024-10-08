@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{SubMsg, WasmMsg};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
     position::{PositionId, PositionQueryResponse},

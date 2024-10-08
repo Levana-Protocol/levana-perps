@@ -1,7 +1,7 @@
 use cosmos::{Contract, Cosmos, HasAddress};
-use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
-use msg::contracts::market::config::Config;
-use msg::prelude::*;
+use perpswap::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use perpswap::contracts::market::config::Config;
+use perpswap::prelude::*;
 use perps_exes::prelude::MarketContract;
 use std::collections::HashSet;
 use std::fmt::Debug;

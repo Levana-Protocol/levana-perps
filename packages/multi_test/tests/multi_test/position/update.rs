@@ -4,11 +4,11 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
     response::CosmosResponseExt, PerpsApp,
 };
-use msg::contracts::market::entry::StatusResp;
-use msg::contracts::market::{
+use perpswap::contracts::market::entry::StatusResp;
+use perpswap::contracts::market::{
     config::ConfigUpdate, entry::QueryMsg, position::events::PositionUpdateEvent,
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 #[test]
 fn position_update_collateral_impact_leverage() {

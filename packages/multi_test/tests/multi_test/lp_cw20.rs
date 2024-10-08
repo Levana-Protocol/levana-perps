@@ -4,7 +4,7 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket,
     PerpsApp,
 };
-use msg::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
 
 #[test]
 fn lp_token_cw20_send() {

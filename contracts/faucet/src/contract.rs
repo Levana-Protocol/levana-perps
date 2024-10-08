@@ -14,7 +14,7 @@ use cosmwasm_std::{
     Coin, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response, Storage,
 };
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
         ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance, GasAllowanceResp,

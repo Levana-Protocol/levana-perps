@@ -1,6 +1,6 @@
 use crate::market_wrapper::PerpsMarket;
-use msg::contracts::market::entry::SlippageAssert;
-use msg::prelude::*;
+use perpswap::contracts::market::entry::SlippageAssert;
+use perpswap::prelude::*;
 use std::{fmt::Debug, rc::Rc};
 
 #[derive(Clone)]

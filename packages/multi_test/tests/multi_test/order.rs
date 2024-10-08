@@ -1,9 +1,9 @@
 use levana_perpswap_multi_test::market_wrapper::PerpsMarket;
 use levana_perpswap_multi_test::PerpsApp;
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::entry::{LimitOrderHistoryResp, LimitOrderResult};
-use msg::contracts::market::order::OrderId;
-use msg::prelude::*;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::entry::{LimitOrderHistoryResp, LimitOrderResult};
+use perpswap::contracts::market::order::OrderId;
+use perpswap::prelude::*;
 
 #[test]
 fn test_place_limit_order_long() {

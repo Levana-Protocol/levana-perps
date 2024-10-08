@@ -1,5 +1,5 @@
 use cw_storage_plus::Item;
-use msg::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
 use perpswap::prelude::*;
 
 const TOKEN_KIND: Item<LiquidityTokenKind> = Item::new(namespace::TOKEN_KIND);

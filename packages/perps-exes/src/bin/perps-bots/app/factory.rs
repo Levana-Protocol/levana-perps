@@ -4,9 +4,9 @@ use std::sync::Arc;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
-use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
-use msg::prelude::*;
-use msg::{
+use perpswap::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
+use perpswap::prelude::*;
+use perpswap::{
     contracts::{
         factory::entry::MarketInfoResponse,
         tracker::entry::{CodeIdResp, ContractResp},

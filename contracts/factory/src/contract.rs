@@ -34,7 +34,7 @@ use cosmwasm_std::{
     to_json_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response,
 };
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::{
+use perpswap::contracts::{
     factory::{
         entry::{
             AddrIsContractResp, ContractType, CopyTradingAddr, CopyTradingInfo, CopyTradingResp,

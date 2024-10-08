@@ -1,5 +1,5 @@
 use cw_storage_plus::{Item, Map};
-use msg::contracts::factory::entry::{CopyTradingAddr, LeaderAddr};
+use perpswap::contracts::factory::entry::{CopyTradingAddr, LeaderAddr};
 use perpswap::namespace;
 
 /// Code ID of the copy trading contract

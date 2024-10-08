@@ -2,7 +2,7 @@ use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
 use cosmwasm_std::{Binary, Order};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::{
         OraclePriceFeedPythResp, OraclePriceFeedSeiResp, OraclePriceFeedSimpleResp,
         OraclePriceFeedStrideResp, PriceForQuery,

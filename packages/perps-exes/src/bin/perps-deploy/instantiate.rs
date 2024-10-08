@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
-use msg::contracts::market::spot_price::{PythConfigInit, SpotPriceConfigInit, StrideConfigInit};
-use msg::prelude::*;
-use msg::{
+use perpswap::contracts::market::spot_price::{PythConfigInit, SpotPriceConfigInit, StrideConfigInit};
+use perpswap::prelude::*;
+use perpswap::{
     contracts::{
         cw20::Cw20Coin,
         market::{config::ConfigUpdate, entry::NewMarketParams},

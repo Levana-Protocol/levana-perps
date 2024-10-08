@@ -4,7 +4,7 @@ use anyhow::Result;
 use backon::{ConstantBuilder, Retryable};
 use cosmos::Address;
 use cosmwasm_std::OverflowError;
-use msg::contracts::market::position::PositionId;
+use perpswap::contracts::market::position::PositionId;
 use parking_lot::Mutex;
 use perps_exes::{
     config::MainnetFactories,

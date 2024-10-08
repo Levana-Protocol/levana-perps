@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
-use msg::prelude::MarketExecuteMsg;
+use perpswap::prelude::MarketExecuteMsg;
 use perps_exes::contracts::Factory;
 use perpswap::storage::MarketId;
 

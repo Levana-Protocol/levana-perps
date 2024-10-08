@@ -2,11 +2,11 @@ use std::io::Write;
 
 use anyhow::{Context, Result};
 use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     market::{config::ConfigUpdate, spot_price::SpotPriceConfigInit},
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 use perps_exes::{config::ConfigTestnet, PerpsNetwork};
 
 use crate::{

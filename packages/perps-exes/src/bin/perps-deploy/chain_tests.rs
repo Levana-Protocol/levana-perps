@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use anyhow::{bail, ensure, Context, Result};
-use msg::contracts::market::entry::SlippageAssert;
-use msg::prelude::*;
+use perpswap::contracts::market::entry::SlippageAssert;
+use perpswap::prelude::*;
 use multi_test::response::CosmosResponseExt;
 use perps_exes::{PerpApp, UpdatePositionCollateralImpact::Leverage};
 

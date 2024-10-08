@@ -1,4 +1,4 @@
-use msg::contracts::market::deferred_execution::DeferredExecId;
+use perpswap::contracts::market::deferred_execution::DeferredExecId;
 
 use crate::prelude::*;
 

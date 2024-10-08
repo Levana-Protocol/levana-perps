@@ -3,9 +3,9 @@ use crate::state::position::liquifund::PositionLiquifund;
 use crate::state::position::{AdjustOpenInterest, CLOSED_POSITIONS};
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
-use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
-use msg::contracts::market::position::{events::PositionCloseEvent, Position};
-use msg::contracts::market::position::{
+use perpswap::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
+use perpswap::contracts::market::position::{events::PositionCloseEvent, Position};
+use perpswap::contracts::market::position::{
     ClosePositionInstructions, ClosedPosition, MaybeClosedPosition, PositionCloseReason,
 };
 use perpswap::prelude::*;

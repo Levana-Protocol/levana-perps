@@ -11,10 +11,10 @@ use cosmos::{
     proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, HasAddress, Wallet,
 };
 use cosmos::{HasAddressHrp, SeedPhrase};
-use msg::contracts::market::entry::StatusResp;
-use msg::contracts::market::position::ClosedPosition;
-use msg::prelude::*;
-use msg::{
+use perpswap::contracts::market::entry::StatusResp;
+use perpswap::contracts::market::position::ClosedPosition;
+use perpswap::prelude::*;
+use perpswap::{
     contracts::{
         factory::entry::MarketInfoResponse,
         faucet::entry::{ExecuteMsg as FaucetExecuteMsg, FaucetAsset},

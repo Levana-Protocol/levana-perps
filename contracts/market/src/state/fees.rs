@@ -4,12 +4,12 @@ use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Decimal256;
 use cw_storage_plus::Item;
-use msg::contracts::market::deferred_execution::FeesReturnedEvent;
-use msg::contracts::market::entry::Fees;
-use msg::contracts::market::fees::events::{
+use perpswap::contracts::market::deferred_execution::FeesReturnedEvent;
+use perpswap::contracts::market::entry::Fees;
+use perpswap::contracts::market::fees::events::{
     CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, InsufficientMarginEvent, TradeId,
 };
-use msg::contracts::market::position::PositionId;
+use perpswap::contracts::market::position::PositionId;
 use perpswap::prelude::*;
 
 use self::liquidity::LiquidityNewYieldToProcess;
