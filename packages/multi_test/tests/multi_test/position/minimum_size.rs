@@ -5,8 +5,8 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket,
     PerpsApp,
 };
-use msg::prelude::*;
-use msg::token::TokenInit;
+use perpswap::prelude::*;
+use perpswap::token::TokenInit;
 
 /// Special market setup for these tests, which leverages a non-USD quote to
 /// avoid inconsistent price errors.

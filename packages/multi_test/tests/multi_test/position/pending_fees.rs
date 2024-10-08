@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::{contracts::market::entry::PositionsQueryFeeApproach, prelude::*};
+use perpswap::{contracts::market::entry::PositionsQueryFeeApproach, prelude::*};
 
 #[test]
 fn pending_fees_in_query() {

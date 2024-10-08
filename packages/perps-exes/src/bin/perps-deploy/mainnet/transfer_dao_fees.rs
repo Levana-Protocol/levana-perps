@@ -39,7 +39,7 @@ async fn go(
             .execute(
                 app.get_wallet()?,
                 vec![],
-                msg::contracts::market::entry::ExecuteMsg::TransferDaoFees {},
+                perpswap::contracts::market::entry::ExecuteMsg::TransferDaoFees {},
             )
             .await
         {

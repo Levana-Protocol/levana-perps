@@ -3,12 +3,12 @@ use std::str::FromStr;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasCosmos};
-use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData};
 use perps_exes::{
     config::MainnetFactories,
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, Timestamp},
 };
+use perpswap::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData};
 
 #[derive(clap::Parser)]
 pub(super) struct CheckPriceFeedHealthOpts {

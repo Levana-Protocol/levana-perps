@@ -2,7 +2,7 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated, time::TimeJump,
     PerpsApp,
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 #[test]
 fn lagging_crank_liquidations() {

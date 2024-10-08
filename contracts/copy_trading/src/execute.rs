@@ -11,12 +11,13 @@ use crate::{
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
-use msg::contracts::{
+
+use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
 };
-use shared::time::Timestamp;
+use perpswap::time::Timestamp;
 
 #[must_use]
 enum Funds {
@@ -44,7 +45,7 @@ impl Funds {
         }
     }
 
-    fn require_some(self, market_token: &msg::token::Token) -> Result<NonZero<Collateral>> {
+    fn require_some(self, market_token: &perpswap::token::Token) -> Result<NonZero<Collateral>> {
         match self {
             Funds::NoFunds => Err(anyhow!(
                 "Message requires attached funds, but none were provided"

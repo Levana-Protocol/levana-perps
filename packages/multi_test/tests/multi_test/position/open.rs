@@ -1,6 +1,6 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::contracts::market::{entry::SlippageAssert, liquidity::LiquidityStats};
-use msg::prelude::*;
+use perpswap::contracts::market::{entry::SlippageAssert, liquidity::LiquidityStats};
+use perpswap::prelude::*;
 
 fn test_position_open_inner(
     market: PerpsMarket,

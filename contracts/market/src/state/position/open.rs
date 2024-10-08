@@ -3,14 +3,14 @@ use crate::state::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 use crate::state::history::trade::trade_volume_usd;
 use crate::state::liquidity::LiquidityLock;
 use crate::state::position::take_profit::TakeProfitToCounterCollateral;
-use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
-use msg::contracts::market::entry::{PositionActionKind, SlippageAssert};
-use msg::contracts::market::fees::events::FeeSource;
-use msg::contracts::market::position::events::{
+use perpswap::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
+use perpswap::contracts::market::entry::{PositionActionKind, SlippageAssert};
+use perpswap::contracts::market::fees::events::FeeSource;
+use perpswap::contracts::market::position::events::{
     calculate_position_collaterals, PositionAttributes, PositionOpenEvent, PositionSaveReason,
     PositionTradingFee,
 };
-use msg::contracts::market::position::{
+use perpswap::contracts::market::position::{
     CollateralAndUsd, LiquidationMargin, SignedCollateralAndUsd,
 };
 

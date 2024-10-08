@@ -5,7 +5,8 @@ use cosmos::{
 
 use backon::{ConstantBuilder, Retryable};
 use cosmwasm_std::to_json_binary;
-use msg::{
+use perpswap::namespace::{CLOSE_ALL_POSITIONS, LAST_POSITION_ID};
+use perpswap::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{
@@ -22,7 +23,6 @@ use msg::{
     },
     prelude::*,
 };
-use shared::namespace::{CLOSE_ALL_POSITIONS, LAST_POSITION_ID};
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 
@@ -110,17 +110,17 @@ impl MarketContract {
             .into_u128(funds.into_decimal256())?
             .context("exec_with_funds: no funds")?;
         let cw20 = match &status.collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places: _,
             } => addr.as_str().parse()?,
-            msg::token::Token::Native { .. } => anyhow::bail!("No support for native"),
+            perpswap::token::Token::Native { .. } => anyhow::bail!("No support for native"),
         };
         let cw20 = self.0.get_cosmos().make_contract(cw20);
         cw20.execute(
             wallet,
             vec![],
-            msg::contracts::cw20::entry::ExecuteMsg::Send {
+            perpswap::contracts::cw20::entry::ExecuteMsg::Send {
                 contract: self.0.get_address_string().into(),
                 amount: funds.into(),
                 msg: to_json_binary(msg)?,
@@ -169,15 +169,15 @@ impl MarketContract {
         addr: impl HasAddress,
     ) -> Result<Collateral> {
         let cw20 = match &status.collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places: _,
             } => addr.as_str().parse()?,
-            msg::token::Token::Native { .. } => anyhow::bail!("No support for native"),
+            perpswap::token::Token::Native { .. } => anyhow::bail!("No support for native"),
         };
         let cw20 = self.0.get_cosmos().make_contract(cw20);
         let BalanceResponse { balance } = cw20
-            .query(msg::contracts::cw20::entry::QueryMsg::Balance {
+            .query(perpswap::contracts::cw20::entry::QueryMsg::Balance {
                 address: addr.get_address_string().into(),
             })
             .await?;
@@ -223,7 +223,7 @@ impl MarketContract {
         let TokensResponse { tokens } = self
             .0
             .query(MarketQueryMsg::NftProxy {
-                nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
+                nft_msg: perpswap::contracts::position_token::entry::QueryMsg::Tokens {
                     owner: owner.get_address_string().into(),
                     start_after: None,
                     limit,

@@ -7,7 +7,7 @@ use crate::{
     prelude::*,
     state::{funding::PositionFeeSettlement, liquidity::LiquidityUpdateLocked},
 };
-use msg::contracts::market::position::{
+use perpswap::contracts::market::position::{
     events::PositionSaveReason, ClosePositionInstructions, LiquidationReason, MaybeClosedPosition,
     PositionCloseReason,
 };

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{contracts::market::entry::ReferralStatsResp, prelude::*};
+use perpswap::{contracts::market::entry::ReferralStatsResp, prelude::*};
 
 #[test]
 fn no_initial_referrer() {

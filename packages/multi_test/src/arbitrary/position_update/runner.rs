@@ -1,6 +1,6 @@
 use crate::market_wrapper::{DeferResponse, PerpsMarket};
-use msg::contracts::market::position::PositionId;
-use msg::prelude::*;
+use perpswap::contracts::market::position::PositionId;
+use perpswap::prelude::*;
 
 use super::data::{
     PositionUpdateAddCollateralImpactLeverage, PositionUpdateAddCollateralImpactSize,

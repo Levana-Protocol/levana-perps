@@ -1,4 +1,4 @@
-use msg::contracts::{
+use perpswap::contracts::{
     factory::entry::{make_referee_count_key, make_referrer_key},
     market::{entry::ReferralStatsResp, position::CollateralAndUsd},
 };

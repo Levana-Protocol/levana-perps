@@ -3,11 +3,11 @@ use std::collections::hash_map::Entry;
 use crate::state::*;
 
 use cw_storage_plus::Item;
-use msg::{
+use perpswap::prelude::*;
+use perpswap::{
     contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse},
     token::{Token, TokenInit},
 };
-use shared::prelude::*;
 
 pub(super) const TOKEN: Item<Token> = Item::new(namespace::TOKEN);
 

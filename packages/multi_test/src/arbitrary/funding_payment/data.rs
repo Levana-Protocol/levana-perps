@@ -1,4 +1,4 @@
-use msg::prelude::*;
+use perpswap::prelude::*;
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
 use crate::{market_wrapper::PerpsMarket, time::TimeJump};

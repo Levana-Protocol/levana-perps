@@ -20,8 +20,8 @@ use axum::async_trait;
 
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::{MarketContract, MarketId};
+use perpswap::prelude::MarketExecuteMsg;
 
 use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;

@@ -4,8 +4,8 @@
 //! batching and more direct control of the faucet amounts based on asset type.
 
 use cosmwasm_std::Coin;
-use msg::contracts::faucet::entry::{FaucetAsset, GasAllowance, MultitapRecipient};
-use msg::prelude::*;
+use perpswap::contracts::faucet::entry::{FaucetAsset, GasAllowance, MultitapRecipient};
+use perpswap::prelude::*;
 
 use super::gas_coin::get_gas_allowance;
 use super::{State, StateContext};

@@ -2,13 +2,13 @@ use cosmwasm_std::{Addr, Binary};
 use levana_perpswap_multi_test::{
     config::TEST_CONFIG, market_wrapper::PerpsMarket, time::TimeJump, PerpsApp,
 };
-use msg::{
+use perpswap::{
     contracts::{
         factory::entry::{CopyTradingInfoRaw, CopyTradingResp},
         market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
     },
     prelude::FactoryExecuteMsg,
-    shared::{namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
+    {namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
 };
 
 #[test]
@@ -30,11 +30,11 @@ fn test_factory_add_market() {
                 market_id: MarketId::new(
                     "BTC",
                     "USD",
-                    msg::shared::storage::MarketType::CollateralIsQuote,
+                    perpswap::storage::MarketType::CollateralIsQuote,
                 ),
                 token: market.token.clone().into(),
                 config: None,
-                spot_price: msg::contracts::market::spot_price::SpotPriceConfigInit::Manual {
+                spot_price: perpswap::contracts::market::spot_price::SpotPriceConfigInit::Manual {
                     admin: Addr::unchecked(TEST_CONFIG.protocol_owner.clone()).into(),
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
@@ -109,7 +109,7 @@ fn test_copy_trading_pagination() {
     assert!(old_resp.addresses.len() == 15);
     let start_after = old_resp.addresses.last().cloned();
     let resp: CopyTradingResp = market
-        .query_factory(&msg::prelude::FactoryQueryMsg::CopyTrading {
+        .query_factory(&perpswap::prelude::FactoryQueryMsg::CopyTrading {
             start_after: start_after.clone().map(|ct| CopyTradingInfoRaw {
                 leader: ct.leader.0.into(),
                 contract: ct.contract.0.into(),
@@ -157,7 +157,7 @@ fn test_copy_trading_leader_pagination() {
         .any(|item| item.leader.0 != trader.clone()));
     let start_after = old_resp.addresses.last().cloned();
     let resp: CopyTradingResp = market
-        .query_factory(&msg::prelude::FactoryQueryMsg::CopyTradingForLeader {
+        .query_factory(&perpswap::prelude::FactoryQueryMsg::CopyTradingForLeader {
             leader: trader.clone().into(),
             start_after: start_after.clone().map(|ct| ct.contract.0.into()),
             limit: None,

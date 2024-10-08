@@ -4,12 +4,12 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Event};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{
+use perpswap::{
     contracts::copy_trading::{
         DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem,
         QueueItemStatus, QueuePositionId, WorkDescription, WorkResp,
     },
-    shared::number::{Collateral, NonZero},
+    number::{Collateral, NonZero},
 };
 
 #[test]
@@ -102,9 +102,8 @@ fn detect_process_queue_item_work() {
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
-                token
-            }
+            work_description:
+                perpswap::contracts::copy_trading::WorkDescription::ComputeLpTokenValue { token }
         }
     );
     let resp = market.exec_copytrading_do_work(&trader).unwrap();
@@ -116,9 +115,10 @@ fn detect_process_queue_item_work() {
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(0))
-            }
+            work_description:
+                perpswap::contracts::copy_trading::WorkDescription::ProcessQueueItem {
+                    id: QueuePositionId::IncQueuePositionId(IncQueuePositionId::new(0))
+                }
         }
     );
 }
@@ -138,9 +138,8 @@ pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) {
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
-                token
-            }
+            work_description:
+                perpswap::contracts::copy_trading::WorkDescription::ComputeLpTokenValue { token }
         }
     );
 
@@ -244,9 +243,8 @@ fn does_not_compute_lp_token_work() {
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
-                token
-            }
+            work_description:
+                perpswap::contracts::copy_trading::WorkDescription::ComputeLpTokenValue { token }
         }
     );
     // Process queue item: Compute lp token value
@@ -282,9 +280,10 @@ fn do_withdraw() {
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::DecQueuePositionId(DecQueuePositionId::new(0))
-            }
+            work_description:
+                perpswap::contracts::copy_trading::WorkDescription::ProcessQueueItem {
+                    id: QueuePositionId::DecQueuePositionId(DecQueuePositionId::new(0))
+                }
         }
     );
     // Process queue item: do the actual withdrawal

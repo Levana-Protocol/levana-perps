@@ -1,4 +1,4 @@
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     deferred_execution::DeferredExecId,
     entry::ClosedPositionCursor,
     position::{PositionId, PositionQueryResponse},
@@ -40,5 +40,5 @@ pub(crate) struct State<'a> {
 pub(crate) struct MarketInfo {
     pub(crate) id: MarketId,
     pub(crate) addr: Addr,
-    pub(crate) token: msg::token::Token,
+    pub(crate) token: perpswap::token::Token,
 }

@@ -1,11 +1,11 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
-use msg::{
+use perpswap::{
     contracts::{
         copy_trading::{DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp},
         market::position::PositionId,
     },
-    shared::storage::DirectionToBase,
+    storage::DirectionToBase,
 };
 
 use crate::copy_trading::{deposit_money, load_markets, withdraw_money};

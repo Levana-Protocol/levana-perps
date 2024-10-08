@@ -2,7 +2,7 @@ use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
-use msg::{contracts::market::entry::StopLoss, prelude::*};
+use perpswap::{contracts::market::entry::StopLoss, prelude::*};
 
 #[test]
 fn test_infinite_max_gains_fail() {

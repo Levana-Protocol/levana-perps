@@ -4,15 +4,15 @@ use crate::state::State;
 use anyhow::Result;
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgResult};
 use cw_storage_plus::{Item, Map};
-use msg::contracts::market::deferred_execution::{
+use perpswap::contracts::market::deferred_execution::{
     DeferredExecCompleteTarget, DeferredExecExecutedEvent, DeferredExecId, DeferredExecItem,
     DeferredExecQueuedEvent, DeferredExecStatus, DeferredExecTarget, DeferredExecWithStatus,
     GetDeferredExecResp, ListDeferredExecsResp,
 };
-use msg::contracts::market::fees::events::TradeId;
-use msg::contracts::market::order::OrderId;
-use msg::contracts::market::position::PositionId;
-use msg::prelude::*;
+use perpswap::contracts::market::fees::events::TradeId;
+use perpswap::contracts::market::order::OrderId;
+use perpswap::contracts::market::position::PositionId;
+use perpswap::prelude::*;
 
 use super::StateContext;
 
@@ -329,7 +329,8 @@ impl State<'_> {
             &DeferredExecWithStatus {
                 id: new_id,
                 created: self.now(),
-                status: msg::contracts::market::deferred_execution::DeferredExecStatus::Pending,
+                status:
+                    perpswap::contracts::market::deferred_execution::DeferredExecStatus::Pending,
                 item,
                 owner: trader.clone(),
             },

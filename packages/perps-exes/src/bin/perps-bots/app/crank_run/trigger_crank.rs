@@ -24,7 +24,7 @@ use anyhow::{bail, Result};
 use async_channel::TrySendError;
 use cosmos::Address;
 use parking_lot::Mutex;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::app::CrankTriggerReason;
 

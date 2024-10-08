@@ -1,6 +1,6 @@
 use crate::market_wrapper::{DeferResponse, PerpsMarket};
 use anyhow::Result;
-use msg::contracts::market::position::PositionId;
+use perpswap::contracts::market::position::PositionId;
 
 use super::data::PositionOpen;
 

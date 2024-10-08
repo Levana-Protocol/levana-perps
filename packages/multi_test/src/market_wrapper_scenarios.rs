@@ -1,7 +1,7 @@
 use crate::{config::DEFAULT_MARKET, market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::position::PositionQueryResponse;
-use msg::prelude::*;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::position::PositionQueryResponse;
+use perpswap::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 

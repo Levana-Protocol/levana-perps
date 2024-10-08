@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::contracts::market::position::PositionId;
-use msg::prelude::*;
+use perpswap::contracts::market::position::PositionId;
+use perpswap::prelude::*;
 use rand::prelude::*;
 
 #[test]

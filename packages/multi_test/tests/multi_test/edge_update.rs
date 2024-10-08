@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{contracts::market::position::PositionId, prelude::*};
+use perpswap::{contracts::market::position::PositionId, prelude::*};
 
 #[derive(Debug)]
 struct OpenParam {

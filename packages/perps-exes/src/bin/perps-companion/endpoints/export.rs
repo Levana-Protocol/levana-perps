@@ -9,19 +9,19 @@ use cosmos::{Address, Contract, Cosmos};
 use cosmwasm_std::Addr;
 use csv::WriterBuilder;
 use itertools::{EitherOrBoth, Itertools};
-use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
-use msg::contracts::market::entry::{
+use perps_exes::prelude::{Collateral, UnsignedDecimal};
+use perpswap::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use perpswap::contracts::market::entry::{
     LpAction, LpActionHistoryResp, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     TraderActionHistoryResp,
 };
-use msg::contracts::market::position::{PositionId, PositionsResp};
-use msg::prelude::{
+use perpswap::contracts::market::position::{PositionId, PositionsResp};
+use perpswap::prelude::{
     DirectionToBase, FactoryQueryMsg, MarketQueryMsg, OrderInMessage, RawAddr, Signed,
 };
-use perps_exes::prelude::{Collateral, UnsignedDecimal};
 
+use perpswap::storage::MarketId;
 use serde::Serialize;
-use shared::storage::MarketId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -572,17 +572,17 @@ impl IntoResponse for Error {
 mod tests {
     use crate::endpoints::export::{generate_csv, get_action_records};
     use cosmwasm_std::Addr;
-    use msg::contracts::market::config::Config;
-    use msg::contracts::market::entry::{
+    use perpswap::contracts::market::config::Config;
+    use perpswap::contracts::market::entry::{
         Fees, LpAction, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     };
-    use msg::contracts::market::position::PositionId;
-    use msg::contracts::market::spot_price::SpotPriceConfig;
-    use msg::token::Token;
-    use shared::market_type::MarketType;
-    use shared::number::{Collateral, Signed};
-    use shared::prelude::{DirectionToBase, Timestamp};
-    use shared::storage::MarketId;
+    use perpswap::contracts::market::position::PositionId;
+    use perpswap::contracts::market::spot_price::SpotPriceConfig;
+    use perpswap::market_type::MarketType;
+    use perpswap::number::{Collateral, Signed};
+    use perpswap::prelude::{DirectionToBase, Timestamp};
+    use perpswap::storage::MarketId;
+    use perpswap::token::Token;
     use std::collections::HashMap;
     use std::str::FromStr;
 

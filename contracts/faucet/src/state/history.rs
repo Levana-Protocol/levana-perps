@@ -1,4 +1,4 @@
-use msg::{contracts::faucet::entry::FaucetAsset, prelude::*};
+use perpswap::{contracts::faucet::entry::FaucetAsset, prelude::*};
 
 use super::{State, StateContext};
 

@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
-use msg::{
+use perps_exes::contracts::Factory;
+use perpswap::storage::MarketId;
+use perpswap::{
     prelude::FactoryExecuteMsg,
     shutdown::{ShutdownEffect, ShutdownImpact},
 };
-use perps_exes::contracts::Factory;
-use shared::storage::MarketId;
 
 use crate::{cli::Opt, util::add_cosmos_msg};
 

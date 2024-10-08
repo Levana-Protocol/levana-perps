@@ -22,8 +22,7 @@ sanity = []
 
 
 [dependencies]
-msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
-shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
+perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
 cosmwasm-std = { workspace = true, features = ["abort"] }
 cw2 = "2.0.0"
 cw-storage-plus = "2.0.0"
@@ -37,5 +36,4 @@ pyth-sdk-cw = { workspace = true}
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
-shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared", features = ["debug_log"] }
 proptest = "1.0.0"

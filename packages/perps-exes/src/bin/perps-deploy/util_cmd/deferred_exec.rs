@@ -7,14 +7,14 @@ use std::{
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos, HasCosmos};
-use msg::contracts::market::deferred_execution::{
-    DeferredExecId, DeferredExecStatus, GetDeferredExecResp,
-};
 use parking_lot::Mutex;
 use perps_exes::{
     config::MainnetFactories,
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, MarketId},
+};
+use perpswap::contracts::market::deferred_execution::{
+    DeferredExecId, DeferredExecStatus, GetDeferredExecResp,
 };
 use tokio::task::JoinSet;
 

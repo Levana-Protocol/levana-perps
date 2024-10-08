@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::prelude::DirectionToBase;
+use perpswap::prelude::DirectionToBase;
 
 #[test]
 fn event_collision() {

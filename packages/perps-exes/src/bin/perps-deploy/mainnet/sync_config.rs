@@ -1,14 +1,6 @@
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-        spot_price::{SpotPriceConfig, SpotPriceFeedData},
-    },
-    prelude::MarketExecuteMsg,
-};
 use perps_exes::{
     config::{
         ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories,
@@ -16,6 +8,14 @@ use perps_exes::{
     },
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
+};
+use perpswap::{
+    contracts::market::{
+        config::{Config, ConfigUpdate},
+        entry::ExecuteOwnerMsg,
+        spot_price::{SpotPriceConfig, SpotPriceFeedData},
+    },
+    prelude::MarketExecuteMsg,
 };
 
 use crate::{
@@ -74,7 +74,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .get(&network)
             .with_context(|| format!("No crank fee config found for network {network}"))?;
         let default_config = Config::new(
-            msg::contracts::market::spot_price::SpotPriceConfig::Manual {
+            perpswap::contracts::market::spot_price::SpotPriceConfig::Manual {
                 admin: Addr::unchecked("ignored"),
             },
         );

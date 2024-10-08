@@ -2,7 +2,7 @@ use crate::state::*;
 use cosmwasm_std::Order;
 use crank::position::liquifund::PositionLiquifund;
 use cw_storage_plus::{Bound, PrefixBound};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     crank::{
         events::{CrankExecBatchEvent, CrankWorkInfoEvent},
         CrankWorkInfo,
@@ -15,7 +15,7 @@ use msg::contracts::market::{
 };
 use serde::{Deserialize, Serialize};
 
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use self::position::close::ClosePositionExec;
 

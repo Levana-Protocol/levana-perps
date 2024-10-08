@@ -2,7 +2,7 @@
 mod faucet;
 pub(crate) use faucet::*;
 pub(crate) mod owner;
-use msg::prelude::*;
+use perpswap::prelude::*;
 mod trading_competition;
 pub(crate) use trading_competition::*;
 pub(crate) mod tokens;

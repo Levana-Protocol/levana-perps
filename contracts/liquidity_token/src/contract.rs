@@ -8,8 +8,10 @@ use super::state::{set_factory_addr, State, StateContext};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::liquidity_token::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use msg::prelude::*;
+use perpswap::contracts::liquidity_token::entry::{
+    ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+};
+use perpswap::prelude::*;
 use semver::Version;
 
 // version info for migration info

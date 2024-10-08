@@ -1,8 +1,8 @@
 use levana_perpswap_multi_test::config::TEST_CONFIG;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::entry::Fees;
-use msg::prelude::*;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::entry::Fees;
+use perpswap::prelude::*;
 
 fn test_fees_inner(market: PerpsMarket, direction: DirectionToBase, expected_fees: Collateral) {
     let trader = market.clone_trader(0).unwrap();

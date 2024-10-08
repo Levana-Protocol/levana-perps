@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmwasm_std::{Addr, Uint128};
 use cw_multi_test::{AppResponse, Executor};
-use msg::contracts::cw20::entry::ExecuteMsg as Cw20ExecuteMsg;
+use perpswap::contracts::cw20::entry::ExecuteMsg as Cw20ExecuteMsg;
 
 use super::PerpsApp;
 

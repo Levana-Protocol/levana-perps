@@ -9,7 +9,7 @@ use anyhow::{Context, Result};
 use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Cosmos, HasAddress, TxBuilder, Wallet,
 };
-use msg::{
+use perpswap::{
     contracts::{cw20::Cw20Coin, market::entry::StatusResp},
     prelude::{Collateral, UnsignedDecimal},
 };
@@ -154,8 +154,8 @@ async fn process_requests(
         tx_builder.add_message(MsgExecuteContract {
             sender: minter.get_address_string(),
             contract: req.faucet.get_address_string(),
-            msg: serde_json::to_vec(&msg::contracts::faucet::entry::ExecuteMsg::OwnerMsg(
-                msg::contracts::faucet::entry::OwnerMsg::Mint {
+            msg: serde_json::to_vec(&perpswap::contracts::faucet::entry::ExecuteMsg::OwnerMsg(
+                perpswap::contracts::faucet::entry::OwnerMsg::Mint {
                     cw20: req.cw20.get_address_string(),
                     balances: vec![Cw20Coin {
                         address: req.addr.get_address_string(),

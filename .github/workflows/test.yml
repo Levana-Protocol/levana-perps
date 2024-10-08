@@ -32,8 +32,7 @@ jobs:
           filters: |
             contracts:
               - 'contracts/**'
-              - 'packages/msg/**'
-              - 'packages/shared/**'
+              - 'packages/perpswap/**'
               - 'packages/multi_test/**'
               - 'packages/fuzz/**'
               - '.ci/**'

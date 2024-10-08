@@ -2,7 +2,7 @@ use super::{State, StateContext};
 use crate::prelude::*;
 use cosmwasm_std::{Decimal256, Storage};
 use cw_storage_plus::Item;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::Config,
     delta_neutrality_fee::{DeltaNeutralityFeeEvent, DeltaNeutralityFeeReason},
     fees::events::{FeeType, InsufficientMarginEvent},

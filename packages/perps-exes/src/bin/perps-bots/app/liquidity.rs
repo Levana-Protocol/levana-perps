@@ -140,11 +140,11 @@ async fn single_market(
                 ));
             }
             let cw20 = match &status.collateral {
-                msg::token::Token::Cw20 {
+                perpswap::token::Token::Cw20 {
                     addr,
                     decimal_places: _,
                 } => addr.as_str().parse()?,
-                msg::token::Token::Native { .. } => {
+                perpswap::token::Token::Native { .. } => {
                     // Not treating this as an error, we simply won't provide liquidity
                     return Ok(WatchedTaskOutput::new(
                         "No support for native coins".to_owned(),

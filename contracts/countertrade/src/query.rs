@@ -1,4 +1,4 @@
-use shared::storage::RawAddr;
+use perpswap::storage::RawAddr;
 
 use crate::prelude::*;
 

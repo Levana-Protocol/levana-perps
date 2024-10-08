@@ -12,7 +12,7 @@ pub(crate) mod reply;
 pub(crate) mod shutdown;
 
 use cosmwasm_std::{Addr, Api, Deps, DepsMut, Env, Storage};
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,

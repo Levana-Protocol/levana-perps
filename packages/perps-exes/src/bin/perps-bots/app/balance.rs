@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
-use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
+use perpswap::prelude::*;
 use rand::Rng;
 
 use crate::{

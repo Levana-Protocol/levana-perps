@@ -1,7 +1,7 @@
 use crate::state::*;
 use anyhow::ensure;
 use cw_storage_plus::Item;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::{Config, ConfigUpdate},
     spot_price::{
         PythConfig, SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeed, SpotPriceFeedData,

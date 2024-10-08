@@ -2,18 +2,18 @@ use crate::state::{State, StateContext};
 use anyhow::{Context, Result};
 use cosmwasm_std::{Addr, Order, Storage};
 use cw_storage_plus::{Bound, Item, Map, PrefixBound};
-use msg::contracts::market::entry::{
+use perpswap::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::market::entry::{
     ExecutedLimitOrder, LimitOrderHistoryResp, LimitOrderResp, LimitOrderResult, LimitOrdersResp,
 };
-use msg::contracts::market::fees::events::TradeId;
-use msg::contracts::market::order::events::{
+use perpswap::contracts::market::fees::events::TradeId;
+use perpswap::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
-use msg::contracts::market::order::{LimitOrder, OrderId};
-use msg::contracts::market::position::events::PositionSaveReason;
-use msg::contracts::market::position::CollateralAndUsd;
-use msg::prelude::*;
-use shared::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::market::order::{LimitOrder, OrderId};
+use perpswap::contracts::market::position::events::PositionSaveReason;
+use perpswap::contracts::market::position::CollateralAndUsd;
+use perpswap::prelude::*;
 
 use super::fees::CapCrankFee;
 use super::position::{OpenPositionExec, OpenPositionParams};

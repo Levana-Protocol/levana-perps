@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use msg::contracts::market::entry::SlippageAssert;
+use perpswap::contracts::market::entry::SlippageAssert;
 
 impl State<'_> {
     pub(crate) fn position_validate_trader_leverage(

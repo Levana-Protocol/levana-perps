@@ -1,6 +1,6 @@
 use anyhow::Result;
-use msg::prelude::*;
 use perps_exes::{contracts::Factory, prelude::MarketContract};
+use perpswap::prelude::*;
 
 use crate::cli::Opt;
 
@@ -26,10 +26,10 @@ impl DepositOpt {
             .get_contract_by_family("factory", &self.family, None)
             .await?;
         let factory = match factory {
-            msg::contracts::tracker::entry::ContractResp::NotFound {} => {
+            perpswap::contracts::tracker::entry::ContractResp::NotFound {} => {
                 anyhow::bail!("No factory found")
             }
-            msg::contracts::tracker::entry::ContractResp::Found { address, .. } => {
+            perpswap::contracts::tracker::entry::ContractResp::Found { address, .. } => {
                 tracing::info!("Found factory address {address}");
                 Factory::from_contract(app.basic.cosmos.make_contract(address.parse()?))
             }

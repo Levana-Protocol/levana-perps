@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
+perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
 cosmwasm-std = { workspace = true, features = ["abort"] }
 cw-storage-plus = "2.0.0"
 cw2 = "2.0.0"
