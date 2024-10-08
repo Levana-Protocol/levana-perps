@@ -652,7 +652,8 @@ pub enum WorkDescription {
     },
     /// Handle deferred exec id
     HandleDeferredExecId {},
-    /// Rebalance
+    /// Rebalance is done when contract balance is not same as the one
+    /// internally tracked by it.
     Rebalance {
         /// Token
         token: Token,
