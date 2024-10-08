@@ -4,8 +4,8 @@ use shared::time::Timestamp;
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LpTokenValue, MarketInfo, MarketLoaderStatus,
-        MarketWorkInfo, Totals, WalletInfo,
+        DecQueuePosition, HighWaterMark, IncQueuePosition, LpTokenValue, MarketInfo,
+        MarketLoaderStatus, MarketWorkInfo, Totals, WalletInfo,
     },
 };
 
@@ -81,3 +81,6 @@ pub(crate) const LAST_CLOSED_POSITION_CURSOR: Map<&MarketId, ClosedPositionCurso
 
 /// Leader comissision
 pub(crate) const LEADER_COMMISSION: Map<&Token, Collateral> = Map::new("leader-commission");
+
+/// High water mark
+pub(crate) const HIGH_WATER_MARK: Map<&Token, HighWaterMark> = Map::new("high-water-market");

@@ -5,8 +5,9 @@ use crate::{
     },
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, LeaderComissision, LpTokenValue, MarketInfo,
-        MarketWorkInfo, OneLpTokenValue, ProcessingStatus, State, WalletInfo,
+        Commission, DecQueuePosition, HighWaterMark, IncQueuePosition, LeaderComissision,
+        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, State,
+        WalletInfo,
     },
     work::{get_work, process_queue_item},
 };
@@ -371,6 +372,9 @@ fn rebalance(
             break;
         }
         let mut cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
+        let mut hwm = crate::state::HIGH_WATER_MARK
+            .may_load(storage, &token)?
+            .unwrap_or_default();
         loop {
             // todo: Batch this operations
             let closed_positions = state.query_closed_position(&market.addr, cursor.clone())?;
@@ -392,7 +396,8 @@ fn rebalance(
             }
             cursor = last_closed_position;
             for position in closed_positions.positions {
-                let commission = handle_leader_commission(storage, state, &token, position)?;
+                let commission =
+                    handle_leader_commission(storage, state, &token, position, &mut hwm)?;
                 check_balance = check_balance.checked_add(commission.active_collateral)?;
                 totals.collateral = totals
                     .collateral
@@ -406,6 +411,7 @@ fn rebalance(
                 break;
             }
         }
+        crate::state::HIGH_WATER_MARK.save(storage, &token, &hwm)?;
     }
     let mut event = Event::new("rebalanced").add_attribute("made-profit", rebalanced.to_string());
     if check_balance < rebalance_amount {
@@ -427,6 +433,7 @@ fn handle_leader_commission(
     state: &State,
     token: &Token,
     closed_position: ClosedPosition,
+    hwm: &mut HighWaterMark,
 ) -> Result<LeaderComissision> {
     let made_profit = closed_position.pnl_collateral.is_strictly_positive();
     if made_profit {
@@ -434,16 +441,18 @@ fn handle_leader_commission(
             .pnl_collateral
             .try_into_non_negative_value()
             .context("Impossible: profit is negative")?;
-        let commission = pnl.checked_mul_dec(state.config.commission_rate)?;
-        let remaining_profit = pnl.checked_sub(commission)?;
+        let commission = hwm.add_profit(pnl, &state.config.commission_rate)?;
+        let remaining_profit = pnl.checked_sub(commission.0)?;
         {
             let leader_comisssion = crate::state::LEADER_COMMISSION
                 .may_load(storage, token)?
                 .unwrap_or_default();
-            let leader_commission = leader_comisssion.checked_add(commission)?;
+            let leader_commission = leader_comisssion.checked_add(commission.0)?;
             crate::state::LEADER_COMMISSION.save(storage, token, &leader_commission)?;
         }
-        let remaining_collateral = closed_position.active_collateral.checked_sub(commission)?;
+        let remaining_collateral = closed_position
+            .active_collateral
+            .checked_sub(commission.0)?;
         Ok(LeaderComissision {
             active_collateral: closed_position.active_collateral,
             profit: pnl,
@@ -452,10 +461,11 @@ fn handle_leader_commission(
             remaining_collateral,
         })
     } else {
+        hwm.add_loss(closed_position.pnl_collateral);
         Ok(LeaderComissision {
             active_collateral: closed_position.active_collateral,
             profit: Collateral::zero(),
-            commission: Collateral::zero(),
+            commission: Commission::zero(),
             remaining_profit: Collateral::zero(),
             remaining_collateral: closed_position.active_collateral,
         })
