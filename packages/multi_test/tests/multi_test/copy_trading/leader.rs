@@ -5,6 +5,7 @@ use perpswap::{
         copy_trading::{DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp},
         market::position::PositionId,
     },
+    number::{Collateral, UnsignedDecimal},
     storage::DirectionToBase,
 };
 
