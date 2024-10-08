@@ -389,8 +389,8 @@ pub struct LeaderComissision {
 pub struct HighWaterMark {
     /// Current net profit
     pub current: Signed<Collateral>,
-    /// Cumulative profit so far. This is the High water mark (HWM)
-    pub cumulative_profit: Collateral,
+    /// High water mark (HWM)
+    pub hwm: Collateral,
 }
 
 /// Comissision that should be paid to the leader
@@ -404,46 +404,22 @@ impl Commission {
 }
 
 impl HighWaterMark {
-    fn in_loss(&self) -> bool {
-        match self.current.try_into_non_negative_value() {
-            Some(current) => self.cumulative_profit > current,
-            None => true,
+    pub fn add_pnl(&mut self, pnl: Signed<Collateral>, rate: &Decimal256) -> Result<Commission> {
+        self.current = self.current.checked_add(pnl)?;
+        if self.current <= self.hwm.into_signed() {
+            Ok(Commission(Collateral::zero()))
+        } else {
+            let profit = self.current.checked_sub(self.hwm.into_signed())?;
+            self.hwm = self
+                .current
+                .try_into_non_negative_value()
+                .context("Impossible: current is negative")?;
+            let commission = profit
+                .checked_mul_number(rate.into_signed())?
+                .try_into_non_negative_value()
+                .context("Impossible: commission is negative")?;
+            Ok(Commission(commission))
         }
-    }
-
-    pub fn add_profit(&mut self, profit: Collateral, rate: &Decimal256) -> Result<Commission> {
-        let new_current_signed = self.current.checked_add(profit.into_signed())?;
-        let new_current = new_current_signed.try_into_non_negative_value();
-        let commission = match new_current {
-            Some(new_current) => {
-                if self.in_loss() {
-                    self.current = new_current_signed;
-                    if new_current > self.cumulative_profit {
-                        let diff = new_current.checked_sub(self.cumulative_profit)?;
-                        self.cumulative_profit = self.cumulative_profit.checked_add(diff)?;
-                        diff.checked_mul_dec(*rate)?
-                    } else {
-                        Collateral::zero()
-                    }
-                } else {
-                    self.current = new_current_signed;
-                    self.cumulative_profit = self.cumulative_profit.checked_add(profit)?;
-                    profit.checked_mul_dec(*rate)?
-                }
-            }
-            None => {
-                // Our net profit is still negative, so no comission needs to be paid
-                self.current = new_current_signed;
-                Collateral::zero()
-            }
-        };
-        Ok(Commission(commission))
-    }
-
-    pub fn add_loss(&mut self, loss: Signed<Collateral>) -> Result<()> {
-        assert!(loss.is_negative() || loss.is_zero());
-        self.current = self.current.checked_add(loss)?;
-        Ok(())
     }
 }
 
@@ -458,50 +434,47 @@ mod tests {
     fn high_water_mark_test() {
         let rate: Decimal256 = "0.1".parse().unwrap();
         let mut hwm = HighWaterMark::default();
-        let commission = hwm.add_profit("100".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("100".parse().unwrap(), &rate).unwrap();
         assert_eq!(commission.0, "10".parse().unwrap());
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
-        assert_eq!(
-            hwm.cumulative_profit,
-            hwm.current.try_into_non_negative_value().unwrap()
-        );
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
+        assert_eq!(hwm.hwm, hwm.current.try_into_non_negative_value().unwrap());
 
-        hwm.add_loss("-20".parse().unwrap()).unwrap();
+        hwm.add_pnl("-20".parse().unwrap(), &rate).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "80".parse().unwrap()
         );
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
 
-        let commission = hwm.add_profit("20".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("20".parse().unwrap(), &rate).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "100".parse().unwrap()
         );
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
         assert_eq!(commission.0, Collateral::zero());
 
-        let commission = hwm.add_profit("20".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("20".parse().unwrap(), &rate).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "120".parse().unwrap()
         );
-        assert_eq!(hwm.cumulative_profit, "120".parse().unwrap());
+        assert_eq!(hwm.hwm, "120".parse().unwrap());
         assert_eq!(commission.0, "2".parse().unwrap());
 
-        hwm.add_loss("-20".parse().unwrap()).unwrap();
+        hwm.add_pnl("-20".parse().unwrap(), &rate).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "100".parse().unwrap()
         );
-        assert_eq!(hwm.cumulative_profit, "120".parse().unwrap());
+        assert_eq!(hwm.hwm, "120".parse().unwrap());
 
-        let commission = hwm.add_profit("40".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("40".parse().unwrap(), &rate).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "140".parse().unwrap()
         );
-        assert_eq!(hwm.cumulative_profit, "140".parse().unwrap());
+        assert_eq!(hwm.hwm, "140".parse().unwrap());
         assert_eq!(commission.0, "2".parse().unwrap());
     }
 
@@ -510,18 +483,18 @@ mod tests {
         let rate: Decimal256 = "0.1".parse().unwrap();
         let mut hwm = HighWaterMark::default();
 
-        hwm.add_loss("-20".parse().unwrap()).unwrap();
+        hwm.add_pnl("-20".parse().unwrap(), &rate).unwrap();
         assert_eq!(hwm.current, "-20".parse().unwrap());
-        assert_eq!(hwm.cumulative_profit, "0".parse().unwrap());
+        assert_eq!(hwm.hwm, "0".parse().unwrap());
 
-        let commission = hwm.add_profit("20".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("20".parse().unwrap(), &rate).unwrap();
         assert_eq!(hwm.current, "0".parse().unwrap());
-        assert_eq!(hwm.cumulative_profit, "0".parse().unwrap());
+        assert_eq!(hwm.hwm, "0".parse().unwrap());
         assert_eq!(commission.0, Collateral::zero());
 
-        let commission = hwm.add_profit("20".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("20".parse().unwrap(), &rate).unwrap();
         assert_eq!(hwm.current, "20".parse().unwrap());
-        assert_eq!(hwm.cumulative_profit, "20".parse().unwrap());
+        assert_eq!(hwm.hwm, "20".parse().unwrap());
         assert_eq!(commission.0, "2".parse().unwrap());
     }
 
@@ -530,36 +503,36 @@ mod tests {
         let rate: Decimal256 = "0.1".parse().unwrap();
         let mut hwm = HighWaterMark::default();
 
-        let commission = hwm.add_profit("100".parse().unwrap(), &rate).unwrap();
+        let commission = hwm.add_pnl("100".parse().unwrap(), &rate).unwrap();
         assert_eq!(hwm.current, "100".parse().unwrap());
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
         assert_eq!(commission.0, "10".parse().unwrap());
 
-        hwm.add_loss("-200".parse().unwrap()).unwrap();
+        hwm.add_pnl("-200".parse().unwrap(), &rate).unwrap();
         assert_eq!(hwm.current, "-100".parse().unwrap());
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
 
-        let commission = hwm.add_profit("80".parse().unwrap(), &rate).unwrap();
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        let commission = hwm.add_pnl("80".parse().unwrap(), &rate).unwrap();
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
         assert_eq!(commission.0, "0".parse().unwrap());
         assert_eq!(hwm.current, "-20".parse().unwrap());
 
-        let commission = hwm.add_profit("20".parse().unwrap(), &rate).unwrap();
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        let commission = hwm.add_pnl("20".parse().unwrap(), &rate).unwrap();
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
         assert_eq!(commission.0, "0".parse().unwrap());
         assert_eq!(hwm.current, "0".parse().unwrap());
 
-        hwm.add_loss("-20".parse().unwrap()).unwrap();
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        hwm.add_pnl("-20".parse().unwrap(), &rate).unwrap();
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
         assert_eq!(hwm.current, "-20".parse().unwrap());
 
-        let commission = hwm.add_profit("40".parse().unwrap(), &rate).unwrap();
-        assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
+        let commission = hwm.add_pnl("40".parse().unwrap(), &rate).unwrap();
+        assert_eq!(hwm.hwm, "100".parse().unwrap());
         assert_eq!(commission.0, "0".parse().unwrap());
         assert_eq!(hwm.current, "20".parse().unwrap());
 
-        let commission = hwm.add_profit("120".parse().unwrap(), &rate).unwrap();
-        assert_eq!(hwm.cumulative_profit, "140".parse().unwrap());
+        let commission = hwm.add_pnl("120".parse().unwrap(), &rate).unwrap();
+        assert_eq!(hwm.hwm, "140".parse().unwrap());
         assert_eq!(commission.0, "4".parse().unwrap());
         assert_eq!(hwm.current, "140".parse().unwrap());
     }

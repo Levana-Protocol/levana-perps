@@ -439,21 +439,21 @@ fn handle_leader_commission(
     closed_position: ClosedPosition,
     hwm: &mut HighWaterMark,
 ) -> Result<LeaderComissision> {
-    let made_profit = closed_position.pnl_collateral.is_strictly_positive();
-    if made_profit {
+    let commission = hwm.add_pnl(
+        closed_position.pnl_collateral,
+        &state.config.commission_rate,
+    )?;
+    if commission.0 > Collateral::zero() {
+        let leader_comisssion = crate::state::LEADER_COMMISSION
+            .may_load(storage, token)?
+            .unwrap_or_default();
+        let leader_commission = leader_comisssion.checked_add(commission.0)?;
+        crate::state::LEADER_COMMISSION.save(storage, token, &leader_commission)?;
         let pnl = closed_position
             .pnl_collateral
             .try_into_non_negative_value()
             .context("Impossible: profit is negative")?;
-        let commission = hwm.add_profit(pnl, &state.config.commission_rate)?;
         let remaining_profit = pnl.checked_sub(commission.0)?;
-        {
-            let leader_comisssion = crate::state::LEADER_COMMISSION
-                .may_load(storage, token)?
-                .unwrap_or_default();
-            let leader_commission = leader_comisssion.checked_add(commission.0)?;
-            crate::state::LEADER_COMMISSION.save(storage, token, &leader_commission)?;
-        }
         let remaining_collateral = closed_position
             .active_collateral
             .checked_sub(commission.0)?;
@@ -465,7 +465,6 @@ fn handle_leader_commission(
             remaining_collateral,
         })
     } else {
-        hwm.add_loss(closed_position.pnl_collateral)?;
         Ok(LeaderComissision {
             active_collateral: closed_position.active_collateral,
             profit: Collateral::zero(),
