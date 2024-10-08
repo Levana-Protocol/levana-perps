@@ -122,7 +122,7 @@ typescript-check:
 
 # Typescript schema
 typescript-schema:
-	cd packages/msg && cargo run --example generate-schema
+	cd packages/perpswap && cargo run --example generate-schema
 	cd ts-schema && yarn && yarn build
 
 # Generate the schema and copy to a webapp directory located at ../webapp
