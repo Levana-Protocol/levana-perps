@@ -545,7 +545,7 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         .checked_add(pending_deposits)?
         .checked_add(leader_comission)?;
     let diff = total.diff(contract_balance);
-    let is_approprimate_same = diff < "0.000001".parse().unwrap();
+    let is_approximate_same = diff < "0.000001".parse().unwrap();
     if is_approprimate_same {
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
