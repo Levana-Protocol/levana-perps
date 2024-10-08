@@ -477,6 +477,14 @@ fn smart_search(
     } else {
         (short_notional, long_notional)
     };
+
+    // Takes care of PERP-4149
+    // In case both popular and unpopular sides are 0, we need to close any CT position, or do
+    // nothing
+    if unpopular_notional == Notional::zero() && popular_notional == Notional::zero() {
+        return Ok(Notional::zero());
+    }
+
     // Ratio refers to what percentage of the market is unpopular.
     // The absolute maximum we can ever achieve is 0.5, meaning a
     // perfectly balanced market.
@@ -484,6 +492,7 @@ fn smart_search(
     // The lowest ratio we'll potentially want is the starting ratio.
     // The fact that we're in this function means we know we want to
     // increase the unpopular side positions.
+
     let mut high_ratio = Decimal256::from_ratio(1u8, 2u8);
     let mut low_ratio = unpopular_notional.into_decimal256().checked_div(
         popular_notional

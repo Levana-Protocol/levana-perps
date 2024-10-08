@@ -1522,6 +1522,70 @@ fn smart_search_bug_perp_4098() {
         assert!(ct_trade.position.is_none());
     }
 }
+
+#[test]
+fn denom_bug_perp_4149() {
+    let market = make_countertrade_market().unwrap();
+    market
+        .exec_countertrade_update_config(ConfigUpdate {
+            iterations: Some(150),
+            ..Default::default()
+        })
+        .unwrap();
+
+    // Set minimum_deposit_usd so that countertrade countract tries to
+    // reduce the collateral instead of closing the position.
+    market
+        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("0.1".parse().unwrap()),
+            crank_fee_surcharge: Some("1".parse().unwrap()),
+            crank_fee_charged: Some("0.1".parse().unwrap()),
+
+            ..Default::default()
+        })
+        .unwrap();
+
+    let lp = market.clone_lp(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "2000")
+        .unwrap();
+
+    let market_type = market.query_status().unwrap().market_type;
+    // The test will have to be adapted for a CollateralIsQuote market
+    if market_type == msg::prelude::MarketType::CollateralIsBase {
+        // We need to find ourselves with a CT short position of notional_size of 1706.878302082123208138
+        // Then, we need to close it, and the denom error happens
+        //
+        // 1. Open the long and short positions
+        let long_position = create_position(&market, "798", 7, DirectionToBase::Long);
+        let short_position = create_position(&market, "280", 7, DirectionToBase::Short);
+
+        // 2. Open CT short to rebalance
+        do_work_ct(&market, &lp);
+        assert!(
+            market.query_status().unwrap().short_funding.into_number()
+                < Number::from(Decimal256::from_ratio(60u32, 100u32)).into_number() // Make is 0.41 to give room for values like 0.4099
+        );
+
+        // 3. Close all non CT positions
+        close_position(&market, short_position.0);
+        close_position(&market, long_position.0);
+
+        // 4. Bug should occur here
+        do_work_ct(&market, &lp);
+
+        // We make sure there are no open position in the market
+        let status = market.query_status().unwrap();
+        let target = Number::from(Decimal256::from_ratio(0u32, 1u32)).into_number();
+        assert!(status.short_notional.into_number() == target);
+        assert!(status.long_notional.into_number() == target);
+    }
+}
 fn create_position(
     market: &PerpsMarket,
     collateral: &str,
@@ -1564,10 +1628,10 @@ fn create_position(
 }
 fn close_position(market: &PerpsMarket, position_id: PositionId) {
     let trader = market.clone_trader(0).unwrap();
-    log_status(&format!("=== Closing position {:?}", position_id), market);
     market
         .exec_close_position(&trader, position_id, None)
         .unwrap();
+    log_status(&format!("=== Closing position {:?}", position_id), market);
 }
 fn log_status(header: &str, market: &PerpsMarket) {
     let status = market.query_status().unwrap();
