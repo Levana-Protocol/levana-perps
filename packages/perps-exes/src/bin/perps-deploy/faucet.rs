@@ -11,7 +11,7 @@ use msg::contracts::{
         QueryMsg, TapAmountResponse,
     },
 };
-use shared::storage::UnsignedDecimal;
+use perpswap::storage::UnsignedDecimal;
 
 #[derive(Clone)]
 pub(crate) struct Faucet(Contract);

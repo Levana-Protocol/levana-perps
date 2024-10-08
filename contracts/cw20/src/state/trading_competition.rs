@@ -1,6 +1,6 @@
 use crate::state::*;
 use msg::contracts::cw20::entry::ExecuteMsg;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// The market address, if we're limiting transactions for the trading competition
 ///

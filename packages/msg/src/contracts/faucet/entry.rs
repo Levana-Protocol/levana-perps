@@ -1,6 +1,6 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Uint128};
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use crate::contracts::cw20::Cw20Coin;
 

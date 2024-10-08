@@ -13,7 +13,7 @@ use msg::contracts::market::order::{LimitOrder, OrderId};
 use msg::contracts::market::position::events::PositionSaveReason;
 use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
-use shared::compat::BackwardsCompatTakeProfit;
+use perpswap::compat::BackwardsCompatTakeProfit;
 
 use super::fees::CapCrankFee;
 use super::position::{OpenPositionExec, OpenPositionParams};

@@ -3,7 +3,7 @@ use super::LiquidityTokenKind;
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{Binary, Uint128};
 use cw_utils::Expiration;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// Instantiate message for liquidity token proxy
 #[cw_serde]

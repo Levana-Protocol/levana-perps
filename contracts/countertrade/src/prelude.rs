@@ -9,7 +9,7 @@ pub(crate) use msg::contracts::countertrade::*;
 pub(crate) use msg::contracts::market::entry::{
     ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg,
 };
-pub(crate) use shared::{
+pub(crate) use perpswap::{
     attr_map,
     storage::{Collateral, LpToken, MarketId, NonZero, Notional, Signed, UnsignedDecimal},
 };

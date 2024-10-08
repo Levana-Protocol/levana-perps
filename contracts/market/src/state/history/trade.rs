@@ -7,7 +7,7 @@ use msg::contracts::market::{
     entry::{PositionAction, PositionActionHistoryResp, PositionActionKind, TradeHistorySummary},
     history::events::{PnlEvent, PositionActionEvent, TradeVolumeEvent},
 };
-use shared::storage::push_to_monotonic_multilevel_map;
+use perpswap::storage::push_to_monotonic_multilevel_map;
 use std::ops::Neg;
 
 const TRADE_HISTORY_SUMMARY: Map<&Addr, TradeHistorySummary> =

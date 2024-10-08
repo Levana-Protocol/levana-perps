@@ -7,7 +7,7 @@ use msg::{
     contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse},
     token::{Token, TokenInit},
 };
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 pub(super) const TOKEN: Item<Token> = Item::new(namespace::TOKEN);
 

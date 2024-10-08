@@ -8,7 +8,7 @@ use msg::contracts::market::position::{events::PositionCloseEvent, Position};
 use msg::contracts::market::position::{
     ClosePositionInstructions, ClosedPosition, MaybeClosedPosition, PositionCloseReason,
 };
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use self::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 

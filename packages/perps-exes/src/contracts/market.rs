@@ -22,7 +22,7 @@ use msg::{
     },
     prelude::*,
 };
-use shared::namespace::{CLOSE_ALL_POSITIONS, LAST_POSITION_ID};
+use perpswap::namespace::{CLOSE_ALL_POSITIONS, LAST_POSITION_ID};
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 

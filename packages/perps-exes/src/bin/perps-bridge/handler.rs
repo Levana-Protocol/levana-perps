@@ -5,12 +5,12 @@ use tokio_tungstenite::tungstenite::Message;
 
 use super::context::Context;
 use cw_multi_test::AppResponse;
-use msg::{
+use perpswap::{
     bridge::{
         BridgeToClientMsg, BridgeToClientWrapper, ClientToBridgeMsg, ClientToBridgeWrapper,
         ExecError,
     },
-    shared::prelude::*,
+    prelude::*,
 };
 use multi_test::{market_wrapper::PerpsMarket, time::TimeJump};
 use std::{cell::RefCell, net::SocketAddr, rc::Rc};

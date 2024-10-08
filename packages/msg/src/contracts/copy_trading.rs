@@ -6,7 +6,7 @@ use super::market::entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert};
 use anyhow::{anyhow, bail};
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
-use shared::{
+use perpswap::{
     number::{Collateral, LpToken, NonZero, Usd},
     price::{PriceBaseInQuote, PricePoint, TakeProfitTrader},
     storage::{DirectionToBase, LeverageToBase, MarketId, RawAddr},

@@ -10,7 +10,7 @@ use msg::contracts::market::fees::events::{
     CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, InsufficientMarginEvent, TradeId,
 };
 use msg::contracts::market::position::PositionId;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use self::liquidity::LiquidityNewYieldToProcess;
 

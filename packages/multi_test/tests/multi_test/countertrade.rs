@@ -5,13 +5,13 @@ use levana_perpswap_multi_test::{
     market_wrapper::{DeferResponse, PerpsMarket},
     PerpsApp,
 };
-use msg::{
+use perpswap::{
     contracts::{
         countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
         market::position::PositionId,
     },
+    number::{Collateral, NonZero},
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
-    shared::number::{Collateral, NonZero},
 };
 
 fn make_countertrade_market() -> anyhow::Result<PerpsMarket> {
@@ -960,10 +960,10 @@ fn deduct_balance() {
                 },
         } => {
             let pos_collateral = match market_type {
-                msg::shared::storage::MarketType::CollateralIsQuote => {
+                perpswap::storage::MarketType::CollateralIsQuote => {
                     Collateral::from_str("1.615376150827128342").unwrap()
                 }
-                msg::shared::storage::MarketType::CollateralIsBase => {
+                perpswap::storage::MarketType::CollateralIsBase => {
                     Collateral::from_str("1.468523773479207584").unwrap()
                 }
             };
@@ -984,11 +984,11 @@ fn deduct_balance() {
         .unwrap();
     // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
     match market_type {
-        msg::shared::storage::MarketType::CollateralIsQuote => assert!(balance
+        perpswap::storage::MarketType::CollateralIsQuote => assert!(balance
             .collateral
             .raw()
             .approx_eq(Collateral::from_str("98.384623849").unwrap())),
-        msg::shared::storage::MarketType::CollateralIsBase => assert!(balance
+        perpswap::storage::MarketType::CollateralIsBase => assert!(balance
             .collateral
             .raw()
             .approx_eq(Collateral::from_str("98.531476226").unwrap())),

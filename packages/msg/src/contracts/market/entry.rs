@@ -8,10 +8,10 @@ use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, BlockInfo, Decimal256, Uint128};
+use perpswap::prelude::*;
 use pyth_sdk_cw::PriceIdentifier;
 use schemars::schema::{InstanceType, SchemaObject};
 use schemars::JsonSchema;
-use shared::prelude::*;
 use std::collections::BTreeMap;
 use std::fmt::Formatter;
 
@@ -474,12 +474,12 @@ pub enum QueryMsg {
         price: Option<PriceForQuery>,
     },
 
-    /// * returns [shared::prelude::PricePoint]
+    /// * returns [perpswap::prelude::PricePoint]
     ///
     /// Gets the spot price, if no time is supplied, then it's current
     /// This is the spot price as seen by the contract storage
     /// i.e. the price that was pushed via execution messages
-    #[returns(shared::prelude::PricePoint)]
+    #[returns(perpswap::prelude::PricePoint)]
     SpotPrice {
         /// Timestamp when the price should be effective.
         ///

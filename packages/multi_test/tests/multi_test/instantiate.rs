@@ -5,8 +5,8 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::{
-    shared::storage::{DirectionToBase, MarketId},
+use perpswap::{
+    storage::{DirectionToBase, MarketId},
     token::TokenInit,
 };
 

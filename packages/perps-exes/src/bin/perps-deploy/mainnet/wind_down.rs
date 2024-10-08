@@ -6,7 +6,7 @@ use msg::{
     shutdown::{ShutdownEffect, ShutdownImpact},
 };
 use perps_exes::contracts::Factory;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::{cli::Opt, util::add_cosmos_msg};
 

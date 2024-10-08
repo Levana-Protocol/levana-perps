@@ -25,7 +25,7 @@ use msg::{
 use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use shared::storage::{MarketId, MarketType};
+use perpswap::storage::{MarketId, MarketType};
 
 use crate::{
     app::App,

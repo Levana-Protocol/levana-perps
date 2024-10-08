@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use cw_storage_plus::{Key, KeyDeserialize, PrimaryKey};
 use once_cell::sync::Lazy;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// Which wallet called the shutdown action?
 #[derive(Debug, Clone, Copy)]

@@ -1,7 +1,7 @@
 //! Market-wide configuration
 
 pub mod defaults;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use self::defaults::ConfigDefaults;
 

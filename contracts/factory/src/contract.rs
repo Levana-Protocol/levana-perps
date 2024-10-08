@@ -47,9 +47,9 @@ use msg::contracts::{
     liquidity_token::LiquidityTokenKind,
     market::entry::{ExecuteMsg as MarketExecuteMsg, NewCopyTradingParams, NewMarketParams},
 };
+use perpswap::prelude::*;
 use reply::{InstantiateCopyTrading, INSTANTIATE_COPY_TRADING};
 use semver::Version;
-use shared::prelude::*;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:factory";

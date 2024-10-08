@@ -4,8 +4,8 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::cw20::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use perpswap::{attr_map, prelude::*};
 use semver::Version;
-use shared::{attr_map, prelude::*};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:cw20";

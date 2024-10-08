@@ -1,5 +1,5 @@
 use cosmwasm_schema::QueryResponses;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 #[cw_serde]
 pub struct InstantiateMsg {}

@@ -3,7 +3,7 @@ use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_storage_plus::{Item, Map};
 use msg::contracts::{factory::entry::ContractType, liquidity_token::LiquidityTokenKind};
-use shared::namespace;
+use perpswap::namespace;
 
 use super::all_contracts::ALL_CONTRACTS;
 

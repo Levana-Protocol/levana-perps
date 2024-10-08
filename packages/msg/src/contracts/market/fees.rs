@@ -1,5 +1,5 @@
 //! Events and helper methods for fees.
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use super::config::Config;
 

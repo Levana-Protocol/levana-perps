@@ -11,8 +11,8 @@ use perps_exes::{
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, Signed, Usd},
 };
-use shared::prelude::*;
-use shared::storage::MarketId;
+use perpswap::prelude::*;
+use perpswap::storage::MarketId;
 use tokio::task::JoinSet;
 
 #[derive(clap::Parser)]

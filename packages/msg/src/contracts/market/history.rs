@@ -1,5 +1,5 @@
 //! History data types
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// History events
 pub mod events {

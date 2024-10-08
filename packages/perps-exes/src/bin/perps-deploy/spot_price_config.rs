@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
 use msg::contracts::market::spot_price::{PythConfigInit, SpotPriceConfigInit, StrideConfigInit};
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::app::OracleInfo;
 

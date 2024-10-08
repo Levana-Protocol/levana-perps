@@ -2,13 +2,13 @@ use cosmwasm_std::{Addr, Binary};
 use levana_perpswap_multi_test::{
     config::TEST_CONFIG, market_wrapper::PerpsMarket, time::TimeJump, PerpsApp,
 };
-use msg::{
+use perpswap::{
     contracts::{
         factory::entry::{CopyTradingInfoRaw, CopyTradingResp},
         market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
     },
     prelude::FactoryExecuteMsg,
-    shared::{namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
+    {namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
 };
 
 #[test]
@@ -30,7 +30,7 @@ fn test_factory_add_market() {
                 market_id: MarketId::new(
                     "BTC",
                     "USD",
-                    msg::shared::storage::MarketType::CollateralIsQuote,
+                    perpswap::storage::MarketType::CollateralIsQuote,
                 ),
                 token: market.token.clone().into(),
                 config: None,

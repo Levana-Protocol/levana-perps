@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{prelude::*, shared::compat::BackwardsCompatTakeProfit};
+use perpswap::{compat::BackwardsCompatTakeProfit, prelude::*};
 
 #[derive(Debug)]
 struct OpenParam {

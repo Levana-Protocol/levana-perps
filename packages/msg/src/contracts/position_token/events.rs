@@ -1,7 +1,7 @@
 //! Events emitted by the position token contract
 use cosmwasm_std::{Addr, Event};
 use cw_utils::Expiration;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// New NFT was minted
 #[derive(Debug)]

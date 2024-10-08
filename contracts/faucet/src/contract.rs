@@ -22,8 +22,8 @@ use msg::contracts::{
         NextTradingIndexResponse, OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
     },
 };
+use perpswap::prelude::*;
 use semver::Version;
-use shared::prelude::*;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:faucet";

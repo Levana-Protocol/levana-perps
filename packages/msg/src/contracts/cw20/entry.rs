@@ -3,7 +3,7 @@ use super::Cw20Coin;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Addr, Binary, Uint128};
 use cw_utils::Expiration;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 #[cw_serde]
 pub struct InstantiateMsg {

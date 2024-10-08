@@ -2,8 +2,8 @@
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
+use perpswap::storage::{NumberGtZero, RawAddr};
 use pyth_sdk_cw::PriceIdentifier;
-use shared::storage::{NumberGtZero, RawAddr};
 use std::str::FromStr;
 
 /// Spot price config
@@ -309,7 +309,7 @@ pub struct StrideConfigInit {
 /// Spot price events
 pub mod events {
     use cosmwasm_std::Event;
-    use shared::prelude::*;
+    use perpswap::prelude::*;
 
     /// Event emited when a new spot price is added to the protocol.
     pub struct SpotPriceEvent {

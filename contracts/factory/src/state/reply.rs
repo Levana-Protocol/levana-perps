@@ -1,7 +1,7 @@
 use cw_storage_plus::Item;
 use msg::prelude::*;
+use perpswap::namespace;
 use serde::{Deserialize, Serialize};
-use shared::namespace;
 use std::convert::TryFrom;
 
 const INSTANTIATE_MARKET: Item<InstantiateMarket> = Item::new(namespace::REPLY_INSTANTIATE_MARKET);

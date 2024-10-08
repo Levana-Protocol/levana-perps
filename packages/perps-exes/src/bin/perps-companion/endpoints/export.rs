@@ -21,7 +21,7 @@ use msg::prelude::{
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
 
 use serde::Serialize;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -579,10 +579,10 @@ mod tests {
     use msg::contracts::market::position::PositionId;
     use msg::contracts::market::spot_price::SpotPriceConfig;
     use msg::token::Token;
-    use shared::market_type::MarketType;
-    use shared::number::{Collateral, Signed};
-    use shared::prelude::{DirectionToBase, Timestamp};
-    use shared::storage::MarketId;
+    use perpswap::market_type::MarketType;
+    use perpswap::number::{Collateral, Signed};
+    use perpswap::prelude::{DirectionToBase, Timestamp};
+    use perpswap::storage::MarketId;
     use std::collections::HashMap;
     use std::str::FromStr;
 

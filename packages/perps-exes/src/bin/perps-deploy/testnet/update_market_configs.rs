@@ -3,7 +3,7 @@ use msg::contracts::market::config::ConfigUpdate;
 use perps_exes::prelude::MarketContract;
 
 use perps_exes::contracts::Factory;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 #[derive(clap::Parser)]
 pub(crate) struct UpdateMarketConfigsOpt {

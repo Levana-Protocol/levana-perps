@@ -11,14 +11,14 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::{
+use perpswap::{
     contracts::market::{
         deferred_execution::DeferredExecStatus,
         entry::{ExecuteMsg as MarketExecuteMsg, PositionsQueryFeeApproach, SlippageAssert},
         position::{events::PositionUpdateEvent, PositionId},
     },
     prelude::*,
-    shared::storage::DirectionToBase,
+    storage::DirectionToBase,
 };
 
 #[test]

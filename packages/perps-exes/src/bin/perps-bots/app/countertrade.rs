@@ -4,7 +4,7 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
 use msg::contracts::countertrade::HasWorkResp;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::{
     config::CounterTradeBotConfig,

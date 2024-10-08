@@ -9,7 +9,7 @@ use anyhow::Result;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Decimal256, OverflowError, StdResult};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
-use shared::prelude::*;
+use perpswap::prelude::*;
 use std::fmt;
 use std::hash::Hash;
 use std::num::ParseIntError;

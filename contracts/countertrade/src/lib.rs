@@ -10,9 +10,9 @@ mod work;
 use std::str::FromStr;
 
 use cw2::{get_contract_version, set_contract_version};
+use perpswap::storage::LeverageToBase;
 use prelude::*;
 use semver::Version;
-use shared::storage::LeverageToBase;
 
 pub use execute::execute;
 pub use query::query;

@@ -13,8 +13,8 @@ use msg::contracts::market::liquidity::events::{
 };
 use msg::contracts::market::liquidity::events::{LiquidityPoolSizeEvent, LockUpdateEvent};
 use msg::contracts::market::liquidity::LiquidityStats;
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
-use shared::prelude::*;
 pub(crate) use stats::*;
 use std::cmp::Ordering;
 

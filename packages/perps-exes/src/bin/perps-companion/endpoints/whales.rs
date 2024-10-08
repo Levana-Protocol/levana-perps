@@ -19,7 +19,7 @@ use futures::StreamExt;
 use msg::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{contracts::Factory, PerpsNetwork};
 use reqwest::Client;
-use shared::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
+use perpswap::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
 use tokio::task::JoinSet;
 
 use crate::{app::App, types::ContractEnvironment};

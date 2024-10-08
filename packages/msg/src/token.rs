@@ -9,7 +9,7 @@ use crate::contracts::{
 use cosmwasm_std::{
     to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal256, QuerierWrapper, WasmMsg,
 };
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use serde::Serialize;
 

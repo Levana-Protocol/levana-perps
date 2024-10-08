@@ -6,7 +6,7 @@ use perps_exes::{
     config::MainnetFactories,
     contracts::{Factory, MarketInfo},
 };
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 #[derive(clap::Parser)]
 pub(super) struct ContractsCsvOpts {

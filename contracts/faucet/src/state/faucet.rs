@@ -10,7 +10,7 @@ use msg::contracts::{
     },
 };
 use msg::prelude::*;
-use shared::namespace;
+use perpswap::namespace;
 
 const LAST_TAP_TIMESTAMP: Map<&Addr, Timestamp> = Map::new(namespace::LAST_TAP_TIMESTAMP);
 const CW20_TOKEN_INFO: Map<&Addr, TokenInfoResponse> = Map::new(namespace::CW20_TOKEN_INFO);

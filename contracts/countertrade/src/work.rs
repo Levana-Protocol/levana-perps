@@ -6,7 +6,7 @@ use msg::contracts::market::{
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
     position::{PositionId, PositionQueryResponse},
 };
-use shared::{
+use perpswap::{
     number::Number,
     price::{Price, TakeProfitTrader},
     storage::{
@@ -75,7 +75,7 @@ pub(crate) fn get_work_for(
                 cursor
             }),
             limit: Some(1),
-            order: Some(shared::storage::OrderInMessage::Ascending),
+            order: Some(perpswap::storage::OrderInMessage::Ascending),
         },
     )?;
     assert!(positions.len() <= 1);

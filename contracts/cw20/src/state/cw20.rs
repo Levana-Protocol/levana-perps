@@ -16,8 +16,8 @@ use msg::contracts::cw20::{
     },
     Cw20ReceiveMsg, ReceiverExecuteMsg,
 };
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
-use shared::prelude::*;
 
 pub(crate) const MINTER: Item<Addr> = Item::new(namespace::MINTER);
 pub(crate) const MINTER_CAP: Item<Uint128> = Item::new(namespace::MINTER_CAP);

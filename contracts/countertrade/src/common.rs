@@ -231,7 +231,7 @@ impl PositionsInfo {
 
 #[cfg(test)]
 mod tests {
-    use shared::number::{Collateral, UnsignedDecimal};
+    use perpswap::number::{Collateral, UnsignedDecimal};
 
     use crate::{PositionsInfo, Totals};
 

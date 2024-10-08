@@ -1,6 +1,6 @@
 //! Events emitted by the factory contract
 use cosmwasm_std::{Addr, Event};
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// Event when the factory instantiates a new contract.
 #[derive(Debug)]

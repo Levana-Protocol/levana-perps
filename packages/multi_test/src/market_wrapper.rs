@@ -71,15 +71,15 @@ use msg::contracts::position_token::{
     },
     Metadata as Cw721Metadata,
 };
-use msg::prelude::*;
-use msg::shared::compat::BackwardsCompatTakeProfit;
+use perpswap::compat::BackwardsCompatTakeProfit;
+use perpswap::prelude::*;
 
 use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
-use msg::constants::event_key;
-use msg::contracts::market::order::OrderId;
-use msg::shared::cosmwasm::OrderInMessage;
-use msg::shutdown::{ShutdownEffect, ShutdownImpact};
-use msg::token::{Token, TokenInit};
+use perpswap::constants::event_key;
+use perpswap::contracts::market::order::OrderId;
+use perpswap::cosmwasm::OrderInMessage;
+use perpswap::shutdown::{ShutdownEffect, ShutdownImpact};
+use perpswap::token::{Token, TokenInit};
 use rand::rngs::ThreadRng;
 use serde::de::DeserializeOwned;
 use serde::Serialize;

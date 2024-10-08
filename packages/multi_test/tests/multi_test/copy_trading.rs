@@ -4,12 +4,12 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Event};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{
+use perpswap::{
     contracts::copy_trading::{
         DecQueuePositionId, IncQueueItem, IncQueuePositionId, ProcessingStatus, QueueItem,
         QueueItemStatus, QueuePositionId, WorkDescription, WorkResp,
     },
-    shared::number::{Collateral, NonZero},
+    number::{Collateral, NonZero},
 };
 
 #[test]

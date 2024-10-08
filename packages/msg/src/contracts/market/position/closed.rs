@@ -1,6 +1,6 @@
 //! Represent closed positions.
 
-use shared::prelude::*;
+use perpswap::prelude::*;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 

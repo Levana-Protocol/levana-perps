@@ -3,7 +3,7 @@ use super::deferred_execution::{DeferredExecId, DeferredExecTarget};
 use super::position::PositionId;
 use crate::contracts::market::order::OrderId;
 use crate::contracts::market::position::LiquidationReason;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// What work is currently available for the crank.
 #[cw_serde]

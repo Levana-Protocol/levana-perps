@@ -4,8 +4,8 @@ use msg::{
     contracts::factory::entry::ShutdownStatus,
     shutdown::{ShutdownEffect, ShutdownImpact, ShutdownWallet},
 };
-use shared::namespace;
-use shared::prelude::*;
+use perpswap::namespace;
+use perpswap::prelude::*;
 
 use super::{
     auth::{get_kill_switch, get_wind_down},

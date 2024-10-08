@@ -1,6 +1,6 @@
 use msg::prelude::*;
 use perps_exes::contracts::Factory;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::instantiate::AddMarketParams;
 

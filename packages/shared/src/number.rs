@@ -57,7 +57,7 @@
 //! *example*
 //!
 //! ```
-//! use levana_perpswap_cosmos_shared::number::*;
+//! use levana_perpswap_cosmos_perpswap::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
 //!
@@ -88,7 +88,7 @@
 //! *example 1*
 //!
 //! ```
-//! use levana_perpswap_cosmos_shared::number::*;
+//! use levana_perpswap_cosmos_perpswap::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
 //!
@@ -102,7 +102,7 @@
 //! *example 2*
 //!
 //! ```
-//! use levana_perpswap_cosmos_shared::number::*;
+//! use levana_perpswap_cosmos_perpswap::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
 //!
@@ -132,7 +132,7 @@
 //! *example 1*
 //!
 //! ```
-//! use levana_perpswap_cosmos_shared::number::*;
+//! use levana_perpswap_cosmos_perpswap::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
 //!
@@ -146,7 +146,7 @@
 //!
 //! *example 2*
 //! ```
-//! use levana_perpswap_cosmos_shared::number::*;
+//! use levana_perpswap_cosmos_perpswap::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
 //!

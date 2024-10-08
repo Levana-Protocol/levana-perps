@@ -7,7 +7,7 @@ use super::{Approval, Metadata};
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{Addr, Binary};
 use cw_utils::Expiration;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// Instantiate a new position token proxy contract
 #[cw_serde]

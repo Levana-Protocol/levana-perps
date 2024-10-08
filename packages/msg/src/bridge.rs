@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 use crate::contracts::market::entry::{ExecuteMsg, QueryMsg};
 use cosmwasm_std::{Addr, Binary, Event};
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
-use shared::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClientToBridgeWrapper {

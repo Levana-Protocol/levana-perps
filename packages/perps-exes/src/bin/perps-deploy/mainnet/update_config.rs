@@ -9,7 +9,7 @@ use perps_exes::{
     config::{ChainConfig, PriceConfig},
     contracts::Factory,
 };
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::{cli::Opt, mainnet::strip_nulls, spot_price_config::get_spot_price_config};
 

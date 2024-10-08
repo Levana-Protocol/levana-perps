@@ -1,6 +1,6 @@
 use super::entry::FaucetAsset;
 use cosmwasm_std::Addr;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 pub struct TapEvent {
     pub recipient: Addr,

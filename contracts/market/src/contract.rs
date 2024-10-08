@@ -33,8 +33,8 @@ use msg::{
 
 use msg::contracts::market::entry::LimitOrderResp;
 
+use perpswap::price::Price;
 use semver::Version;
-use shared::price::Price;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:market";

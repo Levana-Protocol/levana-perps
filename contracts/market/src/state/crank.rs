@@ -15,7 +15,7 @@ use msg::contracts::market::{
 };
 use serde::{Deserialize, Serialize};
 
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 use self::position::close::ClosePositionExec;
 

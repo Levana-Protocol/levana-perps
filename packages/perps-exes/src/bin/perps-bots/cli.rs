@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{Address, SeedPhrase};
 use cosmwasm_std::Decimal256;
 use perps_exes::{build_version, config::GasAmount, PerpsNetwork};
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 use tracing::Level;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 

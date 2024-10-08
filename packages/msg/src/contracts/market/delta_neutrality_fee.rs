@@ -1,6 +1,6 @@
 //! Events around the delta neutrality fee
 use cosmwasm_std::Event;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// Event when a delta neutrality payment is made.
 #[derive(Clone)]

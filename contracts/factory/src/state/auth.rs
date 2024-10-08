@@ -1,6 +1,6 @@
 use crate::state::*;
 use cw_storage_plus::Item;
-use shared::namespace;
+use perpswap::namespace;
 
 /// The common case of contract owner
 const OWNER_ADDR: Item<Addr> = Item::new(namespace::OWNER_ADDR);

@@ -34,7 +34,7 @@ use perps_exes::{
 };
 use reqwest::Url;
 use serde_json::json;
-use shared::storage::{
+use perpswap::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
 use tokio::{sync::Mutex, task::JoinSet};

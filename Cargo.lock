@@ -836,15 +836,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "component"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d77c427b730ea6e0b7ff8f7fb93894a320c06256b3d553be7432788eaee6963"
-dependencies = [
- "anyhow",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2295,7 +2286,6 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "chrono",
- "component",
  "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
@@ -2306,7 +2296,6 @@ dependencies = [
  "once_cell",
  "pyth-sdk-cw",
  "quickcheck",
- "rust-analyzer",
  "schemars",
  "serde",
  "serde-json-wasm 0.5.2",
@@ -3560,12 +3549,6 @@ dependencies = [
  "subtle",
  "zeroize",
 ]
-
-[[package]]
-name = "rust-analyzer"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11707871ffa56ce568d4f15dd34c2f891a2aa5e4b3435b99b8f99938492525c3"
 
 [[package]]
 name = "rustc-demangle"

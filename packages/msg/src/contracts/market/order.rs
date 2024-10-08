@@ -1,7 +1,7 @@
 //! Data types for limit orders
 use cosmwasm_std::{Addr, StdResult};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
-use shared::prelude::*;
+use perpswap::prelude::*;
 use std::fmt;
 use std::hash::Hash;
 use std::num::ParseIntError;
@@ -116,8 +116,8 @@ pub mod events {
     use crate::constants::{event_key, event_val};
     use crate::contracts::market::order::OrderId;
     use crate::contracts::market::position::PositionId;
-    use shared::prelude::MarketType::{CollateralIsBase, CollateralIsQuote};
-    use shared::prelude::*;
+    use perpswap::prelude::MarketType::{CollateralIsBase, CollateralIsQuote};
+    use perpswap::prelude::*;
 
     /// Event when a limit order is placed
     pub struct PlaceLimitOrderEvent {

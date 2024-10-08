@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::{anyhow, bail, ensure, Context};
 use chrono::{DateTime, Days, NaiveDate, Utc};
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::{
     cli::{Opt, ServeOpt},

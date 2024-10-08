@@ -2,7 +2,7 @@
 use anyhow::{Context, Result};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::OverflowError;
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 /// Protocol wide stats on liquidity
 #[cw_serde]
@@ -98,7 +98,7 @@ impl LiquidityStats {
 pub mod events {
     use super::LiquidityStats;
     use cosmwasm_std::Event;
-    use shared::prelude::*;
+    use perpswap::prelude::*;
 
     /// Liquidity was withdrawn from the system
     pub struct WithdrawEvent {

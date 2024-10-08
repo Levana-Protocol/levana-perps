@@ -6,8 +6,8 @@ use crate::{
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Addr;
 use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
+use perpswap::prelude::*;
 use schemars::JsonSchema;
-use shared::prelude::*;
 
 /// Instantiate a new factory contract.
 #[cw_serde]

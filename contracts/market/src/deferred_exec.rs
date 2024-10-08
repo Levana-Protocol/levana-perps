@@ -13,7 +13,7 @@ use msg::contracts::market::{
     entry::SlippageAssert,
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
-use shared::compat::BackwardsCompatTakeProfit;
+use perpswap::compat::BackwardsCompatTakeProfit;
 
 use crate::state::{
     order::{CancelLimitOrderExec, PlaceLimitOrderExec},

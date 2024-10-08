@@ -9,7 +9,7 @@ use msg::contracts::{
     market::entry::StatusResp,
 };
 use perps_exes::{contracts::Factory, PerpsNetwork};
-use shared::{
+use perpswap::{
     number::Number,
     storage::{MarketId, RawAddr},
 };
@@ -162,10 +162,10 @@ fn shares_analysis(status: Vec<MarketStatus>) -> anyhow::Result<()> {
 
 fn basic_market_analysis(status: &StatusResp) -> anyhow::Result<Number> {
     let (long_funding, short_funding) = match status.market_type {
-        shared::storage::MarketType::CollateralIsQuote => {
+        perpswap::storage::MarketType::CollateralIsQuote => {
             (status.long_funding, status.short_funding)
         }
-        shared::storage::MarketType::CollateralIsBase => {
+        perpswap::storage::MarketType::CollateralIsBase => {
             (status.short_funding, status.long_funding)
         }
     };

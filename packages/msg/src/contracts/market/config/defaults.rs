@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use super::MaxLiquidity;
 use cosmwasm_std::Decimal256;
-use shared::storage::{NonZero, Number, NumberGtZero, Usd};
+use perpswap::storage::{NonZero, Number, NumberGtZero, Usd};
 
 pub struct ConfigDefaults {}
 
