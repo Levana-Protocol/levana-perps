@@ -343,7 +343,7 @@ impl<'a> State<'a> {
                 owner: copy_trading.into(),
                 cursor,
                 limit: Some(15),
-                order: Some(shared::storage::OrderInMessage::Ascending),
+                order: Some(perpswap::storage::OrderInMessage::Ascending),
             },
         )?;
         Ok(result)

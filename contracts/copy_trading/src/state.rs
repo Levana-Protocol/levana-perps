@@ -1,4 +1,6 @@
-use perpswap::contracts::market::deferred_execution::DeferredExecId;
+use perpswap::contracts::market::{
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor,
+};
 use perpswap::time::Timestamp;
 
 use crate::{

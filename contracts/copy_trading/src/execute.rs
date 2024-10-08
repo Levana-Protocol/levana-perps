@@ -12,7 +12,10 @@ use crate::{
     work::{get_work, process_queue_item},
 };
 use anyhow::{bail, Ok};
-use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
+use perpswap::contracts::market::{
+    entry::{ClosedPositionCursor, ExecuteMsg as MarketExecuteMsg},
+    position::ClosedPosition,
+};
 use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecStatus, GetDeferredExecResp},
