@@ -124,7 +124,11 @@ fn detect_process_queue_item_work() {
     );
 }
 
-pub(crate) fn deposit_money(market: &PerpsMarket, trader: &Addr, amount: &str) -> anyhow::Result<AppResponse> {
+pub(crate) fn deposit_money(
+    market: &PerpsMarket,
+    trader: &Addr,
+    amount: &str,
+) -> anyhow::Result<AppResponse> {
     // Should not have any prior work
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
