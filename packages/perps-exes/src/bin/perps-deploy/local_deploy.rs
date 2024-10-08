@@ -2,12 +2,12 @@ use std::io::Write;
 
 use anyhow::{Context, Result};
 use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
+use perps_exes::{config::ConfigTestnet, PerpsNetwork};
 use perpswap::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     market::{config::ConfigUpdate, spot_price::SpotPriceConfigInit},
 };
 use perpswap::prelude::*;
-use perps_exes::{config::ConfigTestnet, PerpsNetwork};
 
 use crate::{
     cli::Opt,
@@ -70,7 +70,7 @@ pub(crate) async fn go(
                 wallet,
                 "CW20",
                 vec![],
-                msg::contracts::cw20::entry::InstantiateMsg {
+                perpswap::contracts::cw20::entry::InstantiateMsg {
                     name: market_id.get_collateral().to_owned(),
                     symbol: market_id.get_collateral().to_owned(),
                     decimals: 6,
@@ -152,7 +152,7 @@ pub(crate) async fn go(
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::market::entry::ExecuteMsg::SetManualPrice {
+                perpswap::contracts::market::entry::ExecuteMsg::SetManualPrice {
                     price: initial_price,
                     price_usd: initial_price
                         .try_into_usd(market_id)
@@ -172,7 +172,7 @@ pub(crate) async fn go(
             let spot_price: Result<PricePoint, _> = basic
                 .cosmos
                 .make_contract(*market_addr)
-                .query(msg::contracts::market::entry::QueryMsg::SpotPrice { timestamp: None })
+                .query(perpswap::contracts::market::entry::QueryMsg::SpotPrice { timestamp: None })
                 .await;
             match spot_price {
                 Ok(spot_price) => {

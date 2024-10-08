@@ -18,7 +18,7 @@ fn make_countertrade_market() -> anyhow::Result<PerpsMarket> {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Remove minimum deposit so that we can open tiny balancing positions
-    market.exec_set_config(msg::contracts::market::config::ConfigUpdate {
+    market.exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
         minimum_deposit_usd: Some(Usd::zero()),
         ..Default::default()
     })?;
@@ -492,7 +492,7 @@ fn closes_extra_positions() {
         assert_eq!(
             market.query_countertrade_has_work().unwrap(),
             HasWorkResp::Work {
-                desc: msg::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
+                desc: perpswap::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
             }
         );
 
@@ -512,7 +512,7 @@ fn closes_extra_positions() {
         assert_eq!(
             market.query_countertrade_has_work().unwrap(),
             HasWorkResp::Work {
-                desc: msg::contracts::countertrade::WorkDescription::CollectClosedPosition {
+                desc: perpswap::contracts::countertrade::WorkDescription::CollectClosedPosition {
                     pos_id,
                     close_time: pos.close_time,
                     active_collateral
@@ -623,7 +623,7 @@ fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) 
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::Work {
-            desc: msg::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
+            desc: perpswap::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
         }
     );
 
@@ -662,7 +662,7 @@ fn resets_token_balances() {
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::Work {
-            desc: msg::contracts::countertrade::WorkDescription::ResetShares
+            desc: perpswap::contracts::countertrade::WorkDescription::ResetShares
         }
     );
     assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
@@ -687,7 +687,7 @@ fn opens_balancing_position() {
 
     // Remove minimum deposit so that we can open tiny balancing positions
     market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some(Usd::zero()),
             ..Default::default()
         })
@@ -1107,7 +1107,7 @@ fn update_position_scenario_remove_collateral() {
     // Set minimum_deposit_usd so that countertrade countract tries to
     // reduce the collateral instead of closing the position.
     market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("5".parse().unwrap()),
             crank_fee_surcharge: Some("1".parse().unwrap()),
             crank_fee_charged: Some("0.1".parse().unwrap()),
@@ -1218,7 +1218,7 @@ fn do_not_mutate_countertrade_position() {
     // Set minimum_deposit_usd so that countertrade countract tries to
     // reduce the collateral instead of closing the position.
     market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("5".parse().unwrap()),
             ..Default::default()
         })
@@ -1327,7 +1327,7 @@ fn update_position_funding_rate_less_than_target_rate() {
     // Set minimum_deposit_usd so that countertrade countract tries to
     // reduce the collateral instead of closing the position.
     market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("5".parse().unwrap()),
             crank_fee_surcharge: Some("1".parse().unwrap()),
             crank_fee_charged: Some("0.1".parse().unwrap()),
@@ -1455,7 +1455,7 @@ fn smart_search_bug_perp_4098() {
     // Set minimum_deposit_usd so that countertrade countract tries to
     // reduce the collateral instead of closing the position.
     market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("0.1".parse().unwrap()),
             crank_fee_surcharge: Some("1".parse().unwrap()),
             crank_fee_charged: Some("0.1".parse().unwrap()),
@@ -1536,7 +1536,7 @@ fn denom_bug_perp_4149() {
     // Set minimum_deposit_usd so that countertrade countract tries to
     // reduce the collateral instead of closing the position.
     market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("0.1".parse().unwrap()),
             crank_fee_surcharge: Some("1".parse().unwrap()),
             crank_fee_charged: Some("0.1".parse().unwrap()),

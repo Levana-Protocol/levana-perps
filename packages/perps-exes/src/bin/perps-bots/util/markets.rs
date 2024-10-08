@@ -1,8 +1,8 @@
 use cosmos::{Contract, Cosmos, HasAddress};
+use perps_exes::prelude::MarketContract;
 use perpswap::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use perpswap::contracts::market::config::Config;
 use perpswap::prelude::*;
-use perps_exes::prelude::MarketContract;
 use std::collections::HashSet;
 use std::fmt::Debug;
 
@@ -38,7 +38,7 @@ pub(crate) async fn get_markets(
 
     loop {
         let MarketsResp { markets } = factory
-            .query(msg::contracts::factory::entry::QueryMsg::Markets {
+            .query(perpswap::contracts::factory::entry::QueryMsg::Markets {
                 start_after: start_after.take(),
                 limit: None,
             })
@@ -58,7 +58,7 @@ pub(crate) async fn get_markets(
                 liquidity_token_lp,
                 liquidity_token_xlp,
             } = factory
-                .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                .query(perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                     market_id: market_id.clone(),
                 })
                 .await?;

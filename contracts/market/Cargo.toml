@@ -36,5 +36,4 @@ pyth-sdk-cw = { workspace = true}
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
-shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared", features = ["debug_log"] }
 proptest = "1.0.0"

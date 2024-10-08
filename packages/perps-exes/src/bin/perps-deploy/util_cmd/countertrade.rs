@@ -4,11 +4,11 @@ use anyhow::Context;
 use comfy_table::{presets::UTF8_FULL, Cell, Table};
 use cosmos::Address;
 use cosmwasm_std::{Binary, Uint128};
+use perps_exes::{contracts::Factory, PerpsNetwork};
 use perpswap::contracts::{
     countertrade::{MarketStatus, MarketsResp},
     market::entry::StatusResp,
 };
-use perps_exes::{contracts::Factory, PerpsNetwork};
 use perpswap::{
     number::Number,
     storage::{MarketId, RawAddr},
@@ -82,7 +82,7 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
             }
             let mut results = vec![];
             for market in markets {
-                let status = msg::contracts::market::entry::QueryMsg::Status { price: None };
+                let status = perpswap::contracts::market::entry::QueryMsg::Status { price: None };
                 let market_contract = market.market;
                 let status: StatusResp = market_contract.query(status).await?;
                 let popular_funding = basic_market_analysis(&status)?;
@@ -110,7 +110,7 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
             cosmos_network,
         } => {
             let cosmos = opt.connect(cosmos_network).await?;
-            let mut msg = msg::contracts::countertrade::QueryMsg::Markets {
+            let mut msg = perpswap::contracts::countertrade::QueryMsg::Markets {
                 start_after: None,
                 limit: None,
             };
@@ -122,7 +122,7 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
                 if response.next_start_after.is_none() {
                     break;
                 } else {
-                    msg = msg::contracts::countertrade::QueryMsg::Markets {
+                    msg = perpswap::contracts::countertrade::QueryMsg::Markets {
                         start_after: response.next_start_after,
                         limit: None,
                     };
@@ -199,7 +199,7 @@ async fn deposit_collateral(
 
     let market = market.market;
 
-    let market_status = msg::contracts::market::entry::QueryMsg::Status { price: None };
+    let market_status = perpswap::contracts::market::entry::QueryMsg::Status { price: None };
     let response: StatusResp = market.query(market_status).await?;
 
     let amount = match amount {
@@ -211,9 +211,9 @@ async fn deposit_collateral(
         msg::token::Token::Cw20 { addr, .. } => {
             println!("Cw20 Contract: {addr}");
             let deposit_msg =
-                msg::contracts::countertrade::ExecuteMsg::Deposit { market: market_id };
+                perpswap::contracts::countertrade::ExecuteMsg::Deposit { market: market_id };
             let deposit_msg = Binary::new(serde_json::to_vec(&deposit_msg)?);
-            let cw20_execute_msg = msg::contracts::cw20::entry::ExecuteMsg::Send {
+            let cw20_execute_msg = perpswap::contracts::cw20::entry::ExecuteMsg::Send {
                 contract: RawAddr::from(contract.to_string()),
                 amount,
                 msg: deposit_msg,
@@ -233,7 +233,7 @@ async fn deposit_collateral(
         msg::token::Token::Native { denom, .. } => {
             println!("Countertrade contract: {contract}");
             let deposit_msg =
-                msg::contracts::countertrade::ExecuteMsg::Deposit { market: market_id };
+                perpswap::contracts::countertrade::ExecuteMsg::Deposit { market: market_id };
             let deposit_msg = serde_json::to_string(&deposit_msg)?;
             println!("Message: {deposit_msg}");
             if do_it {

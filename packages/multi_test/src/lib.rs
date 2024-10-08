@@ -99,7 +99,7 @@ impl PerpsApp {
         let factory_addr = app.instantiate_contract(
             factory_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &msg::contracts::factory::entry::InstantiateMsg {
+            &perpswap::contracts::factory::entry::InstantiateMsg {
                 market_code_id: market_code_id.to_string(),
                 position_token_code_id: position_token_code_id.to_string(),
                 liquidity_token_code_id: liquidity_token_code_id.to_string(),
@@ -140,10 +140,10 @@ impl PerpsApp {
         let countertrade_addr = app.instantiate_contract(
             countertrade_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &msg::contracts::countertrade::InstantiateMsg {
+            &perpswap::contracts::countertrade::InstantiateMsg {
                 factory: factory_addr.as_ref().into(),
                 admin: TEST_CONFIG.protocol_owner.clone().into(),
-                config: msg::contracts::countertrade::ConfigUpdate::default(),
+                config: perpswap::contracts::countertrade::ConfigUpdate::default(),
             },
             &[],
             "countertrade",
@@ -271,12 +271,12 @@ impl PerpsApp {
         match self.cw20_addrs.entry(symbol.clone()) {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
-                let msg = msg::contracts::cw20::entry::InstantiateMsg {
+                let msg = perpswap::contracts::cw20::entry::InstantiateMsg {
                     name: symbol.clone(),
                     symbol,
                     decimals: TEST_CONFIG.cw20_decimals,
                     initial_balances: Vec::new(),
-                    minter: msg::contracts::cw20::entry::InstantiateMinter {
+                    minter: perpswap::contracts::cw20::entry::InstantiateMinter {
                         minter: TEST_CONFIG.protocol_owner.clone().into(),
                         cap: None,
                     },

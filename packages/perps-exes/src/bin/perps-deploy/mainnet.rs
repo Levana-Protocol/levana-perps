@@ -15,10 +15,6 @@ use std::collections::BTreeMap;
 use chrono::{TimeZone, Utc};
 use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty};
-use perpswap::contracts::market::{
-    entry::NewMarketParams,
-    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
-};
 use perps_exes::{
     config::{
         load_toml, save_toml, ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig,
@@ -27,6 +23,10 @@ use perps_exes::{
     contracts::Factory,
     prelude::*,
     PerpsNetwork,
+};
+use perpswap::contracts::market::{
+    entry::NewMarketParams,
+    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
 };
 
 use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path};
@@ -417,7 +417,7 @@ async fn instantiate_factory(
             wallet,
             factory_label.clone(),
             vec![],
-            msg::contracts::factory::entry::InstantiateMsg {
+            perpswap::contracts::factory::entry::InstantiateMsg {
                 market_code_id: market.to_string(),
                 position_token_code_id: position.to_string(),
                 liquidity_token_code_id: liquidity.to_string(),
@@ -523,7 +523,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
         let spot_price = get_spot_price_config(&oracle, &market_id)?;
         validate_spot_price_config(&app.cosmos, &spot_price, &market_id).await?;
 
-        let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+        let msg = perpswap::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: NewMarketParams {
                 spot_price,
                 market_id,

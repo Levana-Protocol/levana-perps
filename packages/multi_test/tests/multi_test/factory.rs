@@ -34,7 +34,7 @@ fn test_factory_add_market() {
                 ),
                 token: market.token.clone().into(),
                 config: None,
-                spot_price: msg::contracts::market::spot_price::SpotPriceConfigInit::Manual {
+                spot_price: perpswap::contracts::market::spot_price::SpotPriceConfigInit::Manual {
                     admin: Addr::unchecked(TEST_CONFIG.protocol_owner.clone()).into(),
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),

@@ -795,7 +795,9 @@ fn drain_all_liquidity_perp_705() {
     for _ in 0..100 {
         market.exec_crank_single(&crank).unwrap();
         let crank_stats = market.query_crank_stats().unwrap();
-        if crank_stats == Some(msg::contracts::market::crank::CrankWorkInfo::ResetLpBalances {}) {
+        if crank_stats
+            == Some(perpswap::contracts::market::crank::CrankWorkInfo::ResetLpBalances {})
+        {
             found_reset = true;
             break;
         }
@@ -1509,7 +1511,7 @@ fn max_liquidity() {
 
     market
         .exec_set_config(ConfigUpdate {
-            max_liquidity: Some(msg::contracts::market::config::MaxLiquidity::Usd {
+            max_liquidity: Some(perpswap::contracts::market::config::MaxLiquidity::Usd {
                 amount: "1000".parse().unwrap(),
             }),
             ..Default::default()
@@ -1531,7 +1533,7 @@ fn max_liquidity() {
 
     market
         .exec_set_config(ConfigUpdate {
-            max_liquidity: Some(msg::contracts::market::config::MaxLiquidity::Usd {
+            max_liquidity: Some(perpswap::contracts::market::config::MaxLiquidity::Usd {
                 amount: "2000".parse().unwrap(),
             }),
             ..Default::default()

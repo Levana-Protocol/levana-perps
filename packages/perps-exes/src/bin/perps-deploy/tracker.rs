@@ -2,9 +2,9 @@ use cosmos::{
     proto::{cosmos::base::abci::v1beta1::TxResponse, cosmwasm::wasm::v1::MsgExecuteContract},
     Address, CodeId, Contract, HasAddress, HasCosmos, TxBuilder, Wallet,
 };
+use perps_exes::contracts::Factory;
 use perpswap::contracts::tracker::entry::{CodeIdResp, ContractResp, ExecuteMsg, QueryMsg};
 use perpswap::prelude::*;
-use perps_exes::contracts::Factory;
 
 use crate::{cli::Opt, util::get_hash_for_path};
 
@@ -107,7 +107,7 @@ impl Tracker {
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::tracker::entry::ExecuteMsg::Migrate {
+                perpswap::contracts::tracker::entry::ExecuteMsg::Migrate {
                     new_code_id,
                     address: address.get_address_string(),
                 },

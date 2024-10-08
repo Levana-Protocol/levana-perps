@@ -140,7 +140,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &migration_admin,
                 get_market_code_id(ctx.storage)?,
                 format!("Levana Perps Market - {market_id}{label_suffix}"),
-                &msg::contracts::market::entry::InstantiateMsg {
+                &perpswap::contracts::market::entry::InstantiateMsg {
                     factory: state.env.contract.address.into(),
                     config,
                     market_id,
@@ -173,9 +173,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &migration_admin,
                 copy_trading_code_id,
                 format!("Levana Perps Copy Trading - {label_suffix}"),
-                &msg::contracts::copy_trading::InstantiateMsg {
+                &perpswap::contracts::copy_trading::InstantiateMsg {
                     leader: leader.into(),
-                    config: msg::contracts::copy_trading::ConfigUpdate {
+                    config: perpswap::contracts::copy_trading::ConfigUpdate {
                         name: Some(name),
                         description: Some(description),
                         commission_rate: None,
@@ -286,7 +286,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                         &migration_admin,
                         position_token_code_id(ctx.storage)?,
                         format!("Levana Perps Position Token - {market_id}{label_suffix}"),
-                        &msg::contracts::position_token::entry::InstantiateMsg {
+                        &perpswap::contracts::position_token::entry::InstantiateMsg {
                             factory: factory.clone().into(),
                             market_id: market_id.clone(),
                         },
@@ -297,7 +297,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                         &migration_admin,
                         liquidity_token_code_id(ctx.storage)?,
                         format!("Levana Perps LP Token - {market_id}{label_suffix}"),
-                        &msg::contracts::liquidity_token::entry::InstantiateMsg {
+                        &perpswap::contracts::liquidity_token::entry::InstantiateMsg {
                             factory: factory.clone().into(),
                             market_id: market_id.clone(),
                             kind: LiquidityTokenKind::Lp,
@@ -309,7 +309,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                         &migration_admin,
                         liquidity_token_code_id(ctx.storage)?,
                         format!("Levana Perps xLP Token - {market_id}{label_suffix}"),
-                        &msg::contracts::liquidity_token::entry::InstantiateMsg {
+                        &perpswap::contracts::liquidity_token::entry::InstantiateMsg {
                             factory: factory.into(),
                             market_id,
                             kind: LiquidityTokenKind::Xlp,

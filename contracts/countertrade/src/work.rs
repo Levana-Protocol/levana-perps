@@ -35,13 +35,13 @@ pub(crate) fn get_work_for(
             &MarketQueryMsg::GetDeferredExec { id },
         )? {
             GetDeferredExecResp::Found { item } => match item.status {
-                msg::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
+                perpswap::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
                     return Ok(HasWorkResp::NoWork {});
                 }
-                msg::contracts::market::deferred_execution::DeferredExecStatus::Success {
+                perpswap::contracts::market::deferred_execution::DeferredExecStatus::Success {
                     ..
                 }
-                | msg::contracts::market::deferred_execution::DeferredExecStatus::Failure {
+                | perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
                     ..
                 } => {
                     return Ok(HasWorkResp::Work {
@@ -541,7 +541,7 @@ fn smart_search(
 fn derive_popular_funding_rate_annual(
     popular_notional: Notional,
     unpopular_notional: Notional,
-    config: &msg::contracts::market::config::Config,
+    config: &perpswap::contracts::market::config::Config,
 ) -> Result<Decimal256> {
     let rf_per_annual_cap = config.funding_rate_max_annualized;
     let instant_net_open_interest = popular_notional
@@ -1043,11 +1043,11 @@ fn estimate_crank_fee(
     price: &PricePoint,
 ) -> Result<Collateral> {
     // Loginc taken from from deferred_execution part of the code.
-    let status: msg::contracts::market::entry::StatusResp = state
+    let status: perpswap::contracts::market::entry::StatusResp = state
         .querier
         .query_wasm_smart(
             &market.addr,
-            &msg::contracts::market::entry::QueryMsg::Status { price: None },
+            &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
         )
         .with_context(|| format!("Unable to load market status from contract {}", market.addr))?;
     let crank_fee_surcharge = status.config.crank_fee_surcharge;

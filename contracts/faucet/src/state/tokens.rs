@@ -71,7 +71,7 @@ impl State<'_> {
         }
         self.set_tap_amount(
             ctx,
-            msg::contracts::faucet::entry::FaucetAsset::Cw20(new_contract.into()),
+            perpswap::contracts::faucet::entry::FaucetAsset::Cw20(new_contract.into()),
             token_info.tap_amount,
         )?;
         Ok(())

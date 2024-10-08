@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmos::HasAddress;
-use perpswap::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
 use perps_exes::contracts::{Factory, MarketInfo};
+use perpswap::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
 
 use crate::{
     cli::Opt,
@@ -61,7 +61,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             .migrate(
                 wallet,
                 factory_code_id.get_code_id(),
-                msg::contracts::factory::entry::MigrateMsg {},
+                perpswap::contracts::factory::entry::MigrateMsg {},
             )
             .await?;
         tracing::info!("Migrated the factory itself to {}", factory_code_id);
@@ -73,7 +73,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     }
 
     let code_ids: CodeIds = factory
-        .query(msg::contracts::factory::entry::QueryMsg::CodeIds {})
+        .query(perpswap::contracts::factory::entry::QueryMsg::CodeIds {})
         .await?;
 
     if code_ids.liquidity_token.u64() == liquidity_token_code_id.get_code_id() {
@@ -86,7 +86,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::factory::entry::ExecuteMsg::SetLiquidityTokenCodeId {
+                perpswap::contracts::factory::entry::ExecuteMsg::SetLiquidityTokenCodeId {
                     code_id: liquidity_token_code_id.get_code_id().to_string(),
                 },
             )
@@ -104,7 +104,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::factory::entry::ExecuteMsg::SetMarketCodeId {
+                perpswap::contracts::factory::entry::ExecuteMsg::SetMarketCodeId {
                     code_id: market_code_id.get_code_id().to_string(),
                 },
             )
@@ -122,7 +122,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::factory::entry::ExecuteMsg::SetPositionTokenCodeId {
+                perpswap::contracts::factory::entry::ExecuteMsg::SetPositionTokenCodeId {
                     code_id: position_token_code_id.get_code_id().to_string(),
                 },
             )
@@ -149,7 +149,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .migrate(
                     wallet,
                     market_code_id.get_code_id(),
-                    msg::contracts::market::entry::MigrateMsg {},
+                    perpswap::contracts::market::entry::MigrateMsg {},
                 )
                 .await?;
             tracing::info!("Market contract for {market_id} migrated");
@@ -177,7 +177,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .migrate(
                     wallet,
                     position_token_code_id.get_code_id(),
-                    msg::contracts::position_token::entry::MigrateMsg {},
+                    perpswap::contracts::position_token::entry::MigrateMsg {},
                 )
                 .await?;
             tracing::info!("Position token contract for {market_id} migrated");
@@ -211,7 +211,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 lt.migrate(
                     wallet,
                     liquidity_token_code_id.get_code_id(),
-                    msg::contracts::position_token::entry::MigrateMsg {},
+                    perpswap::contracts::position_token::entry::MigrateMsg {},
                 )
                 .await?;
                 tracing::info!("{kind} liquidity token contract for {market_id} migrated");
@@ -248,8 +248,8 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //         // Check if this is a new Hermes Pyth bridge. If the config call
         //         // fails, we'll assume that it's an old bridge and we need to
         //         // insantiate a new one.
-        //         let config_res: Result<msg::contracts::pyth_bridge::entry::Config> = price_admin
-        //             .query(msg::contracts::pyth_bridge::entry::QueryMsg::Config {})
+        //         let config_res: Result<perpswap::contracts::pyth_bridge::entry::Config> = price_admin
+        //             .query(perpswap::contracts::pyth_bridge::entry::QueryMsg::Config {})
         //             .await;
         //         match config_res {
         //             Ok(_) => {
@@ -264,7 +264,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //                         .migrate(
         //                             &app.basic.wallet,
         //                             pyth_bridge_code_id.get_code_id(),
-        //                             msg::contracts::pyth_bridge::entry::MigrateMsg {},
+        //                             perpswap::contracts::pyth_bridge::entry::MigrateMsg {},
         //                         )
         //                         .await?;
         //                     tracing::info!("pyth_bridge price admin contract for {market_id} migrated");

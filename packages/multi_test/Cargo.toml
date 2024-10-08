@@ -34,5 +34,5 @@ cw-storage-plus = { version = "2.0.0", default-features = false }
 [features]
 default = ["sanity"]
 proptest = ["arbitrary"]
-arbitrary = ["msg/arbitrary", "dep:arbitrary"]
+arbitrary = ["dep:arbitrary"]
 sanity = ["market/sanity"]

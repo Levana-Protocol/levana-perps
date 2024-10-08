@@ -1,6 +1,6 @@
 use anyhow::Context;
-use perpswap::contracts::market::config::ConfigUpdate;
 use perps_exes::prelude::MarketContract;
+use perpswap::contracts::market::config::ConfigUpdate;
 
 use perps_exes::contracts::Factory;
 use perpswap::storage::MarketId;
@@ -28,10 +28,10 @@ impl UpdateMarketConfigsOpt {
             .get_contract_by_family("factory", &self.family, None)
             .await?;
         let factory = match factory {
-            msg::contracts::tracker::entry::ContractResp::NotFound {} => {
+            perpswap::contracts::tracker::entry::ContractResp::NotFound {} => {
                 anyhow::bail!("No factory found")
             }
-            msg::contracts::tracker::entry::ContractResp::Found { address, .. } => {
+            perpswap::contracts::tracker::entry::ContractResp::Found { address, .. } => {
                 Factory::from_contract(app.basic.cosmos.make_contract(address.parse()?))
             }
         };

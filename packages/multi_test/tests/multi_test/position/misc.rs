@@ -124,7 +124,7 @@ fn version_and_meta() {
     assert!(!market_version.version.is_empty());
 
     let status: StatusResp = market
-        .query(&msg::contracts::market::entry::QueryMsg::Status { price: None })
+        .query(&perpswap::contracts::market::entry::QueryMsg::Status { price: None })
         .unwrap();
     assert!(!status.base.is_empty());
     assert!(!status.quote.is_empty());

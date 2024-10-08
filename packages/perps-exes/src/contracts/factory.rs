@@ -222,7 +222,7 @@ impl Factory {
             .execute(
                 wallet,
                 vec![],
-                msg::contracts::factory::entry::ExecuteMsg::AddMarket { new_market },
+                perpswap::contracts::factory::entry::ExecuteMsg::AddMarket { new_market },
             )
             .await
     }

@@ -182,11 +182,13 @@ pub(crate) async fn get_contract(
 ) -> Result<(Address, Option<String>)> {
     let tracker = cosmos.make_contract(tracker);
     let (addr, code_id) = match tracker
-        .query(msg::contracts::tracker::entry::QueryMsg::ContractByFamily {
-            contract_type: contract_type.to_owned(),
-            family: family.to_owned(),
-            sequence: None,
-        })
+        .query(
+            perpswap::contracts::tracker::entry::QueryMsg::ContractByFamily {
+                contract_type: contract_type.to_owned(),
+                family: family.to_owned(),
+                sequence: None,
+            },
+        )
         .await
         .with_context(|| {
             format!("Calling ContractByFamily with {contract_type} and {family} against {tracker}",)
@@ -201,7 +203,7 @@ pub(crate) async fn get_contract(
         } => (address.parse()?, current_code_id),
     };
     let gitrev = match tracker
-        .query(msg::contracts::tracker::entry::QueryMsg::CodeById { code_id })
+        .query(perpswap::contracts::tracker::entry::QueryMsg::CodeById { code_id })
         .await?
     {
         CodeIdResp::Found { gitrev, .. } => gitrev,
@@ -221,7 +223,7 @@ async fn get_tokens_markets(
     for market in &markets {
         let denom = market.market_id.get_collateral().to_owned();
         let market_info: MarketInfoResponse = factory
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+            .query(perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                 market_id: market.market_id.clone(),
             })
             .await?;
@@ -235,7 +237,7 @@ async fn get_tokens_markets(
             collateral: Token,
         }
         let StatusRespJustCollateral { collateral } = market
-            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
+            .query(perpswap::contracts::market::entry::QueryMsg::Status { price: None })
             .await?;
         match collateral {
             msg::token::Token::Cw20 {
@@ -256,7 +258,7 @@ async fn get_faucet_gas_amount(cosmos: &Cosmos, faucet: Address) -> Result<Optio
     let contract = cosmos.make_contract(faucet);
     Ok(
         match contract
-            .query(msg::contracts::faucet::entry::QueryMsg::GetGasAllowance {})
+            .query(perpswap::contracts::faucet::entry::QueryMsg::GetGasAllowance {})
             .await?
         {
             GasAllowanceResp::Disabled {} => None,
@@ -275,9 +277,11 @@ async fn get_faucet_collateral_amount(
     let contract = cosmos.make_contract(faucet);
     for name in ["ATOM", "ETH", "BTC", "USDC"] {
         match contract
-            .query(msg::contracts::faucet::entry::QueryMsg::TapAmountByName {
-                name: name.to_owned(),
-            })
+            .query(
+                perpswap::contracts::faucet::entry::QueryMsg::TapAmountByName {
+                    name: name.to_owned(),
+                },
+            )
             .await?
         {
             TapAmountResponse::CanTap { amount } => {

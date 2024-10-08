@@ -329,7 +329,8 @@ impl State<'_> {
             &DeferredExecWithStatus {
                 id: new_id,
                 created: self.now(),
-                status: msg::contracts::market::deferred_execution::DeferredExecStatus::Pending,
+                status:
+                    perpswap::contracts::market::deferred_execution::DeferredExecStatus::Pending,
                 item,
                 owner: trader.clone(),
             },
