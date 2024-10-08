@@ -466,7 +466,7 @@ mod tests {
             hwm.current.try_into_non_negative_value().unwrap()
         );
 
-        hwm.add_loss("-20".parse().unwrap());
+        hwm.add_loss("-20".parse().unwrap()).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "80".parse().unwrap()
@@ -489,7 +489,7 @@ mod tests {
         assert_eq!(hwm.cumulative_profit, "120".parse().unwrap());
         assert_eq!(commission.0, "2".parse().unwrap());
 
-        hwm.add_loss("-20".parse().unwrap());
+        hwm.add_loss("-20".parse().unwrap()).unwrap();
         assert_eq!(
             hwm.current.try_into_non_negative_value().unwrap(),
             "100".parse().unwrap()
@@ -510,7 +510,7 @@ mod tests {
         let rate: Decimal256 = "0.1".parse().unwrap();
         let mut hwm = HighWaterMark::default();
 
-        hwm.add_loss("-20".parse().unwrap());
+        hwm.add_loss("-20".parse().unwrap()).unwrap();
         assert_eq!(hwm.current, "-20".parse().unwrap());
         assert_eq!(hwm.cumulative_profit, "0".parse().unwrap());
 
@@ -535,7 +535,7 @@ mod tests {
         assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
         assert_eq!(commission.0, "10".parse().unwrap());
 
-        hwm.add_loss("-200".parse().unwrap());
+        hwm.add_loss("-200".parse().unwrap()).unwrap();
         assert_eq!(hwm.current, "-100".parse().unwrap());
         assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
 
@@ -549,7 +549,7 @@ mod tests {
         assert_eq!(commission.0, "0".parse().unwrap());
         assert_eq!(hwm.current, "0".parse().unwrap());
 
-        hwm.add_loss("-20".parse().unwrap());
+        hwm.add_loss("-20".parse().unwrap()).unwrap();
         assert_eq!(hwm.cumulative_profit, "100".parse().unwrap());
         assert_eq!(hwm.current, "-20".parse().unwrap());
 
