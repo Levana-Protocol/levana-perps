@@ -22,6 +22,8 @@ pub struct InstantiateMsg {
     pub leader: RawAddr,
     /// Initial configuration values
     pub config: ConfigUpdate,
+    /// Initial parameters
+    pub parameters: FactoryConfigUpdate,
 }
 
 /// Full configuration
@@ -47,6 +49,8 @@ pub struct Config {
     pub commission_rate: Decimal256,
     /// Creation time of contract
     pub created_at: Timestamp,
+    /// Allowed smart queries During Rebalance operations
+    pub allowed_rebalance_queries: u32,
 }
 
 impl Config {
@@ -59,7 +63,7 @@ impl Config {
         } else if self.commission_rate < Decimal256::from_ratio(1u32, 100u32) {
             Err(anyhow!("Commission rate less than 1 percent"))
         } else if self.commission_rate > Decimal256::from_ratio(30u32, 100u32) {
-            Err(anyhow!("Commission rate greater than 1 percent"))
+            Err(anyhow!("Commission rate greater than 30 percent"))
         } else {
             Ok(())
         }
@@ -69,6 +73,14 @@ impl Config {
     pub fn ensure_leader(&self, sender: &Addr) -> anyhow::Result<()> {
         if self.leader != sender {
             bail!("Unautorized access, only {} allowed", self.leader)
+        }
+        Ok(())
+    }
+
+    /// Ensure it is factory contract
+    pub fn ensure_factory(&self, sender: &Addr) -> anyhow::Result<()> {
+        if self.factory != sender {
+            bail!("Unautorized access, only {} allowed", self.factory)
         }
         Ok(())
     }
@@ -84,6 +96,16 @@ pub struct ConfigUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
     pub commission_rate: Option<Decimal256>,
+}
+
+/// Updates to configuration values.
+///
+/// See [Config] for field meanings.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub struct FactoryConfigUpdate {
+    pub allowed_rebalance_queries: Option<u32>,
 }
 
 /// Executions available on the copy trading contract.
@@ -115,8 +137,10 @@ pub enum ExecuteMsg {
     },
     /// Accept appointment of admin
     AcceptAdmin {},
-    /// Update configuration values
-    UpdateConfig(ConfigUpdate),
+    /// Update configuration values that is allowed for leader.
+    LeaderUpdateConfig(ConfigUpdate),
+    /// Update configuration values that is allowed for facotr.
+    FactoryUpdateConfig(FactoryConfigUpdate),
     /// Leader specific execute messages
     LeaderMsg {
         /// Market id that message is for
@@ -624,6 +648,16 @@ pub enum WorkResp {
     },
 }
 
+impl WorkResp {
+    /// Does it have work ?
+    pub fn has_work(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { .. } => true,
+        }
+    }
+}
+
 /// Work Description
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -659,6 +693,8 @@ pub enum WorkDescription {
         token: Token,
         /// Amount that needs to be balanced
         amount: NonZero<Collateral>,
+        /// Start from specific market id
+        start_from: Option<MarketId>,
     },
 }
 

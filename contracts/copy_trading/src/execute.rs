@@ -5,9 +5,9 @@ use crate::{
     },
     prelude::*,
     types::{
-        Commission, DecQueuePosition, HighWaterMark, IncQueuePosition, LeaderComissision,
-        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, State,
-        WalletInfo,
+        BatchWork, Commission, DecQueuePosition, HighWaterMark, IncQueuePosition,
+        LeaderComissision, LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue,
+        ProcessingStatus, State, WalletInfo,
     },
     work::{get_work, process_queue_item},
 };
@@ -149,8 +149,41 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             execute_leader_msg(storage, &state, market_id, message, collateral)
         }
+        ExecuteMsg::FactoryUpdateConfig(config) => {
+            state.config.ensure_factory(&sender)?;
+            funds.require_none()?;
+            factory_update_config(storage, config)
+        }
         _ => panic!("Not implemented yet"),
     }
+}
+
+fn factory_update_config(
+    storage: &mut dyn Storage,
+    config: FactoryConfigUpdate,
+) -> Result<Response> {
+    let FactoryConfigUpdate {
+        allowed_rebalance_queries,
+    } = config;
+    let mut config = crate::state::CONFIG
+        .may_load(storage)?
+        .context("CONFIG store is empty")?;
+    let mut event = Event::new("factory-update-config");
+    if let Some(allowed_rebalance_queries) = allowed_rebalance_queries {
+        config.allowed_rebalance_queries = allowed_rebalance_queries;
+        event = event
+            .add_attribute(
+                "old-allowed-rebalance-queries",
+                config.allowed_rebalance_queries.to_string(),
+            )
+            .add_attribute(
+                "new-allowed-rebalance-queries",
+                allowed_rebalance_queries.to_string(),
+            );
+    }
+    crate::state::CONFIG.save(storage, &config)?;
+    let response = Response::new().add_event(event);
+    Ok(response)
 }
 
 #[allow(deprecated)]
@@ -350,7 +383,11 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
             let response = handle_deferred_exec_id(storage, &state)?;
             Ok(response)
         }
-        WorkDescription::Rebalance { token, amount } => rebalance(storage, &state, token, amount),
+        WorkDescription::Rebalance {
+            token,
+            amount,
+            start_from,
+        } => rebalance(storage, &state, token, amount, start_from),
     }
 }
 
@@ -363,25 +400,27 @@ fn rebalance(
     state: &State,
     token: Token,
     rebalance_amount: NonZero<Collateral>,
+    start_from: Option<MarketId>,
 ) -> Result<Response> {
-    let markets = state.load_market_ids_with_token(storage, &token)?;
+    let markets = state.load_market_ids_with_token(storage, &token, start_from)?;
     let mut totals = crate::state::TOTALS
         .may_load(storage, &token)?
         .unwrap_or_default();
     let rebalance_amount = rebalance_amount.raw();
     let mut check_balance = Collateral::zero();
-    let mut rebalanced = false;
+    let mut made_profit = false;
+    let mut total_queries = 0u32;
+    let mut early_exit = false;
+    let mut market_id = None;
     for market in markets {
-        if check_balance.approx_eq(rebalance_amount) {
-            break;
-        }
+        market_id = Some(market.id.clone());
         let mut cursor = crate::state::LAST_CLOSED_POSITION_CURSOR.may_load(storage, &market.id)?;
         let mut hwm = crate::state::HIGH_WATER_MARK
             .may_load(storage, &token)?
             .unwrap_or_default();
         loop {
-            // todo: Batch this operations
             let closed_positions = state.query_closed_position(&market.addr, cursor.clone())?;
+            total_queries += 1;
             let last_closed_position =
                 closed_positions
                     .positions
@@ -391,6 +430,7 @@ fn rebalance(
                         time: item.close_time,
                         position: item.id,
                     });
+
             if let Some(ref last_closed_position) = last_closed_position {
                 crate::state::LAST_CLOSED_POSITION_CURSOR.save(
                     storage,
@@ -408,17 +448,32 @@ fn rebalance(
                     .checked_add(commission.remaining_collateral)?;
                 if commission.profit > Collateral::zero() {
                     // If leader made profit
-                    rebalanced = true;
+                    made_profit = true;
                 }
+            }
+            if check_balance.approx_eq(rebalance_amount) {
+                break;
             }
             if closed_positions.cursor.is_none() {
                 break;
             }
+            if total_queries >= state.config.allowed_rebalance_queries {
+                early_exit = true;
+                break;
+            }
         }
         crate::state::HIGH_WATER_MARK.save(storage, &token, &hwm)?;
+        if check_balance.approx_eq(rebalance_amount) {
+            break;
+        }
+        if total_queries > state.config.allowed_rebalance_queries {
+            early_exit = true;
+            break;
+        }
     }
-    let mut event = Event::new("rebalanced").add_attribute("made-profit", rebalanced.to_string());
-    if check_balance < rebalance_amount {
+    let mut event = Event::new("rebalanced").add_attribute("made-profit", made_profit.to_string());
+    event = event.add_attribute("batched", early_exit.to_string());
+    if check_balance < rebalance_amount && !early_exit {
         // We have settled all the markets's closed positions, but we
         // are still not balanced. This means that the money was sent
         // by someone directly to the contract.
@@ -426,6 +481,29 @@ fn rebalance(
         totals.collateral = totals.collateral.checked_add(diff)?;
         crate::state::TOTALS.save(storage, &token, &totals)?;
         event = event.add_attribute("gains", diff.to_string());
+    }
+    if early_exit {
+        let balance = if check_balance.is_zero() {
+            Some(rebalance_amount)
+        } else if check_balance.approx_eq(rebalance_amount) || check_balance > rebalance_amount {
+            None
+        } else {
+            let diff = rebalance_amount.checked_sub(check_balance)?;
+            Some(diff)
+        };
+        if let Some(balance) = balance {
+            let balance = NonZero::new(balance).context("Impossible: balance is zero")?;
+            crate::state::CURRENT_BATCH_WORK.save(
+                storage,
+                &BatchWork::BatchRebalance {
+                    start_from: market_id,
+                    balance,
+                    token: token.clone(),
+                },
+            )?;
+        }
+    } else {
+        crate::state::CURRENT_BATCH_WORK.save(storage, &BatchWork::NoWork)?;
     }
     crate::state::TOTALS.save(storage, &token, &totals)?;
     let response = Response::new().add_event(event);
@@ -476,7 +554,7 @@ fn handle_leader_commission(
 }
 
 fn reset_stats(storage: &mut dyn Storage, state: &State, token: Token) -> Result<Response> {
-    let markets = state.load_market_ids_with_token(storage, &token)?;
+    let markets = state.load_market_ids_with_token(storage, &token, None)?;
     let market_work_info = MarketWorkInfo::default();
     for market in markets {
         crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work_info)?;
@@ -607,7 +685,7 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
     // todo: track operations
-    let markets = state.load_market_ids_with_token(storage, &token)?;
+    let markets = state.load_market_ids_with_token(storage, &token, None)?;
     for market in &markets {
         process_single_market(storage, state, market)?;
     }

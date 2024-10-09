@@ -259,10 +259,12 @@ impl<'a> State<'a> {
         &self,
         storage: &dyn Storage,
         token: &Token,
+        start_from: Option<MarketId>,
     ) -> Result<Vec<MarketInfo>> {
+        let min = start_from.map(Bound::inclusive);
         let markets = crate::state::MARKETS_TOKEN.prefix(token.clone()).range(
             storage,
-            None,
+            min,
             None,
             Order::Ascending,
         );
@@ -415,7 +417,7 @@ impl Totals {
     pub(crate) fn add_collateral(
         &mut self,
         funds: NonZero<Collateral>,
-        token_value: OneLpTokenValue,
+        token_value: &OneLpTokenValue,
     ) -> Result<NonZero<LpToken>> {
         let new_shares = token_value.collateral_to_shares(funds)?;
 
