@@ -395,7 +395,7 @@ pub struct CommissionStats {
     /// Total unclaimed collateral by the leader
     pub unclaimed: Collateral,
     /// Total claimed collateral by the leader. This is cumulative.
-    pub claimed: Collateral
+    pub claimed: Collateral,
 }
 
 /// Comissision that should be paid to the leader
