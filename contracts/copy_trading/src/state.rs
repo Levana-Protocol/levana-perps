@@ -6,7 +6,8 @@ use perpswap::time::Timestamp;
 use crate::{
     prelude::*,
     types::{
-        BatchWork, DecQueuePosition, HighWaterMark, IncQueuePosition, LpTokenValue, MarketInfo, MarketLoaderStatus, MarketWorkInfo, Totals, WalletInfo
+        BatchWork, DecQueuePosition, HighWaterMark, IncQueuePosition, LpTokenValue, MarketInfo,
+        MarketLoaderStatus, MarketWorkInfo, Totals, WalletInfo,
     },
 };
 

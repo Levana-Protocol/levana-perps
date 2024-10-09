@@ -436,8 +436,8 @@ pub enum BatchWork {
         /// How much to rebalance
         balance: NonZero<Collateral>,
         /// Token
-        token: Token
-    }
+        token: Token,
+    },
 }
 
 #[cfg(test)]
