@@ -485,9 +485,7 @@ fn rebalance(
     if early_exit {
         let balance = if check_balance.is_zero() {
             Some(rebalance_amount)
-        } else if check_balance.approx_eq(rebalance_amount) {
-            None
-        } else if check_balance > rebalance_amount {
+        } else if check_balance.approx_eq(rebalance_amount) || check_balance > rebalance_amount {
             None
         } else {
             let diff = rebalance_amount.checked_sub(check_balance)?;
