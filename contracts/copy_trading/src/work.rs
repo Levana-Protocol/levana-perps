@@ -304,29 +304,36 @@ pub(crate) fn process_queue_item(
             match queue_item.item.clone() {
                 IncQueueItem::Deposit { funds, token } => {
                     let token_value = state.load_lp_token_value(storage, &token)?;
-                    let new_shares = token_value.collateral_to_shares(funds)?;
-                    let mut totals = crate::state::TOTALS
-                        .may_load(storage, &token)
-                        .context("Could not load TOTALS")?
-                        .unwrap_or_default();
-                    totals.add_collateral(funds, token_value)?;
-                    crate::state::TOTALS.save(storage, &token, &totals)?;
-                    let mut pending_deposits = crate::state::PENDING_DEPOSITS
-                        .may_load(storage, &token)?
-                        .unwrap_or_default();
-                    pending_deposits = pending_deposits.checked_sub(funds.raw())?;
-                    crate::state::PENDING_DEPOSITS.save(storage, &token, &pending_deposits)?;
-                    let wallet_info = WalletInfo {
-                        token,
-                        wallet: queue_item.wallet.clone(),
-                    };
-                    let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
-                    let new_shares = match shares {
-                        Some(shares) => shares.checked_add(new_shares.raw())?,
-                        None => new_shares,
+                    {
+                        let mut totals = crate::state::TOTALS
+                            .may_load(storage, &token)
+                            .context("Could not load TOTALS")?
+                            .unwrap_or_default();
+                        totals.add_collateral(funds, &token_value)?;
+                        crate::state::TOTALS.save(storage, &token, &totals)?;
+                    }
+                    {
+                        let mut pending_deposits = crate::state::PENDING_DEPOSITS
+                            .may_load(storage, &token)?
+                            .unwrap_or_default();
+                        pending_deposits = pending_deposits.checked_sub(funds.raw())?;
+                        crate::state::PENDING_DEPOSITS.save(storage, &token, &pending_deposits)?;
+                    }
+                    let new_shares = {
+                        let wallet_info = WalletInfo {
+                            token,
+                            wallet: queue_item.wallet.clone(),
+                        };
+                        let new_shares = token_value.collateral_to_shares(funds)?;
+                        let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
+                        let new_shares = match shares {
+                            Some(shares) => shares.checked_add(new_shares.raw())?,
+                            None => new_shares,
+                        };
+                        crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
+                        new_shares
                     };
                     queue_item.status = copy_trading::ProcessingStatus::Finished;
-                    crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
                     crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &queue_pos_id)?;
                     crate::state::COLLATERAL_INCREASE_QUEUE.save(
                         storage,
@@ -567,9 +574,10 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         .collateral
         .checked_add(pending_deposits)?
         .checked_add(leader_comission)?;
-    let total = market_token.round_down_to_precision(total)?;
     let diff = total.diff(contract_balance);
-    let is_approximate_same = diff <= "0.000001".parse().unwrap();
+    // This diff number was chosen arbitrarly by opening and closing
+    // 1500 positions which resulted in some leader commission.
+    let is_approximate_same = diff <= "0.00001".parse().unwrap();
     if is_approximate_same {
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
