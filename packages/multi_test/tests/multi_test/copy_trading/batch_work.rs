@@ -2,9 +2,7 @@ use cosmwasm_std::Event;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use perpswap::{
     contracts::{
-        copy_trading::{
-            self, FactoryConfigUpdate, WorkResp,
-        },
+        copy_trading::{self, FactoryConfigUpdate, WorkResp},
         market::position::PositionId,
     },
     number::Collateral,
