@@ -13,7 +13,7 @@ use perpswap::{number::Usd, time::Timestamp};
 
 use crate::prelude::*;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct MarketInfo {
     /// Market id
     pub(crate) id: MarketId,
@@ -420,6 +420,23 @@ impl HighWaterMark {
                 .context("Impossible: commission is negative")?;
             Ok(Commission(commission))
         }
+    }
+}
+
+/// Current batch work in Progress
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum BatchWork {
+    /// No work present
+    NoWork,
+    /// Continue Rebalance operation
+    BatchRebalance {
+        /// Which market id to start from
+        start_from: Option<MarketId>,
+        /// How much to rebalance
+        balance: NonZero<Collateral>,
+        /// Token
+        token: Token
     }
 }
 

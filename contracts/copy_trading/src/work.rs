@@ -146,7 +146,33 @@ fn get_work_from_dec_queue(
     }
 }
 
+fn get_batch_work(storage: &dyn Storage) -> Result<WorkResp> {
+    let batch = crate::state::CURRENT_BATCH_WORK.may_load(storage)?;
+    match batch {
+        Some(batch) => match batch {
+            crate::types::BatchWork::NoWork => Ok(WorkResp::NoWork),
+            crate::types::BatchWork::BatchRebalance {
+                start_from,
+                balance,
+                token,
+            } => Ok(WorkResp::HasWork {
+                work_description: WorkDescription::Rebalance {
+                    token,
+                    amount: balance,
+                    start_from,
+                },
+            }),
+        },
+        None => Ok(WorkResp::NoWork),
+    }
+}
+
 pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp> {
+    let batch_work = get_batch_work(storage)?;
+    if batch_work.has_work() {
+        return Ok(batch_work);
+    }
+
     let market_status = crate::state::MARKET_LOADER_STATUS.may_load(storage)?;
     match market_status {
         Some(market_status) => match market_status {
@@ -563,6 +589,7 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
             work_description: WorkDescription::Rebalance {
                 token: token.clone(),
                 amount: rebalance_amount,
+                start_from: None,
             },
         })
     }

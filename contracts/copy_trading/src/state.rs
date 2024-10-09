@@ -6,8 +6,7 @@ use perpswap::time::Timestamp;
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, HighWaterMark, IncQueuePosition, LpTokenValue, MarketInfo,
-        MarketLoaderStatus, MarketWorkInfo, Totals, WalletInfo,
+        BatchWork, DecQueuePosition, HighWaterMark, IncQueuePosition, LpTokenValue, MarketInfo, MarketLoaderStatus, MarketWorkInfo, Totals, WalletInfo
     },
 };
 
@@ -86,3 +85,6 @@ pub(crate) const LEADER_COMMISSION: Map<&Token, Collateral> = Map::new("leader-c
 
 /// High water mark
 pub(crate) const HIGH_WATER_MARK: Map<&Token, HighWaterMark> = Map::new("high-water-market");
+
+/// Tracks current batch work that is in progress
+pub(crate) const CURRENT_BATCH_WORK: Item<BatchWork> = Item::new("current-batch-work");

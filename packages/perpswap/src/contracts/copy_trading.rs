@@ -47,6 +47,8 @@ pub struct Config {
     pub commission_rate: Decimal256,
     /// Creation time of contract
     pub created_at: Timestamp,
+    /// Allowed smart queries During Rebalance operations
+    pub allowed_rebalance_queries: u32,
 }
 
 impl Config {
@@ -84,6 +86,7 @@ pub struct ConfigUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
     pub commission_rate: Option<Decimal256>,
+    pub allowed_rebalance_queries: Option<u32>,
 }
 
 /// Executions available on the copy trading contract.
@@ -624,6 +627,16 @@ pub enum WorkResp {
     },
 }
 
+impl WorkResp {
+    /// Does it have work ?
+    pub fn has_work(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { .. } => true,
+        }
+    }
+}
+
 /// Work Description
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -659,6 +672,8 @@ pub enum WorkDescription {
         token: Token,
         /// Amount that needs to be balanced
         amount: NonZero<Collateral>,
+        /// Start from specific market id
+        start_from: Option<MarketId>,
     },
 }
 
