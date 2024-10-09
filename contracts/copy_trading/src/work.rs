@@ -172,7 +172,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
     if batch_work.has_work() {
         return Ok(batch_work);
     }
-
     let market_status = crate::state::MARKET_LOADER_STATUS.may_load(storage)?;
     match market_status {
         Some(market_status) => match market_status {
@@ -209,7 +208,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
             })
         }
     }
-
     let inc_queue_item = get_current_processed_inc_queue_id(storage)?;
     let (next_inc_queue_position, queue_item) = match inc_queue_item {
         Some((queue_id, queue_item)) => (queue_id, queue_item),
@@ -227,7 +225,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
 
     let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
-
     match requires_token {
         RequiresToken::Token { token } => {
             let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
@@ -570,8 +567,9 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         .collateral
         .checked_add(pending_deposits)?
         .checked_add(leader_comission)?;
+    let total = market_token.round_down_to_precision(total)?;
     let diff = total.diff(contract_balance);
-    let is_approximate_same = diff < "0.000001".parse().unwrap();
+    let is_approximate_same = diff <= "0.000001".parse().unwrap();
     if is_approximate_same {
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
