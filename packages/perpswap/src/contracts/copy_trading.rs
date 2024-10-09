@@ -447,6 +447,10 @@ pub struct TokenStatus {
     pub collateral: Collateral,
     /// Total shares so far. Represents AUM.
     pub shares: LpToken,
+    /// Unclaimed commission
+    pub unclaimed_commission: Collateral,
+    /// Claimed commission
+    pub claimed_commission: Collateral,
 }
 
 /// Individual market response from [QueryMsg::Status]

@@ -446,6 +446,7 @@ fn leader_position_closed_with_profit() {
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let tokens = status.tokens;
+    assert!(tokens[0].unclaimed_commission > Collateral::zero());
 
     let tokens_collateral = tokens_collateral
         .checked_add("20".parse().unwrap())
