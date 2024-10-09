@@ -141,7 +141,7 @@ pub enum ExecuteMsg {
     LeaderUpdateConfig(ConfigUpdate),
     /// Update configuration values that is allowed for facotr.
     FactoryUpdateConfig(FactoryConfigUpdate),
-    /// Leader specific execute messages
+    /// Leader specific execute message for the market
     LeaderMsg {
         /// Market id that message is for
         market_id: MarketId,
@@ -149,6 +149,13 @@ pub enum ExecuteMsg {
         message: Box<MarketExecuteMsg>,
         /// Collateral to use for the action
         collateral: Option<NonZero<Collateral>>,
+    },
+    /// Leader withdrawal (for commission).
+    LeaderWithdrawal {
+        /// Fund to be withdrawn
+        requested_funds: NonZero<Collateral>,
+        /// Token type in which amount should be withdrawn
+        token: Token,
     },
     /// Perform queue work
     DoWork {},

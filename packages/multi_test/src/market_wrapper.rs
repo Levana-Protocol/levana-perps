@@ -2506,6 +2506,19 @@ impl PerpsMarket {
         self.exec_copytrading(&leader, wasm_msg)
     }
 
+    pub fn exec_copytrading_leader_withdraw(&self, amount: Collateral) -> Result<AppResponse> {
+        let amount = NonZero::new(amount).context("amount is zero")?;
+        let token = self.get_copytrading_token()?;
+        let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+        self.exec_copytrading(
+            &leader,
+            &CopyTradingExecuteMsg::LeaderWithdrawal {
+                requested_funds: amount,
+                token,
+            },
+        )
+    }
+
     pub fn exec_copytrading_mint_and_deposit(
         &self,
         sender: &Addr,
