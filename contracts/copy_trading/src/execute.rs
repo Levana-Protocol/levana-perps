@@ -5,9 +5,9 @@ use crate::{
     },
     prelude::*,
     types::{
-        BatchWork, DecQueuePosition, HighWaterMark, IncQueuePosition,
-        LeaderComissision, LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue,
-        ProcessingStatus, State, WalletInfo,
+        BatchWork, DecQueuePosition, HighWaterMark, IncQueuePosition, LeaderComissision,
+        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, State,
+        WalletInfo,
     },
     work::{get_work, process_queue_item},
 };
@@ -522,10 +522,10 @@ fn handle_leader_commission(
         &state.config.commission_rate,
     )?;
     if !commission.0.is_zero() {
-        let leader_comisssion = crate::state::LEADER_COMMISSION
+        let mut leader_commission = crate::state::LEADER_COMMISSION
             .may_load(storage, token)?
             .unwrap_or_default();
-        let leader_commission = leader_comisssion.checked_add(commission.0)?;
+        leader_commission.unclaimed = leader_commission.unclaimed.checked_add(commission.0)?;
         crate::state::LEADER_COMMISSION.save(storage, token, &leader_commission)?;
         let pnl = closed_position
             .pnl_collateral

@@ -389,6 +389,15 @@ pub struct HighWaterMark {
     pub hwm: Collateral,
 }
 
+/// Commission stats for the leader
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+pub struct CommissionStats {
+    /// Total unclaimed collateral by the leader
+    pub unclaimed: Collateral,
+    /// Total claimed collateral by the leader. This is cumulative.
+    pub claimed: Collateral
+}
+
 /// Comissision that should be paid to the leader
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Commission(pub Collateral);
