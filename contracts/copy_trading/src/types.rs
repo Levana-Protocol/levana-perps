@@ -424,7 +424,6 @@ impl HighWaterMark {
 }
 
 /// Current batch work in Progress
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum BatchWork {
     /// No work present

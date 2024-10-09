@@ -417,7 +417,7 @@ impl Totals {
     pub(crate) fn add_collateral(
         &mut self,
         funds: NonZero<Collateral>,
-        token_value: OneLpTokenValue,
+        token_value: &OneLpTokenValue,
     ) -> Result<NonZero<LpToken>> {
         let new_shares = token_value.collateral_to_shares(funds)?;
 
