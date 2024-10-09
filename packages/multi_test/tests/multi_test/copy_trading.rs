@@ -1,4 +1,5 @@
 mod leader;
+mod batch_work;
 
 use std::str::FromStr;
 
