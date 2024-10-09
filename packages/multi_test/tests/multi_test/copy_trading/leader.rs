@@ -3,7 +3,7 @@ use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarke
 use perpswap::{
     contracts::{
         copy_trading::{DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp},
-        market::position::PositionId,
+        market::position::{ClosedPosition, PositionId},
     },
     number::{Collateral, UnsignedDecimal},
     storage::DirectionToBase,
@@ -627,4 +627,105 @@ fn leader_withdrawal() {
         new_commission.checked_add(valid_commission).unwrap(),
         commission
     );
+}
+
+fn make_profit(market: &PerpsMarket, trader: &Addr) -> anyhow::Result<ClosedPosition> {
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    // Leader opens a position
+    market
+        .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+        .unwrap();
+
+    // Process queue item: Open the position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    // Process queue item: Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let position_ids = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
+
+    // We are going to make a profit!
+    market.exec_set_price("1.5".try_into().unwrap()).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    let closed_position = market
+        .query_closed_position(&market.copy_trading_addr, position_ids[0])
+        .unwrap();
+
+    // Restore the price back
+    market.exec_set_price("1".try_into().unwrap()).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    Ok(closed_position)
+}
+
+fn deposit_and_rebalance(market: &PerpsMarket, trader: &Addr) {
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "20")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    match work {
+        WorkResp::NoWork => panic!("Impossible: No work"),
+        WorkResp::HasWork { work_description } => assert!(work_description.is_rebalance()),
+    }
+    // Rebalance work
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Compute lp token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Do deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+}
+
+#[test]
+fn no_double_comission() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200").unwrap();
+
+    let closed_position = make_profit(&market, &trader).unwrap();
+    deposit_and_rebalance(&market, &trader);
+    let trader1 = market.clone_trader(1).unwrap();
+
+    let leader_comission = closed_position
+        .pnl_collateral
+        .try_into_non_negative_value()
+        .unwrap()
+        .checked_mul_dec("0.1".parse().unwrap())
+        .unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(leader_comission, tokens[0].unclaimed_commission);
+
+    make_profit(&market, &trader).unwrap();
+    deposit_and_rebalance(&market, &trader1);
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let total_commission = status.tokens[0].unclaimed_commission;
+    assert_eq!(
+        leader_comission
+            .checked_mul_dec("2".parse().unwrap())
+            .unwrap(),
+        total_commission
+    );
+    assert_eq!(status.tokens[0].claimed_commission, Collateral::zero());
 }
