@@ -51,16 +51,22 @@ fn leader_status(
     let tokens = crate::state::TOTALS
         .range(storage, None, start_after, Order::Ascending)
         .take(limit);
-    let response = tokens
-        .map(|item| {
-            item.map(|(token, totals)| TokenStatus {
-                token,
-                collateral: totals.collateral,
-                shares: totals.shares,
-            })
-        })
-        .collect::<cosmwasm_std::StdResult<Vec<_>>>()?;
-    let response = LeaderStatusResp { tokens: response };
+    let mut result = Vec::with_capacity(limit);
+    for token in tokens {
+        let (token, totals) = token?;
+        let commission = crate::state::LEADER_COMMISSION
+            .may_load(storage, &token)?
+            .unwrap_or_default();
+        let item = TokenStatus {
+            token,
+            collateral: totals.collateral,
+            shares: totals.shares,
+            unclaimed_commission: commission.unclaimed,
+            claimed_commission: commission.claimed,
+        };
+        result.push(item);
+    }
+    let response = LeaderStatusResp { tokens: result };
     Ok(response)
 }
 

@@ -573,7 +573,7 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
     let total = totals
         .collateral
         .checked_add(pending_deposits)?
-        .checked_add(leader_comission)?;
+        .checked_add(leader_comission.unclaimed)?;
     let diff = total.diff(contract_balance);
     // This diff number was chosen arbitrarly by opening and closing
     // 1500 positions which resulted in some leader commission.

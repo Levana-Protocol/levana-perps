@@ -376,10 +376,6 @@ pub struct LeaderComissision {
     pub active_collateral: Collateral,
     /// Total profit made in that closed position
     pub profit: Collateral,
-    /// Total comission that leader got from the closed position
-    pub commission: Commission,
-    /// This is the difference between pnl and comission
-    pub remaining_profit: Collateral,
     /// This is the difference between active collateral and commission
     pub remaining_collateral: Collateral,
 }
@@ -393,15 +389,18 @@ pub struct HighWaterMark {
     pub hwm: Collateral,
 }
 
+/// Commission stats for the leader
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+pub struct CommissionStats {
+    /// Total unclaimed collateral by the leader
+    pub unclaimed: Collateral,
+    /// Total claimed collateral by the leader. This is cumulative.
+    pub claimed: Collateral,
+}
+
 /// Comissision that should be paid to the leader
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Commission(pub Collateral);
-
-impl Commission {
-    pub fn zero() -> Self {
-        Commission(Collateral::zero())
-    }
-}
 
 impl HighWaterMark {
     pub fn add_pnl(&mut self, pnl: Signed<Collateral>, rate: &Decimal256) -> Result<Commission> {

@@ -3,6 +3,7 @@ use perpswap::contracts::market::{
 };
 use perpswap::time::Timestamp;
 
+use crate::types::CommissionStats;
 use crate::{
     prelude::*,
     types::{
@@ -82,7 +83,7 @@ pub(crate) const LAST_CLOSED_POSITION_CURSOR: Map<&MarketId, ClosedPositionCurso
     Map::new("last-closed-position-cursor");
 
 /// Leader comissision
-pub(crate) const LEADER_COMMISSION: Map<&Token, Collateral> = Map::new("leader-commission");
+pub(crate) const LEADER_COMMISSION: Map<&Token, CommissionStats> = Map::new("leader-commission");
 
 /// High water mark
 pub(crate) const HIGH_WATER_MARK: Map<&Token, HighWaterMark> = Map::new("high-water-market");
