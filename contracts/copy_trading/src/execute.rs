@@ -149,8 +149,41 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             execute_leader_msg(storage, &state, market_id, message, collateral)
         }
+        ExecuteMsg::FactoryUpdateConfig(config) => {
+            state.config.ensure_factory(&sender)?;
+            funds.require_none()?;
+            factory_update_config(storage, config)
+        }
         _ => panic!("Not implemented yet"),
     }
+}
+
+fn factory_update_config(
+    storage: &mut dyn Storage,
+    config: FactoryConfigUpdate,
+) -> Result<Response> {
+    let FactoryConfigUpdate {
+        allowed_rebalance_queries,
+    } = config;
+    let mut config = crate::state::CONFIG
+        .may_load(storage)?
+        .context("CONFIG store is empty")?;
+    let mut event = Event::new("factory-update-config");
+    if let Some(allowed_rebalance_queries) = allowed_rebalance_queries {
+        config.allowed_rebalance_queries = allowed_rebalance_queries;
+        event = event
+            .add_attribute(
+                "old-allowed-rebalance-queries",
+                config.allowed_rebalance_queries.to_string(),
+            )
+            .add_attribute(
+                "new-allowed-rebalance-queries",
+                allowed_rebalance_queries.to_string(),
+            );
+    }
+    crate::state::CONFIG.save(storage, &config)?;
+    let response = Response::new().add_event(event);
+    Ok(response)
 }
 
 #[allow(deprecated)]
@@ -397,6 +430,7 @@ fn rebalance(
                         time: item.close_time,
                         position: item.id,
                     });
+
             if let Some(ref last_closed_position) = last_closed_position {
                 crate::state::LAST_CLOSED_POSITION_CURSOR.save(
                     storage,
@@ -432,14 +466,13 @@ fn rebalance(
         if check_balance.approx_eq(rebalance_amount) {
             break;
         }
-        if total_queries >= state.config.allowed_rebalance_queries {
+        if total_queries > state.config.allowed_rebalance_queries {
             early_exit = true;
             break;
         }
     }
     let mut event = Event::new("rebalanced").add_attribute("made-profit", made_profit.to_string());
-    let batched = total_queries >= state.config.allowed_rebalance_queries;
-    event = event.add_attribute("batched", batched.to_string());
+    event = event.add_attribute("batched", early_exit.to_string());
     if check_balance < rebalance_amount && !early_exit {
         // We have settled all the markets's closed positions, but we
         // are still not balanced. This means that the money was sent

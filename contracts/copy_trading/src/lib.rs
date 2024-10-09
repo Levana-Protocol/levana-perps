@@ -32,8 +32,10 @@ pub fn instantiate(
                 name,
                 description,
                 commission_rate,
-                allowed_rebalance_queries,
             },
+        parameters: FactoryConfigUpdate {
+            allowed_rebalance_queries,
+        },
     }: InstantiateMsg,
 ) -> Result<Response> {
     // Sender is the factory contract

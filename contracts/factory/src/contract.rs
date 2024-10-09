@@ -179,6 +179,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                         name: Some(name),
                         description: Some(description),
                         commission_rate: None,
+                    },
+                    parameters: perpswap::contracts::copy_trading::FactoryConfigUpdate {
                         allowed_rebalance_queries: None,
                     },
                 },
