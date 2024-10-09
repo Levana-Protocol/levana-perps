@@ -415,7 +415,9 @@ fn leader_position_closed_with_profit() {
 
     // Rebalance the market
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
-    let event = Event::new("wasm-rebalanced").add_attribute("made-profit", true.to_string());
+    let event = Event::new("wasm-rebalanced")
+        .add_attribute("made-profit", true.to_string())
+        .add_attribute("batched", false.to_string());
     response.assert_event(&event);
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
