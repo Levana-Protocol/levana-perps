@@ -559,3 +559,72 @@ fn leader_position_closed_with_loss() {
     // Since token value has decreased, he can buy more shares for the same amount
     assert!(shares.raw() > "20".parse().unwrap());
 }
+
+#[test]
+fn leader_withdrawal() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200").unwrap();
+
+    // Leader opens a position
+    market
+        .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+        .unwrap();
+
+    // Process queue item: Open the position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    // Process queue item: Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    // We are going to make a profit!
+    market.exec_set_price("1.5".try_into().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    match work {
+        WorkResp::NoWork => panic!("Impossible: No work"),
+        WorkResp::HasWork { work_description } => assert!(work_description.is_rebalance()),
+    }
+
+    // Rebalance the market
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-rebalanced")
+        .add_attribute("made-profit", true.to_string())
+        .add_attribute("batched", false.to_string());
+    response.assert_event(&event);
+
+    let leader_status = market.query_copy_trading_leader_tokens().unwrap();
+    let commission = leader_status.tokens[0].unclaimed_commission;
+
+    // Try to steal 0.1 collateral additonally
+    let steal_commission = commission.checked_add("0.1".parse().unwrap()).unwrap();
+    market
+        .exec_copytrading_leader_withdraw(steal_commission)
+        .unwrap_err();
+
+    let valid_commission = commission.checked_div_dec("2".parse().unwrap()).unwrap();
+    market
+        .exec_copytrading_leader_withdraw(valid_commission)
+        .unwrap();
+
+    let leader_status = market.query_copy_trading_leader_tokens().unwrap();
+    let new_commission = leader_status.tokens[0].unclaimed_commission;
+    assert_eq!(
+        new_commission.checked_add(valid_commission).unwrap(),
+        commission
+    );
+}
