@@ -154,8 +154,44 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             factory_update_config(storage, config)
         }
+        ExecuteMsg::LeaderWithdrawal {
+            requested_funds,
+            token,
+        } => {
+            state.config.ensure_leader(&sender)?;
+            funds.require_none()?;
+            leader_withdrawal(&state, storage, requested_funds, token)
+        }
         _ => panic!("Not implemented yet"),
     }
+}
+
+fn leader_withdrawal(
+    state: &State,
+    storage: &mut dyn Storage,
+    requested_funds: NonZero<Collateral>,
+    token: Token,
+) -> Result<Response> {
+    let mut commission = crate::state::LEADER_COMMISSION
+        .may_load(storage, &token)?
+        .unwrap_or_default();
+    let market_token = state.get_first_full_token_info(storage, &token)?;
+    ensure!(
+        commission.unclaimed >= requested_funds.raw(),
+        FailedReason::NotEnoughCollateral {
+            available: commission.unclaimed,
+            requested: requested_funds
+        }
+    );
+    commission.unclaimed = commission.unclaimed.checked_sub(requested_funds.raw())?;
+    commission.claimed = commission.claimed.checked_add(requested_funds.raw())?;
+    crate::state::LEADER_COMMISSION.save(storage, &token, &commission)?;
+    let msg = market_token
+        .into_transfer_msg(&state.config.leader, requested_funds)?
+        .context("Collateral amount would be less than the chain's minimum representation")?;
+    let event =
+        Event::new("leader-withdraw").add_attribute("collateral", requested_funds.to_string());
+    Ok(Response::new().add_event(event).add_message(msg))
 }
 
 fn factory_update_config(
