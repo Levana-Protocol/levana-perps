@@ -162,7 +162,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             leader_withdrawal(&state, storage, requested_funds, token)
         }
-        _ => panic!("Not implemented yet"),
+        ExecuteMsg::AppointAdmin { .. } => todo!(),
+        ExecuteMsg::AcceptAdmin {} => todo!(),
+        ExecuteMsg::LeaderUpdateConfig(_) => todo!(),
     }
 }
 
