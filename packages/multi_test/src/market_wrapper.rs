@@ -2521,7 +2521,7 @@ impl PerpsMarket {
 
     pub fn exec_copytrading_leader(&self, msg: &CopyTradingExecuteMsg) -> Result<AppResponse> {
         let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
-        self.exec_copytrading(&leader, &msg)
+        self.exec_copytrading(&leader, msg)
     }
 
     pub fn exec_copytrading_mint_and_deposit(
