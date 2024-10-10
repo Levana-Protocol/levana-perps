@@ -9,7 +9,6 @@ pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE: u64 = 1;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
-    println!("inside reply");
     let (_state, storage) = State::load_mut(deps, &env)?;
     if msg.id == REPLY_ID_OPEN_POSITION {
         match msg.result {
