@@ -421,3 +421,152 @@ fn update_position_remove_collateral_impact_leverage_failure() {
     let final_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
     assert_eq!(initial_token.collateral, final_token.collateral);
 }
+
+#[test]
+fn update_position_remove_collateral_impact_size() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "2000").unwrap();
+
+    market
+        .exec_copy_trading_open_position("20", DirectionToBase::Long, "1.5")
+        .unwrap();
+    // Open position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    // Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+    let initial_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
+
+    let position_id = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>()[0];
+
+    let five_collateral = "5".parse().unwrap();
+
+    let collateral = NonZero::new(five_collateral).unwrap();
+    market
+        .exec_copytrading_leader(&copy_trading::ExecuteMsg::LeaderMsg {
+            market_id: market.id.clone(),
+            message: Box::new(
+                perpswap::storage::MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                    id: position_id,
+                    amount: collateral,
+                    slippage_assert: None,
+                },
+            ),
+            collateral: None,
+        })
+        .unwrap();
+    // Update position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // No work since cranking is not done yet
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_deferred_work());
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    // Let's do deposit, to rebalance the increase of money
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "3")
+        .unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_rebalance());
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // compute lp token value
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let estimated_final_token = initial_token
+        .collateral
+        .checked_add(five_collateral)
+        .unwrap()
+        .checked_add("3".parse().unwrap())
+        .unwrap();
+    let final_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
+    assert!(final_token.collateral.approx_eq(estimated_final_token));
+    let leader_queue = market
+        .query_copy_trading_queue_status(leader.clone().into())
+        .unwrap();
+    assert!(leader_queue.items.iter().all(|item| item.status.finish()));
+}
+
+#[test]
+fn update_position_remove_collateral_impact_size_failure() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "2000").unwrap();
+
+    market
+        .exec_copy_trading_open_position("20", DirectionToBase::Long, "1.5")
+        .unwrap();
+    // Open position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    // Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+    let initial_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
+
+    let position_id = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>()[0];
+
+    let twenty_collateral = "20".parse().unwrap();
+
+    let collateral = NonZero::new(twenty_collateral).unwrap();
+    market
+        .exec_copytrading_leader(&copy_trading::ExecuteMsg::LeaderMsg {
+            market_id: market.id.clone(),
+            message: Box::new(
+                perpswap::storage::MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                    id: position_id,
+                    amount: collateral,
+                    slippage_assert: None,
+                },
+            ),
+            collateral: None,
+        })
+        .unwrap();
+    // Update position.
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // No work since cranking is not done yet
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let leader_queue = market
+        .query_copy_trading_queue_status(leader.clone().into())
+        .unwrap();
+    assert!(leader_queue.items.iter().any(|item| item.status.failed()));
+
+    let final_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
+    assert_eq!(initial_token.collateral, final_token.collateral);
+}
