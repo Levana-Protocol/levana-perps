@@ -29,49 +29,11 @@ fn handle_sucess(storage: &mut dyn Storage, msg: SubMsgResponse, event: Event) -
     Ok(event.add_attribute("success", true.to_string()))
 }
 
-fn open_position_handle_failure(
+fn handle_dec_failure(
     storage: &mut dyn Storage,
     event: Event,
     error: String,
-) -> Result<Event> {
-    // Opening position has failed
-    let queue_item = get_current_processed_dec_queue_id(storage)?;
-    let (queue_id, mut queue_item) = match queue_item {
-        Some(queue_item) => queue_item,
-        None => bail!("Impossible: Work handle not able to find queue item"),
-    };
-
-    assert!(queue_item.status.in_progress());
-    let (market_id, token, item) = match queue_item.item.clone() {
-        DecQueueItem::MarketItem { id, token, item } => (id, token, item),
-        _ => bail!("Impossible: Deferred work handler got non market item"),
-    };
-    let mut totals = crate::state::TOTALS
-        .may_load(storage, &token)?
-        .context("TOTALS store is empty")?;
-    match *item {
-        DecMarketItem::OpenPosition { collateral, .. } => {
-            totals.collateral = totals.collateral.checked_add(collateral.raw())?;
-            crate::state::TOTALS.save(storage, &token, &totals)?;
-        }
-        err => {
-            bail!("Impossible: Reply handler got non open position: {err:?}")
-        }
-    }
-    queue_item.status = copy_trading::ProcessingStatus::Failed(FailedReason::MarketError {
-        market_id,
-        message: error,
-    });
-    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
-    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
-    let event = event.add_attribute("failure", true.to_string());
-    Ok(event)
-}
-
-fn update_position_handle_failure(
-    storage: &mut dyn Storage,
-    event: Event,
-    error: String,
+    handler: fn(&mut dyn Storage, Token, Box<DecMarketItem>) -> Result<()>,
 ) -> Result<Event> {
     // Updating position has failed
     let queue_item = get_current_processed_dec_queue_id(storage)?;
@@ -85,6 +47,42 @@ fn update_position_handle_failure(
         DecQueueItem::MarketItem { id, token, item } => (id, token, item),
         _ => bail!("Impossible: Deferred work handler got non market item"),
     };
+    handler(storage, token, item)?;
+    queue_item.status = copy_trading::ProcessingStatus::Failed(FailedReason::MarketError {
+        market_id,
+        message: error,
+    });
+    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
+    let event = event.add_attribute("failure", true.to_string());
+    Ok(event)
+}
+
+fn open_position_failure(
+    storage: &mut dyn Storage,
+    token: Token,
+    item: Box<DecMarketItem>,
+) -> Result<()> {
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &token)?
+        .context("TOTALS store is empty")?;
+    match *item {
+        DecMarketItem::OpenPosition { collateral, .. } => {
+            totals.collateral = totals.collateral.checked_add(collateral.raw())?;
+            crate::state::TOTALS.save(storage, &token, &totals)?;
+        }
+        err => {
+            bail!("Impossible: Reply handler got non open position: {err:?}")
+        }
+    }
+    Ok(())
+}
+
+fn add_collateral_impact_leverage_failure(
+    storage: &mut dyn Storage,
+    token: Token,
+    item: Box<DecMarketItem>,
+) -> Result<()> {
     let mut totals = crate::state::TOTALS
         .may_load(storage, &token)?
         .context("TOTALS store is empty")?;
@@ -97,14 +95,7 @@ fn update_position_handle_failure(
             bail!("Impossible: Reply handler got non update position: {err:?}")
         }
     }
-    queue_item.status = copy_trading::ProcessingStatus::Failed(FailedReason::MarketError {
-        market_id,
-        message: error,
-    });
-    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
-    crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &queue_id)?;
-    let event = event.add_attribute("failure", true.to_string());
-    Ok(event)
+    Ok(())
 }
 
 #[entry_point]
@@ -115,14 +106,17 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
         REPLY_ID_OPEN_POSITION => match msg.result {
             cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
             cosmwasm_std::SubMsgResult::Err(error) => {
-                open_position_handle_failure(storage, event, error)?
+                handle_dec_failure(storage, event, error, open_position_failure)?
             }
         },
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE => match msg.result {
             cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
-            cosmwasm_std::SubMsgResult::Err(error) => {
-                update_position_handle_failure(storage, event, error)?
-            }
+            cosmwasm_std::SubMsgResult::Err(error) => handle_dec_failure(
+                storage,
+                event,
+                error,
+                add_collateral_impact_leverage_failure,
+            )?,
         },
         _ => bail!("Got unknown reply id {}", msg.id),
     };
