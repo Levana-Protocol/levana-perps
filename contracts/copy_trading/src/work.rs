@@ -706,9 +706,9 @@ pub(crate) fn process_queue_item(
                                 slippage_assert,
                                 leverage,
                                 direction,
-                                max_gains: None,
                                 stop_loss_override,
-                                take_profit,
+                                // TODO: remove unwrap
+                                take_profit: take_profit.unwrap(),
                             },
                         )?;
                         // We use reply always so that we also handle the error case

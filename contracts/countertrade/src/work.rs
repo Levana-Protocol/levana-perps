@@ -915,9 +915,8 @@ pub(crate) fn execute(
                     slippage_assert: None,
                     leverage,
                     direction,
-                    max_gains: None,
                     stop_loss_override,
-                    take_profit: Some(take_profit),
+                    take_profit,
                 },
             )?;
             totals.collateral = totals.collateral.checked_sub(collateral.raw())?;

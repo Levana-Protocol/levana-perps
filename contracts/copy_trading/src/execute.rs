@@ -225,6 +225,7 @@ fn factory_update_config(
 }
 
 #[allow(deprecated)]
+#[allow(clippy::boxed_local)]
 fn execute_leader_msg(
     storage: &mut dyn Storage,
     state: &State,
@@ -251,7 +252,6 @@ fn execute_leader_msg(
             slippage_assert,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
@@ -259,12 +259,6 @@ fn execute_leader_msg(
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for opening position"),
             };
-            if max_gains.is_some() {
-                bail!("max_gains is deprecated, use take_profit instead")
-            }
-            if take_profit.is_none() {
-                bail!("take profit is not specified")
-            }
             let dec_queue_id = get_next_dec_queue_id(storage)?;
             let leader = state.config.leader.clone();
             crate::state::WALLET_QUEUE_ITEMS.save(
@@ -282,7 +276,7 @@ fn execute_leader_msg(
                         leverage,
                         direction,
                         stop_loss_override,
-                        take_profit,
+                        take_profit: Some(take_profit),
                     }),
                 },
                 status: copy_trading::ProcessingStatus::NotProcessed,
