@@ -6,6 +6,7 @@ use crate::{common::get_current_processed_dec_queue_id, prelude::*, types::State
 
 pub(crate) const REPLY_ID_OPEN_POSITION: u64 = 0;
 pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE: u64 = 1;
+pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE: u64 = 2;
 
 fn handle_sucess(storage: &mut dyn Storage, msg: SubMsgResponse, event: Event) -> Result<Event> {
     let deferred_exec_id: DeferredExecId = msg
@@ -98,6 +99,26 @@ fn add_collateral_impact_leverage_failure(
     Ok(())
 }
 
+fn add_collateral_impact_size_failure(
+    storage: &mut dyn Storage,
+    token: Token,
+    item: Box<DecMarketItem>,
+) -> Result<()> {
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &token)?
+        .context("TOTALS store is empty")?;
+    match *item {
+        DecMarketItem::UpdatePositionAddCollateralImpactSize { collateral, .. } => {
+            totals.collateral = totals.collateral.checked_add(collateral.raw())?;
+            crate::state::TOTALS.save(storage, &token, &totals)?;
+        }
+        err => {
+            bail!("Impossible: Reply handler got non update position: {err:?}")
+        }
+    }
+    Ok(())
+}
+
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
     let (_state, storage) = State::load_mut(deps, &env)?;
@@ -117,6 +138,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 error,
                 add_collateral_impact_leverage_failure,
             )?,
+        },
+        REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE => match msg.result {
+            cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
+            cosmwasm_std::SubMsgResult::Err(error) => {
+                handle_dec_failure(storage, event, error, add_collateral_impact_size_failure)?
+            }
         },
         _ => bail!("Got unknown reply id {}", msg.id),
     };

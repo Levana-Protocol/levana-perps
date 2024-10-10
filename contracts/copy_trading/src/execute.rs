@@ -335,8 +335,46 @@ fn execute_leader_msg(
                     .add_attribute("collateral", collateral.to_string()),
             ))
         }
-        // dec collater
-        MarketExecuteMsg::UpdatePositionAddCollateralImpactSize { .. } => todo!(),
+        MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
+            id,
+            slippage_assert,
+        } => {
+            let collateral = match collateral {
+                Some(collateral) => collateral,
+                None => bail!("No supplied collateral for updating position"),
+            };
+            let dec_queue_id = get_next_dec_queue_id(storage)?;
+            let leader = state.config.leader.clone();
+            crate::state::WALLET_QUEUE_ITEMS.save(
+                storage,
+                (&leader, QueuePositionId::DecQueuePositionId(dec_queue_id)),
+                &(),
+            )?;
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionAddCollateralImpactSize {
+                        collateral,
+                        id,
+                        slippage_assert,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            crate::state::COLLATERAL_DECREASE_QUEUE.save(
+                storage,
+                &dec_queue_id,
+                &queue_position,
+            )?;
+            Ok(Response::new().add_event(
+                Event::new("update-position-add-collateral-impact-size")
+                    .add_attribute("queue-id", dec_queue_id.to_string())
+                    .add_attribute("position-id", id.to_string())
+                    .add_attribute("collateral", collateral.to_string()),
+            ))
+        }
         // increase coll
         MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => todo!(),
         // increas

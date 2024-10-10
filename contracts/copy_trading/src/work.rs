@@ -11,7 +11,10 @@ use crate::{
         SIX_HOURS_IN_SECONDS,
     },
     prelude::*,
-    reply::{REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_OPEN_POSITION},
+    reply::{
+        REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
+        REPLY_ID_OPEN_POSITION,
+    },
     types::{DecQueuePosition, DecQueueResponse, State, WalletInfo},
 };
 use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
@@ -482,6 +485,40 @@ pub(crate) fn process_queue_item(
                     token,
                     item,
                 } => match *item {
+                    DecMarketItem::UpdatePositionAddCollateralImpactSize {
+                        collateral,
+                        id,
+                        slippage_assert,
+                    } => {
+                        let market_info = crate::state::MARKETS
+                            .may_load(storage, &market_id)?
+                            .context("MARKETS store is empty")?;
+                        let msg = market_info.token.into_market_execute_msg(
+                            &market_info.addr,
+                            collateral.raw(),
+                            MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
+                                id,
+                                slippage_assert,
+                            },
+                        )?;
+                        // We use reply always so that we also handle the error case
+                        let sub_msg =
+                            SubMsg::reply_always(msg, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE);
+                        let event = Event::new("update-position-add-collateral-impact-size")
+                            .add_attribute("collateral", collateral.to_string())
+                            .add_attribute("market-id", market_info.id.to_string())
+                            .add_attribute("position-id", id.to_string());
+                        let response = DecQueueResponse {
+                            sub_msg,
+                            collateral,
+                            token,
+                            event,
+                            queue_item,
+                            queue_id: queue_pos_id,
+                            response,
+                        };
+                        process_dec_queue(response, storage)
+                    }
                     DecMarketItem::UpdatePositionAddCollateralImpactLeverage { collateral, id } => {
                         let market_info = crate::state::MARKETS
                             .may_load(storage, &market_id)?
