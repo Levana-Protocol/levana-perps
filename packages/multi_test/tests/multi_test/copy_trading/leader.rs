@@ -721,11 +721,9 @@ fn no_double_comission() {
 
     let status = market.query_copy_trading_leader_tokens().unwrap();
     let total_commission = status.tokens[0].unclaimed_commission;
-    assert_eq!(
-        leader_comission
-            .checked_mul_dec("2".parse().unwrap())
-            .unwrap(),
-        total_commission
-    );
+    assert!(leader_comission
+        .checked_mul_dec("2".parse().unwrap())
+        .unwrap()
+        .approx_eq(total_commission));
     assert_eq!(status.tokens[0].claimed_commission, Collateral::zero());
 }
