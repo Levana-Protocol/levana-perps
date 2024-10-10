@@ -381,6 +381,13 @@ pub(crate) fn process_queue_item(
                                 .may_load(storage, &market_id)?
                                 .context("MARKETS store is empty")?;
                             let crank_fee = state.estimate_crank_fee(&market_info)?;
+                            {
+                                let mut totals = crate::state::TOTALS
+                                    .may_load(storage, &token)?
+                                    .context("TOTALS store is empty")?;
+                                totals.collateral = totals.collateral.checked_sub(crank_fee)?;
+                                crate::state::TOTALS.save(storage, &token, &totals)?;
+                            }
                             let msg = market_info.token.into_market_execute_msg(
                                 &market_info.addr,
                                 crank_fee,
