@@ -14,8 +14,9 @@ use crate::{
     reply::{
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
         REPLY_ID_OPEN_POSITION, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
+        REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE,
     },
-    types::{DecQueuePosition, DecQueueResponse, State, WalletInfo},
+    types::{DecQueuePosition, DecQueueResponse, IncQueueResponse, State, WalletInfo},
 };
 use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
@@ -373,6 +374,41 @@ pub(crate) fn process_queue_item(
                     token,
                 } => {
                     match *item {
+                        IncMarketItem::UpdatePositionRemoveCollateralImpactSize {
+                            id,
+                            amount,
+                            slippage_assert,
+                        } => {
+                            let market_info = crate::state::MARKETS
+                                .may_load(storage, &market_id)?
+                                .context("MARKETS store is empty")?;
+                            let crank_fee = state.estimate_crank_fee(&market_info)?;
+                            let msg = market_info.token.into_market_execute_msg(
+                                &market_info.addr,
+                                crank_fee,
+                                MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                                    id,
+                                    amount,
+                                    slippage_assert,
+                                },
+                            )?;
+                            // We use reply always so that we also handle the error case
+                            let sub_msg =
+                                SubMsg::reply_always(msg, REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE);
+                            let event = Event::new("update-position-remove-collateral-impact-size")
+                                .add_attribute("amount", amount.to_string())
+                                .add_attribute("maret-id", market_info.id.to_string())
+                                .add_attribute("position-id", id.to_string());
+                            let response = IncQueueResponse {
+                                sub_msg,
+                                collateral: Some(crank_fee),
+                                token,
+                                event,
+                                queue_item,
+                                queue_id: queue_pos_id,
+                            };
+                            process_inc_queue(response, storage)
+                        }
                         IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage {
                             id,
                             amount,
@@ -381,13 +417,6 @@ pub(crate) fn process_queue_item(
                                 .may_load(storage, &market_id)?
                                 .context("MARKETS store is empty")?;
                             let crank_fee = state.estimate_crank_fee(&market_info)?;
-                            {
-                                let mut totals = crate::state::TOTALS
-                                    .may_load(storage, &token)?
-                                    .context("TOTALS store is empty")?;
-                                totals.collateral = totals.collateral.checked_sub(crank_fee)?;
-                                crate::state::TOTALS.save(storage, &token, &totals)?;
-                            }
                             let msg = market_info.token.into_market_execute_msg(
                                 &market_info.addr,
                                 crank_fee,
@@ -401,24 +430,20 @@ pub(crate) fn process_queue_item(
                                 msg,
                                 REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
                             );
-                            let mut token_value = crate::state::LP_TOKEN_VALUE
-                                .may_load(storage, &token)?
-                                .context("LP_TOKEN_VALUE store is empty")?;
-                            token_value.set_outdated();
-                            crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
-                            queue_item.status = ProcessingStatus::InProgress;
-                            crate::state::COLLATERAL_INCREASE_QUEUE.save(
-                                storage,
-                                &queue_pos_id,
-                                &queue_item,
-                            )?;
                             let event =
                                 Event::new("update-position-remove-collateral-impact-leverage")
                                     .add_attribute("amount", amount.to_string())
                                     .add_attribute("maret-id", market_info.id.to_string())
                                     .add_attribute("position-id", id.to_string());
-                            let response = Response::new().add_event(event).add_submessage(sub_msg);
-                            Ok(response)
+                            let response = IncQueueResponse {
+                                sub_msg,
+                                collateral: Some(crank_fee),
+                                token,
+                                event,
+                                queue_item,
+                                queue_id: queue_pos_id,
+                            };
+                            process_inc_queue(response, storage)
                         }
                     }
                 }
@@ -780,6 +805,43 @@ fn process_dec_queue(response: DecQueueResponse, storage: &mut dyn Storage) -> R
     queue_item.status = ProcessingStatus::InProgress;
     crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
     let result = response.response.add_event(response.event);
+    let result = result.add_submessage(response.sub_msg);
+    Ok(result)
+}
+
+fn process_inc_queue(response: IncQueueResponse, storage: &mut dyn Storage) -> Result<Response> {
+    let mut queue_item = response.queue_item;
+    let token = response.token;
+    if let Some(collateral) = response.collateral {
+        let mut totals = crate::state::TOTALS
+            .may_load(storage, &token)?
+            .context("TOTALS store is empty")?;
+        if totals.collateral >= collateral {
+            totals.collateral = totals.collateral.checked_sub(collateral)?;
+            crate::state::TOTALS.save(storage, &token, &totals)?;
+        } else {
+            let event = response.event.add_attribute("failure", true.to_string());
+            queue_item.status = ProcessingStatus::Failed(FailedReason::NotEnoughCrankFee {
+                available: totals.collateral,
+                requested: collateral,
+            });
+            crate::state::COLLATERAL_INCREASE_QUEUE.save(
+                storage,
+                &response.queue_id,
+                &queue_item,
+            )?;
+            crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &response.queue_id)?;
+            return Ok(Response::new().add_event(event));
+        }
+    }
+    let mut token_value = crate::state::LP_TOKEN_VALUE
+        .may_load(storage, &token)?
+        .context("LP_TOKEN_VALUE store is empty")?;
+    token_value.set_outdated();
+    crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
+    queue_item.status = ProcessingStatus::InProgress;
+    crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
+    let result = Response::new().add_event(response.event);
     let result = result.add_submessage(response.sub_msg);
     Ok(result)
 }

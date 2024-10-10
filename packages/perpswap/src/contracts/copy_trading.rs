@@ -296,6 +296,14 @@ pub enum FailedReason {
         /// Requested collateral
         requested: NonZero<Collateral>,
     },
+    /// Not enough crank fee
+    #[error("Crank fee not available. Requested {requested}, but only available {available}")]
+    NotEnoughCrankFee {
+        /// Available collateral
+        available: Collateral,
+        /// Requested collateral
+        requested: Collateral,
+    },
     /// Fund less than chain's minimum representation
     #[error("Collateral amount {funds} is less than chain's minimum representation.not available")]
     FundLessThanMinChain {
@@ -401,6 +409,15 @@ pub enum IncMarketItem {
         /// Amount of funds to remove from the position
         amount: NonZero<Collateral>,
     },
+    /// Remove collateral from a position, causing leverage to increase
+    UpdatePositionRemoveCollateralImpactSize {
+        /// ID of position to update
+        id: PositionId,
+        /// Amount of funds to remove from the position
+        amount: NonZero<Collateral>,
+        /// Slippage alert
+        slippage_assert: Option<SlippageAssert>,
+    },
 }
 
 /// Queue item that needs to be processed
@@ -458,6 +475,9 @@ impl IncQueueItem {
             IncQueueItem::Deposit { token, .. } => RequiresToken::Token { token },
             IncQueueItem::MarketItem { item, .. } => match *item {
                 IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { .. } => {
+                    RequiresToken::NoToken {}
+                }
+                IncMarketItem::UpdatePositionRemoveCollateralImpactSize { .. } => {
                     RequiresToken::NoToken {}
                 }
             },

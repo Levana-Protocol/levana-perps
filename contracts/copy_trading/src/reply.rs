@@ -12,6 +12,7 @@ pub(crate) const REPLY_ID_OPEN_POSITION: u64 = 0;
 pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE: u64 = 1;
 pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE: u64 = 2;
 pub(crate) const REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE: u64 = 3;
+pub(crate) const REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE: u64 = 4;
 
 fn handle_sucess(storage: &mut dyn Storage, msg: SubMsgResponse, event: Event) -> Result<Event> {
     let deferred_exec_id: DeferredExecId = msg
