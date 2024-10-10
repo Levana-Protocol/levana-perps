@@ -456,7 +456,7 @@ impl IncQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             IncQueueItem::Deposit { token, .. } => RequiresToken::Token { token },
-            IncQueueItem::MarketItem { id, token, item } => match *item {
+            IncQueueItem::MarketItem { item, .. } => match *item {
                 IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { .. } => {
                     RequiresToken::NoToken {}
                 }
