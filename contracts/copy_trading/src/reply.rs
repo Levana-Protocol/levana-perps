@@ -2,13 +2,14 @@ use anyhow::bail;
 use cosmwasm_std::Reply;
 use perpswap::contracts::{copy_trading, market::deferred_execution::DeferredExecId};
 
-use crate::{prelude::*, types::State};
+use crate::{common::get_current_processed_dec_queue_id, prelude::*, types::State};
 
 pub(crate) const REPLY_ID_OPEN_POSITION: u64 = 0;
 pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE: u64 = 1;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
+    println!("inside reply");
     let (_state, storage) = State::load_mut(deps, &env)?;
     if msg.id == REPLY_ID_OPEN_POSITION {
         match msg.result {
@@ -28,17 +29,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
             }
             cosmwasm_std::SubMsgResult::Err(e) => {
                 // Opening position has failed
-                let queue_id = crate::state::LAST_PROCESSED_DEC_QUEUE_ID.may_load(storage)?;
-                let queue_id = match queue_id {
-                    Some(queue_id) => queue_id.next(),
-                    None => DecQueuePositionId::new(0),
-                };
-                let queue_item =
-                    crate::state::COLLATERAL_DECREASE_QUEUE.may_load(storage, &queue_id)?;
-                let mut queue_item = match queue_item {
+                let queue_item = get_current_processed_dec_queue_id(storage)?;
+                let (queue_id, mut queue_item) = match queue_item {
                     Some(queue_item) => queue_item,
                     None => bail!("Impossible: Work handle not able to find queue item"),
                 };
+
                 assert!(queue_item.status.in_progress());
                 let (market_id, token, item) = match queue_item.item.clone() {
                     DecQueueItem::MarketItem { id, token, item } => (id, token, item),
