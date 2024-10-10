@@ -1,5 +1,6 @@
 mod batch_work;
 mod leader;
+mod update_position;
 
 use std::str::FromStr;
 

@@ -45,11 +45,11 @@ fn leader_opens_attempt_open_incorrect_position() {
 
     let position_ids = market
         .query_position_token_ids(&market.copy_trading_addr)
-        .unwrap();
-    let position_ids = position_ids
+        .unwrap()
         .iter()
         .map(|item| PositionId::new(item.parse().unwrap()))
         .collect::<Vec<_>>();
+
     assert!(position_ids.is_empty());
 
     let status = market.query_copy_trading_leader_tokens().unwrap();

@@ -229,7 +229,7 @@ fn batch_work_rebalance() {
 }
 
 #[test]
-fn no_deferred_work_lost() {
+fn no_deferred_work_lost_for_open_position() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
