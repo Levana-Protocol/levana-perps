@@ -639,11 +639,11 @@ fn make_profit(market: &PerpsMarket, trader: &Addr) -> anyhow::Result<ClosedPosi
         .unwrap();
 
     // Process queue item: Open the position
-    market.exec_copytrading_do_work(&trader).unwrap();
-    market.exec_crank_till_finished(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
+    market.exec_crank_till_finished(trader).unwrap();
 
     // Process queue item: Handle deferred exec id
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
 
     let position_ids = market
         .query_position_token_ids(&market.copy_trading_addr)
@@ -654,7 +654,7 @@ fn make_profit(market: &PerpsMarket, trader: &Addr) -> anyhow::Result<ClosedPosi
 
     // We are going to make a profit!
     market.exec_set_price("1.5".try_into().unwrap()).unwrap();
-    market.exec_crank_till_finished(&trader).unwrap();
+    market.exec_crank_till_finished(trader).unwrap();
 
     let closed_position = market
         .query_closed_position(&market.copy_trading_addr, position_ids[0])
@@ -674,7 +674,7 @@ fn deposit_and_rebalance(market: &PerpsMarket, trader: &Addr) {
     assert_eq!(work, WorkResp::NoWork);
 
     market
-        .exec_copytrading_mint_and_deposit(&trader, "20")
+        .exec_copytrading_mint_and_deposit(trader, "20")
         .unwrap();
 
     let work = market.query_copy_trading_work().unwrap();
@@ -683,11 +683,11 @@ fn deposit_and_rebalance(market: &PerpsMarket, trader: &Addr) {
         WorkResp::HasWork { work_description } => assert!(work_description.is_rebalance()),
     }
     // Rebalance work
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
     // Compute lp token value
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
     // Do deposit
-    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_copytrading_do_work(trader).unwrap();
 
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
