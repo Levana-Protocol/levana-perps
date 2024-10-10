@@ -370,7 +370,7 @@ pub(crate) fn process_queue_item(
                 IncQueueItem::MarketItem {
                     id: market_id,
                     item,
-                    ..
+                    token,
                 } => {
                     match *item {
                         IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage {
@@ -386,6 +386,17 @@ pub(crate) fn process_queue_item(
                                 msg,
                                 REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
                             );
+                            let mut token_value = crate::state::LP_TOKEN_VALUE
+                                .may_load(storage, &token)?
+                                .context("LP_TOKEN_VALUE store is empty")?;
+                            token_value.set_outdated();
+                            crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
+                            queue_item.status = ProcessingStatus::InProgress;
+                            crate::state::COLLATERAL_INCREASE_QUEUE.save(
+                                storage,
+                                &queue_pos_id,
+                                &queue_item,
+                            )?;
                             let event =
                                 Event::new("update-position-remove-collateral-impact-leverage")
                                     .add_attribute("amount", amount.to_string())
