@@ -1,5 +1,5 @@
 use anyhow::bail;
-use cosmwasm_std::{SubMsg, WasmMsg};
+use cosmwasm_std::SubMsg;
 use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
@@ -380,7 +380,15 @@ pub(crate) fn process_queue_item(
                             let market_info = crate::state::MARKETS
                                 .may_load(storage, &market_id)?
                                 .context("MARKETS store is empty")?;
-                            let msg = WasmMsg::Execute { contract_addr: market_info.addr.into_string(), msg: to_json_binary(&MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id , amount  })?, funds: vec![] };
+                            let crank_fee = state.estimate_crank_fee(&market_info)?;
+                            let msg = market_info.token.into_market_execute_msg(
+                                &market_info.addr,
+                                crank_fee,
+                                MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage {
+                                    id,
+                                    amount,
+                                },
+                            )?;
                             // We use reply always so that we also handle the error case
                             let sub_msg = SubMsg::reply_always(
                                 msg,
