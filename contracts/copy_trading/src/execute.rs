@@ -376,7 +376,38 @@ fn execute_leader_msg(
             ))
         }
         // increase coll
-        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => todo!(),
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
+            // todo: abstract it under function
+            let inc_queue_id = get_next_inc_queue_id(storage)?;
+            let leader = state.config.leader.clone();
+            crate::state::WALLET_QUEUE_ITEMS.save(
+                storage,
+                (&leader, QueuePositionId::IncQueuePositionId(inc_queue_id)),
+                &(),
+            )?;
+            let queue_position = IncQueuePosition {
+                item: copy_trading::IncQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(
+                        IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount },
+                    ),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            crate::state::COLLATERAL_INCREASE_QUEUE.save(
+                storage,
+                &inc_queue_id,
+                &queue_position,
+            )?;
+            Ok(Response::new().add_event(
+                Event::new("update-position-remove-collateral-impact-leverage")
+                    .add_attribute("queue-id", inc_queue_id.to_string())
+                    .add_attribute("position-id", id.to_string())
+                    .add_attribute("amount", amount.to_string()),
+            ))
+        }
         // increas
         MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => todo!(),
         // no impact on collateral. only impatcs notional size.

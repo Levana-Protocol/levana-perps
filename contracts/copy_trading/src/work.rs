@@ -1,5 +1,5 @@
 use anyhow::bail;
-use cosmwasm_std::SubMsg;
+use cosmwasm_std::{SubMsg, WasmMsg};
 use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
@@ -13,13 +13,13 @@ use crate::{
     prelude::*,
     reply::{
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
-        REPLY_ID_OPEN_POSITION,
+        REPLY_ID_OPEN_POSITION, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
     },
     types::{DecQueuePosition, DecQueueResponse, State, WalletInfo},
 };
 use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
-fn get_deferred_work(
+fn get_dec_deferred_work(
     storage: &dyn Storage,
     state: &State,
     deferred_exec_id: DeferredExecId,
@@ -32,6 +32,39 @@ fn get_deferred_work(
     let market_id = match queue_item.item.clone() {
         DecQueueItem::MarketItem { id, .. } => id,
         _ => bail!("Impossible: Deferred work handler got non market item"),
+    };
+    let market_addr = crate::state::MARKETS
+        .may_load(storage, &market_id)?
+        .context("MARKETS state is empty")?
+        .addr;
+    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let status = match response {
+        GetDeferredExecResp::Found { item } => item,
+        GetDeferredExecResp::NotFound {} => {
+            bail!("Impossible: Deferred exec id not found")
+        }
+    };
+    if status.status.is_pending() {
+        return Ok(WorkResp::NoWork);
+    }
+    Ok(WorkResp::HasWork {
+        work_description: WorkDescription::HandleDeferredExecId {},
+    })
+}
+
+fn get_inc_deferred_work(
+    storage: &dyn Storage,
+    state: &State,
+    deferred_exec_id: DeferredExecId,
+) -> Result<WorkResp> {
+    let queue_item = get_current_processed_inc_queue_id(storage)?;
+    let (_queue_id, queue_item) = match queue_item {
+        Some((queue_id, queue_item)) => (queue_id, queue_item),
+        None => bail!("Impossible: Inc Work handle not able to find queue item"),
+    };
+    let market_id = match queue_item.item.clone() {
+        IncQueueItem::MarketItem { id, .. } => id,
+        _ => bail!("Impossible: Deferred Inc work handler got non market item"),
     };
     let market_addr = crate::state::MARKETS
         .may_load(storage, &market_id)?
@@ -73,7 +106,7 @@ fn get_work_from_dec_queue(
                                 .may_load(storage)?
                                 .flatten();
                             if let Some(deferred_exec_id) = deferred_exec_id {
-                                return get_deferred_work(storage, state, deferred_exec_id);
+                                return get_dec_deferred_work(storage, state, deferred_exec_id);
                             }
                         }
                         return Ok(WorkResp::HasWork {
@@ -87,7 +120,7 @@ fn get_work_from_dec_queue(
                             .may_load(storage)?
                             .flatten();
                         if let Some(deferred_exec_id) = deferred_exec_id {
-                            return get_deferred_work(storage, state, deferred_exec_id);
+                            return get_dec_deferred_work(storage, state, deferred_exec_id);
                         }
                     }
                 }
@@ -139,7 +172,7 @@ fn get_work_from_dec_queue(
                     .may_load(storage)?
                     .flatten();
                 if let Some(deferred_exec_id) = deferred_exec_id {
-                    return get_deferred_work(storage, state, deferred_exec_id);
+                    return get_dec_deferred_work(storage, state, deferred_exec_id);
                 }
             }
             Ok(WorkResp::HasWork {
@@ -226,6 +259,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
         }
     };
 
+    let status = queue_item.status;
     let queue_item = queue_item.item;
     let requires_token = queue_item.requires_token();
     match requires_token {
@@ -239,11 +273,29 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                             next_inc_queue_position,
                         ))
                     {
+                        if status == ProcessingStatus::InProgress {
+                            let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                                .may_load(storage)?
+                                .flatten();
+                            if let Some(deferred_exec_id) = deferred_exec_id {
+                                return get_inc_deferred_work(storage, state, deferred_exec_id);
+                            }
+                        }
                         return Ok(WorkResp::HasWork {
                             work_description: WorkDescription::ProcessQueueItem {
                                 id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
                             },
                         });
+                    } else {
+                        // LP token is invalid. But if we have
+                        // deferred exec id, best to handle it
+                        // before we try to compute lp token value.
+                        let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                            .may_load(storage)?
+                            .flatten();
+                        if let Some(deferred_exec_id) = deferred_exec_id {
+                            return get_inc_deferred_work(storage, state, deferred_exec_id);
+                        }
                     }
                 }
                 None => {
@@ -285,11 +337,21 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
             // value.
             check_balance_work(storage, state, &token)
         }
-        RequiresToken::NoToken {} => Ok(WorkResp::HasWork {
-            work_description: WorkDescription::ProcessQueueItem {
-                id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
-            },
-        }),
+        RequiresToken::NoToken {} => {
+            if status == ProcessingStatus::InProgress {
+                let deferred_exec_id = crate::state::REPLY_DEFERRED_EXEC_ID
+                    .may_load(storage)?
+                    .flatten();
+                if let Some(deferred_exec_id) = deferred_exec_id {
+                    return get_inc_deferred_work(storage, state, deferred_exec_id);
+                }
+            }
+            Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ProcessQueueItem {
+                    id: QueuePositionId::IncQueuePositionId(next_inc_queue_position),
+                },
+            })
+        }
     }
 }
 
@@ -305,6 +367,35 @@ pub(crate) fn process_queue_item(
                 .may_load(storage, &queue_pos_id)?
                 .context("PENDING_QUEUE_ITEMS load failed")?;
             match queue_item.item.clone() {
+                IncQueueItem::MarketItem {
+                    id: market_id,
+                    item,
+                    ..
+                } => {
+                    match *item {
+                        IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage {
+                            id,
+                            amount,
+                        } => {
+                            let market_info = crate::state::MARKETS
+                                .may_load(storage, &market_id)?
+                                .context("MARKETS store is empty")?;
+                            let msg = WasmMsg::Execute { contract_addr: market_info.addr.into_string(), msg: to_json_binary(&MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id , amount  })?, funds: vec![] };
+                            // We use reply always so that we also handle the error case
+                            let sub_msg = SubMsg::reply_always(
+                                msg,
+                                REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
+                            );
+                            let event =
+                                Event::new("update-position-remove-collateral-impact-leverage")
+                                    .add_attribute("amount", amount.to_string())
+                                    .add_attribute("maret-id", market_info.id.to_string())
+                                    .add_attribute("position-id", id.to_string());
+                            let response = Response::new().add_event(event).add_submessage(sub_msg);
+                            Ok(response)
+                        }
+                    }
+                }
                 IncQueueItem::Deposit { funds, token } => {
                     let token_value = state.load_lp_token_value(storage, &token)?;
                     {
