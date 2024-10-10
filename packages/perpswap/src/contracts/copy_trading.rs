@@ -726,6 +726,14 @@ impl WorkResp {
             WorkResp::HasWork { work_description } => work_description.is_deferred_work(),
         }
     }
+
+    /// Is it deferred work
+    pub fn is_rebalance(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_rebalance(),
+        }
+    }
 }
 
 /// Work Description
