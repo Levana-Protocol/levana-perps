@@ -1,5 +1,5 @@
-use cosmwasm_std::Event;
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use cosmwasm_std::{Addr, Event};
+use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use perpswap::{
     contracts::{
         copy_trading::{self, FactoryConfigUpdate, WorkResp},
@@ -226,4 +226,44 @@ fn batch_work_rebalance() {
     let shares = tokens.balance[0].shares;
     // Since token value has increased, he can buy less shares for the same amount
     assert!(shares.raw() < "20".parse().unwrap());
+}
+
+#[test]
+fn no_deferred_work_lost() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "2000").unwrap();
+
+    let mut open_positions = 0;
+    for _ in 0..=2 {
+        // Leader opens a position
+        open_positions += 1;
+        market
+            .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+            .unwrap();
+        market.exec_crank_till_finished(&trader).unwrap();
+    }
+
+    let items = market
+        .query_copy_trading_queue_status(leader.into())
+        .unwrap();
+    assert_eq!(items.items.len(), 3);
+
+    let mut deferred_works = 0;
+    loop {
+        market.exec_crank_till_finished(&trader).unwrap();
+        let work = market.query_copy_trading_work().unwrap();
+        if work.has_work() {
+            if work.is_deferred_work() {
+                deferred_works += 1;
+            }
+            market.exec_copytrading_do_work(&trader).unwrap();
+        } else {
+            break;
+        }
+    }
+    assert_eq!(open_positions, deferred_works);
 }
