@@ -408,6 +408,15 @@ pub enum DecMarketItem {
         /// ID of position to update
         id: PositionId,
     },
+    /// Add collateral to position, causing notional size to increase
+    UpdatePositionAddCollateralImpactSize {
+        /// Collateral that will be added
+        collateral: NonZero<Collateral>,
+        /// ID of position to update
+        id: PositionId,
+        /// Slippage assert
+        slippage_assert: Option<SlippageAssert>,
+    },
 }
 
 /// Token required for the queue item
@@ -442,6 +451,9 @@ impl DecQueueItem {
                     RequiresToken::NoToken {}
                 }
                 DecMarketItem::UpdatePositionAddCollateralImpactLeverage { .. } => {
+                    RequiresToken::NoToken {}
+                }
+                DecMarketItem::UpdatePositionAddCollateralImpactSize { .. } => {
                     RequiresToken::NoToken {}
                 }
             },
