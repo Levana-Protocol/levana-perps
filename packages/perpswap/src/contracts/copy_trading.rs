@@ -2,7 +2,10 @@
 
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
-use super::market::entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert};
+use super::market::{
+    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert},
+    position::PositionId,
+};
 use crate::{
     number::{Collateral, LpToken, NonZero, Usd},
     price::{PriceBaseInQuote, PricePoint, TakeProfitTrader},
@@ -398,6 +401,13 @@ pub enum DecMarketItem {
         #[serde(alias = "take_profit_override")]
         take_profit: Option<TakeProfitTrader>,
     },
+    /// Add collateral to position, causing leverage to decrease
+    UpdatePositionAddCollateralImpactLeverage {
+        /// Collateral that will be added
+        collateral: NonZero<Collateral>,
+        /// ID of position to update
+        id: PositionId,
+    },
 }
 
 /// Token required for the queue item
@@ -429,6 +439,9 @@ impl DecQueueItem {
                 DecMarketItem::OpenPosition { .. } => {
                     // For opening a position, we don't require LP
                     // token value to be computed.
+                    RequiresToken::NoToken {}
+                }
+                DecMarketItem::UpdatePositionAddCollateralImpactLeverage { .. } => {
                     RequiresToken::NoToken {}
                 }
             },
@@ -667,6 +680,14 @@ impl WorkResp {
             WorkResp::HasWork { .. } => true,
         }
     }
+
+    /// Is it deferred work
+    pub fn is_deferred_work(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_deferred_work(),
+        }
+    }
 }
 
 /// Work Description
@@ -720,6 +741,19 @@ impl WorkDescription {
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
             WorkDescription::Rebalance { .. } => true,
+        }
+    }
+
+    /// Is deferred work ?
+    pub fn is_deferred_work(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => false,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => true,
+            WorkDescription::Rebalance { .. } => false,
         }
     }
 }
