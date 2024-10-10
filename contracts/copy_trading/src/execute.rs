@@ -727,24 +727,12 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         match status.status {
             DeferredExecStatus::Pending => bail!("Impossible: Deferred exec status is pending"),
             DeferredExecStatus::Success { .. } => {
-                queue_item.status = copy_trading::ProcessingStatus::Finished;
                 match queue_item.item.clone() {
                     IncQueueItem::Deposit { .. } => {
                         bail!("Impossible: Deposit should not be handled in deferred exec handler")
                     }
-                    IncQueueItem::MarketItem { token, item, .. } => {
-                        let mut totals = crate::state::TOTALS
-                            .may_load(storage, &token)?
-                            .context("TOTALS store is empty")?;
-                        match *item {
-                            IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage {
-                                amount,
-                                ..
-                            } => {
-                                totals.collateral = totals.collateral.checked_add(amount.raw())?;
-                            }
-                        }
-                        crate::state::TOTALS.save(storage, &token, &totals)?;
+                    IncQueueItem::MarketItem { .. } => {
+                        queue_item.status = copy_trading::ProcessingStatus::Finished;
                     }
                 };
                 crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
