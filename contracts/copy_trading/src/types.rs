@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use cosmwasm_std::{StdError, StdResult};
+use cosmwasm_std::{StdError, StdResult, SubMsg};
 use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
 use perpswap::contracts::copy_trading;
@@ -436,6 +436,24 @@ pub enum BatchWork {
         /// Token
         token: Token,
     },
+}
+
+/// Helper type for construcing response
+pub struct DecQueueResponse {
+    /// SubMsg that should be part of response on success case
+    pub sub_msg: SubMsg,
+    /// Collateral that would be deducted
+    pub collateral: NonZero<Collateral>,
+    /// Token type for the market actio
+    pub token: Token,
+    /// Event that should be part of response on successful response
+    pub event: Event,
+    /// Queue item that is being processed
+    pub queue_item: DecQueuePosition,
+    /// Corresponding queue id
+    pub queue_id: DecQueuePositionId,
+    /// Successful reponse
+    pub response: Response,
 }
 
 #[cfg(test)]

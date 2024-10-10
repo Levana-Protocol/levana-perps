@@ -5,6 +5,7 @@ use perpswap::contracts::{copy_trading, market::deferred_execution::DeferredExec
 use crate::{prelude::*, types::State};
 
 pub(crate) const REPLY_ID_OPEN_POSITION: u64 = 0;
+pub(crate) const REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE: u64 = 1;
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
@@ -50,6 +51,9 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     DecMarketItem::OpenPosition { collateral, .. } => {
                         totals.collateral = totals.collateral.checked_add(collateral.raw())?;
                         crate::state::TOTALS.save(storage, &token, &totals)?;
+                    }
+                    err => {
+                        bail!("Impossible: Reply handler got non open position: {err:?}")
                     }
                 }
                 queue_item.status =
