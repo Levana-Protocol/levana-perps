@@ -16,7 +16,10 @@ use crate::{
         REPLY_ID_OPEN_POSITION, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
         REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE, REPLY_ID_UPDATE_POSITION_LEVERAGE,
     },
-    types::{DecQueuePosition, DecQueueResponse, IncQueueResponse, State, WalletInfo},
+    types::{
+        DecQueueCrankResponse, DecQueuePosition, DecQueueResponse, IncQueueResponse, State,
+        WalletInfo,
+    },
 };
 use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
@@ -635,10 +638,10 @@ pub(crate) fn process_queue_item(
                         let market_info = crate::state::MARKETS
                             .may_load(storage, &market_id)?
                             .context("MARKETS store is empty")?;
-                        let crank_fee = state.estimate_crank_fee(&market_info)?;
+                        let crank_fees = state.estimate_crank_fee(&market_info)?;
                         let msg = market_info.token.into_market_execute_msg(
                             &market_info.addr,
-                            crank_fee,
+                            crank_fees,
                             MarketExecuteMsg::UpdatePositionLeverage {
                                 id,
                                 leverage,
@@ -650,17 +653,16 @@ pub(crate) fn process_queue_item(
                         let event = Event::new("update-position-leverage")
                             .add_attribute("market-id", market_info.id.to_string())
                             .add_attribute("position-id", id.to_string());
-                        let collateral = NonZero::new(crank_fee).context("crank fee is zero")?;
-                        let response = DecQueueResponse {
+                        let response = DecQueueCrankResponse {
                             sub_msg,
-                            collateral,
+                            crank_fees,
                             token,
                             event,
                             queue_item,
                             queue_id: queue_pos_id,
                             response,
                         };
-                        process_dec_queue(response, storage)
+                        process_dec_crank_queue(response, storage)
                     }
                     DecMarketItem::UpdatePositionAddCollateralImpactSize {
                         collateral,
@@ -826,6 +828,40 @@ fn process_dec_queue(response: DecQueueResponse, storage: &mut dyn Storage) -> R
         queue_item.status = ProcessingStatus::Failed(FailedReason::NotEnoughCollateral {
             available: totals.collateral,
             requested: response.collateral,
+        });
+        crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
+        crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &response.queue_id)?;
+        return Ok(response.response.add_event(event));
+    }
+    crate::state::TOTALS.save(storage, &token, &totals)?;
+    let mut token_value = crate::state::LP_TOKEN_VALUE
+        .may_load(storage, &token)?
+        .context("LP_TOKEN_VALUE store is empty")?;
+    token_value.set_outdated();
+    crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
+    queue_item.status = ProcessingStatus::InProgress;
+    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
+    let result = response.response.add_event(response.event);
+    let result = result.add_submessage(response.sub_msg);
+    Ok(result)
+}
+
+fn process_dec_crank_queue(
+    response: DecQueueCrankResponse,
+    storage: &mut dyn Storage,
+) -> Result<Response> {
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &response.token)?
+        .context("TOTALS store is empty")?;
+    let mut queue_item = response.queue_item;
+    let token = response.token;
+    if totals.collateral >= response.crank_fees {
+        totals.collateral = totals.collateral.checked_sub(response.crank_fees)?;
+    } else {
+        let event = response.event.add_attribute("failure", true.to_string());
+        queue_item.status = ProcessingStatus::Failed(FailedReason::NotEnoughCrankFee {
+            available: totals.collateral,
+            requested: response.crank_fees,
         });
         crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
         crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &response.queue_id)?;

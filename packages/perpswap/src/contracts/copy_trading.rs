@@ -455,6 +455,15 @@ pub enum DecMarketItem {
         /// Slippage assert
         slippage_assert: Option<SlippageAssert>,
     },
+    /// Update position leverage
+    UpdatePositionLeverage {
+        /// ID of position to update
+        id: PositionId,
+        /// New leverage of the position
+        leverage: LeverageToBase,
+        /// Slippage assert
+        slippage_assert: Option<SlippageAssert>,
+    },
 }
 
 /// Token required for the queue item
@@ -502,6 +511,7 @@ impl DecQueueItem {
                 DecMarketItem::UpdatePositionAddCollateralImpactSize { .. } => {
                     RequiresToken::NoToken {}
                 }
+                DecMarketItem::UpdatePositionLeverage { .. } => RequiresToken::NoToken {},
             },
         }
     }
@@ -754,6 +764,14 @@ impl WorkResp {
             WorkResp::HasWork { work_description } => work_description.is_rebalance(),
         }
     }
+
+    /// Is it compute lp token work ?
+    pub fn is_compute_lp_token(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_compute_lp_token(),
+        }
+    }
 }
 
 /// Work Description
@@ -807,6 +825,19 @@ impl WorkDescription {
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
             WorkDescription::Rebalance { .. } => true,
+        }
+    }
+
+    /// Is it compute lp token work ?
+    pub fn is_compute_lp_token(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => true,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => false,
         }
     }
 
