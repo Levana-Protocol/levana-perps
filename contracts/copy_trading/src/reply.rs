@@ -15,6 +15,7 @@ pub(crate) const REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE: u64 = 3;
 pub(crate) const REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE: u64 = 4;
 pub(crate) const REPLY_ID_UPDATE_POSITION_LEVERAGE: u64 = 5;
 pub(crate) const REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE: u64 = 6;
+pub(crate) const REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE: u64 = 7;
 
 fn handle_sucess(storage: &mut dyn Storage, msg: SubMsgResponse, event: Event) -> Result<Event> {
     let deferred_exec_id: DeferredExecId = msg
@@ -207,12 +208,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 }
             }
         }
-        REPLY_ID_UPDATE_POSITION_LEVERAGE | REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE => {
-            match msg.result {
-                cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
-                cosmwasm_std::SubMsgResult::Err(error) => dec_failure(storage, event, error)?,
-            }
-        }
+        REPLY_ID_UPDATE_POSITION_LEVERAGE
+        | REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE
+        | REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE => match msg.result {
+            cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
+            cosmwasm_std::SubMsgResult::Err(error) => dec_failure(storage, event, error)?,
+        },
         _ => bail!("Got unknown reply id {}", msg.id),
     };
     Ok(Response::new().add_event(event))

@@ -414,8 +414,20 @@ fn execute_leader_msg(
                 .add_attribute("price", price.to_string());
             decrease_collateral_response(storage, state, queue_position, event)
         }
-        // crank fees. no change.
-        MarketExecuteMsg::UpdatePositionStopLossPrice { .. } => todo!(),
+        MarketExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => {
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionStopLossPrice { id, stop_loss }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("update-position-stop-loss-price")
+                .add_attribute("position-id", id.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
         MarketExecuteMsg::SetTriggerOrder { .. } => not_supported_response("set-trigger-order"),
         // reduces collateral
         MarketExecuteMsg::PlaceLimitOrder { .. } => todo!(),

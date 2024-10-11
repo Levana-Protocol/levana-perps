@@ -3,7 +3,7 @@
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
 use super::market::{
-    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert},
+    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert, StopLoss},
     position::PositionId,
 };
 use crate::{
@@ -470,6 +470,13 @@ pub enum DecMarketItem {
         id: PositionId,
         /// New take profit price of the position
         price: TakeProfitTrader,
+    },
+    /// Update the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position, or remove
+        stop_loss: StopLoss,
     },
 }
 
