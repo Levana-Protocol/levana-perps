@@ -415,16 +415,16 @@ fn execute_leader_msg(
                 .add_attribute("amount", amount.to_string());
             increase_collateral_response(storage, state, queue_position, event)
         }
-        // no impact on collateral. only impatcs notional size.
+        // no impact on collateral. only impatcs notional size. crank fees. so dec queue
         MarketExecuteMsg::UpdatePositionLeverage { .. } => todo!(),
-        // no impact. todo: look through the codebase.
-        MarketExecuteMsg::UpdatePositionMaxGains { .. } => todo!(),
-        //
+        MarketExecuteMsg::UpdatePositionMaxGains { .. } => {
+            not_supported_response("update-position-max-gains")
+        }
+        // crank fees. dec queue.
         MarketExecuteMsg::UpdatePositionTakeProfitPrice { .. } => todo!(),
-        // no impact
+        // crank fees. no change.
         MarketExecuteMsg::UpdatePositionStopLossPrice { .. } => todo!(),
-        // no impact.
-        MarketExecuteMsg::SetTriggerOrder { .. } => todo!(),
+        MarketExecuteMsg::SetTriggerOrder { .. } => not_supported_response("set-trigger-order"),
         // reduces collateral
         MarketExecuteMsg::PlaceLimitOrder { .. } => todo!(),
         // increse collateral

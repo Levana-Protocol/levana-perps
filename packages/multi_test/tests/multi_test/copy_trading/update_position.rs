@@ -280,6 +280,16 @@ fn update_position_remove_collateral_impact_leverage() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+    // Set minimum_deposit_usd so that countertrade countract tries to
+    // reduce the collateral instead of closing the position.
+    market
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("5".parse().unwrap()),
+            crank_fee_surcharge: Some("1".parse().unwrap()),
+            crank_fee_charged: Some("0.1".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
 
     load_markets(&market);
     deposit_money(&market, &trader, "2000").unwrap();
@@ -346,12 +356,16 @@ fn update_position_remove_collateral_impact_leverage() {
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
 
+    let estimated_crank_fee = market.query_crank_fee().unwrap();
     let estimated_final_token = initial_token
         .collateral
         .checked_add(five_collateral)
         .unwrap()
         .checked_add("3".parse().unwrap())
+        .unwrap()
+        .checked_sub(estimated_crank_fee)
         .unwrap();
+
     let final_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
     assert!(final_token.collateral.approx_eq(estimated_final_token));
     let leader_queue = market
