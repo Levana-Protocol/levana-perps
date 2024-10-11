@@ -430,7 +430,45 @@ fn execute_leader_msg(
         }
         MarketExecuteMsg::SetTriggerOrder { .. } => not_supported_response("set-trigger-order"),
         // reduces collateral
-        MarketExecuteMsg::PlaceLimitOrder { .. } => todo!(),
+        MarketExecuteMsg::PlaceLimitOrder {
+            trigger_price,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit,
+        } => {
+            let collateral = match collateral {
+                Some(collateral) => collateral,
+                None => bail!("No supplied collateral for opening position"),
+            };
+            if max_gains.is_some() {
+                bail!("max_gains is deprecated, use take_profit instead")
+            }
+            let take_profit = match take_profit {
+                Some(take_profit) => take_profit,
+                None => bail!("take profit is not specified"),
+            };
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::PlaceLimitOrder {
+                        collateral,
+                        trigger_price,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event =
+                Event::new("place-limit-order").add_attribute("collateral", collateral.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
         // increse collateral
         MarketExecuteMsg::CancelLimitOrder { .. } => todo!(),
         // increase or leave it exactly same.

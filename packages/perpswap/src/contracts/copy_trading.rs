@@ -478,6 +478,23 @@ pub enum DecMarketItem {
         /// New stop loss price of the position, or remove
         stop_loss: StopLoss,
     },
+    /// Set a limit order to open a position when the price of the asset hits
+    /// the specified trigger price.
+    PlaceLimitOrder {
+        /// Collateral for the position
+        collateral: NonZero<Collateral>,
+        /// Price when the order should trigger
+        trigger_price: PriceBaseInQuote,
+        /// Leverage of new position
+        leverage: LeverageToBase,
+        /// Direction of new position
+        direction: DirectionToBase,
+        /// Stop loss price of new position
+        stop_loss_override: Option<PriceBaseInQuote>,
+        /// Take profit price of new position
+        #[serde(alias = "take_profit_override")]
+        take_profit: TakeProfitTrader,
+    },
 }
 
 /// Token required for the queue item
