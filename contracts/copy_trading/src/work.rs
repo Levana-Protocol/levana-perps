@@ -14,7 +14,7 @@ use crate::{
     reply::{
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
         REPLY_ID_OPEN_POSITION, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
-        REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE,
+        REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE, REPLY_ID_UPDATE_POSITION_LEVERAGE,
     },
     types::{DecQueuePosition, DecQueueResponse, IncQueueResponse, State, WalletInfo},
 };
@@ -627,6 +627,41 @@ pub(crate) fn process_queue_item(
                     token,
                     item,
                 } => match *item {
+                    DecMarketItem::UpdatePositionLeverage {
+                        id,
+                        leverage,
+                        slippage_assert,
+                    } => {
+                        let market_info = crate::state::MARKETS
+                            .may_load(storage, &market_id)?
+                            .context("MARKETS store is empty")?;
+                        let crank_fee = state.estimate_crank_fee(&market_info)?;
+                        let msg = market_info.token.into_market_execute_msg(
+                            &market_info.addr,
+                            crank_fee,
+                            MarketExecuteMsg::UpdatePositionLeverage {
+                                id,
+                                leverage,
+                                slippage_assert,
+                            },
+                        )?;
+                        // We use reply always so that we also handle the error case
+                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_UPDATE_POSITION_LEVERAGE);
+                        let event = Event::new("update-position-leverage")
+                            .add_attribute("market-id", market_info.id.to_string())
+                            .add_attribute("position-id", id.to_string());
+                        let collateral = NonZero::new(crank_fee).context("crank fee is zero")?;
+                        let response = DecQueueResponse {
+                            sub_msg,
+                            collateral,
+                            token,
+                            event,
+                            queue_item,
+                            queue_id: queue_pos_id,
+                            response,
+                        };
+                        process_dec_queue(response, storage)
+                    }
                     DecMarketItem::UpdatePositionAddCollateralImpactSize {
                         collateral,
                         id,

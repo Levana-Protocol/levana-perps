@@ -374,8 +374,28 @@ fn execute_leader_msg(
             increase_collateral_response(storage, state, queue_position, event)
         }
         // no impact on collateral. only impatcs notional size. crank fees. so dec queue
-        MarketExecuteMsg::UpdatePositionLeverage { .. } => {
-            todo!()
+        MarketExecuteMsg::UpdatePositionLeverage {
+            id,
+            leverage,
+            slippage_assert,
+        } => {
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionLeverage {
+                        id,
+                        leverage,
+                        slippage_assert,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("update-position-leverage")
+                .add_attribute("position-id", id.to_string())
+                .add_attribute("leverage", leverage.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
         }
         MarketExecuteMsg::UpdatePositionMaxGains { .. } => {
             not_supported_response("update-position-max-gains")
