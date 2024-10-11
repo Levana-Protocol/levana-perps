@@ -359,6 +359,15 @@ pub enum IncQueueItem {
         /// Token
         token: Token,
     },
+    /// Market action items
+    MarketItem {
+        /// Market id
+        id: MarketId,
+        /// Market token
+        token: Token,
+        /// Market item
+        item: Box<IncMarketItem>,
+    },
 }
 
 /// Queue item that needs to be processed
@@ -379,6 +388,18 @@ pub enum DecQueueItem {
         token: Token,
         /// Market item
         item: Box<DecMarketItem>,
+    },
+}
+
+/// Queue item that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+pub enum IncMarketItem {
+    /// Remove collateral from a position, causing leverage to increase
+    UpdatePositionRemoveCollateralImpactLeverage {
+        /// ID of position to update
+        id: PositionId,
+        /// Amount of funds to remove from the position
+        amount: NonZero<Collateral>,
     },
 }
 
@@ -421,7 +442,7 @@ pub enum DecMarketItem {
 
 /// Token required for the queue item
 pub enum RequiresToken {
-    /// Token required
+    /// Token required for LP token value computation
     Token {
         /// Token
         token: Token,
@@ -435,6 +456,11 @@ impl IncQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             IncQueueItem::Deposit { token, .. } => RequiresToken::Token { token },
+            IncQueueItem::MarketItem { item, .. } => match *item {
+                IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { .. } => {
+                    RequiresToken::NoToken {}
+                }
+            },
         }
     }
 }
@@ -698,6 +724,14 @@ impl WorkResp {
         match self {
             WorkResp::NoWork => false,
             WorkResp::HasWork { work_description } => work_description.is_deferred_work(),
+        }
+    }
+
+    /// Is it deferred work
+    pub fn is_rebalance(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_rebalance(),
         }
     }
 }

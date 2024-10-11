@@ -21,6 +21,10 @@ pub(crate) struct MarketInfo {
     pub(crate) addr: Addr,
     /// Token used by the market
     pub(crate) token: perpswap::token::Token,
+    /// The crank fee to be paid into the system, in collateral
+    pub crank_fee_charged: Usd,
+    /// The crank surcharge charged for every 10 items in the deferred execution queue.
+    pub crank_fee_surcharge: Usd,
 }
 
 pub(crate) struct State<'a> {

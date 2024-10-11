@@ -1,7 +1,7 @@
 use crate::{
     common::{
-        get_current_processed_dec_queue_id, get_current_queue_element, get_next_dec_queue_id,
-        get_next_inc_queue_id,
+        get_current_processed_dec_queue_id, get_current_processed_inc_queue_id,
+        get_current_queue_element, get_next_dec_queue_id, get_next_inc_queue_id,
     },
     prelude::*,
     types::{
@@ -376,7 +376,38 @@ fn execute_leader_msg(
             ))
         }
         // increase coll
-        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => todo!(),
+        MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
+            // todo: abstract it under function
+            let inc_queue_id = get_next_inc_queue_id(storage)?;
+            let leader = state.config.leader.clone();
+            crate::state::WALLET_QUEUE_ITEMS.save(
+                storage,
+                (&leader, QueuePositionId::IncQueuePositionId(inc_queue_id)),
+                &(),
+            )?;
+            let queue_position = IncQueuePosition {
+                item: copy_trading::IncQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(
+                        IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount },
+                    ),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            crate::state::COLLATERAL_INCREASE_QUEUE.save(
+                storage,
+                &inc_queue_id,
+                &queue_position,
+            )?;
+            Ok(Response::new().add_event(
+                Event::new("update-position-remove-collateral-impact-leverage")
+                    .add_attribute("queue-id", inc_queue_id.to_string())
+                    .add_attribute("position-id", id.to_string())
+                    .add_attribute("amount", amount.to_string()),
+            ))
+        }
         // increas
         MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => todo!(),
         // no impact on collateral. only impatcs notional size.
@@ -675,6 +706,65 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         Some(deferred_exec_id) => deferred_exec_id,
         None => bail!("Impossible: Work handle unable to find deferred exec id"),
     };
+    let queue_item = get_current_processed_inc_queue_id(storage)?;
+    if let Some((queue_id, mut queue_item)) = queue_item {
+        assert!(queue_item.status.in_progress());
+        let market_id = match queue_item.item.clone() {
+            IncQueueItem::MarketItem { id, .. } => id,
+            _ => bail!("Impossible: Deferred work handler got non market item"),
+        };
+        let market_addr = crate::state::MARKETS
+            .may_load(storage, &market_id)?
+            .context("MARKETS state is empty")?
+            .addr;
+        let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+        let status = match response {
+            GetDeferredExecResp::Found { item } => item,
+            GetDeferredExecResp::NotFound {} => {
+                bail!("Impossible: Deferred exec id not found")
+            }
+        };
+        match status.status {
+            DeferredExecStatus::Pending => bail!("Impossible: Deferred exec status is pending"),
+            DeferredExecStatus::Success { .. } => {
+                match queue_item.item.clone() {
+                    IncQueueItem::Deposit { .. } => {
+                        bail!("Impossible: Deposit should not be handled in deferred exec handler")
+                    }
+                    IncQueueItem::MarketItem { .. } => {
+                        queue_item.status = copy_trading::ProcessingStatus::Finished;
+                    }
+                };
+                crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+                crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &queue_id)?;
+                crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
+                return Ok(Response::new().add_event(
+                    Event::new("handle-deferred-exec-id")
+                        .add_attribute("success", true.to_string()),
+                ));
+            }
+            DeferredExecStatus::Failure {
+                reason,
+                executed,
+                crank_price,
+            } => {
+                queue_item.status =
+                    copy_trading::ProcessingStatus::Failed(FailedReason::DeferredExecFailure {
+                        reason,
+                        executed,
+                        crank_price,
+                    });
+                crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &queue_id, &queue_item)?;
+                crate::state::LAST_PROCESSED_INC_QUEUE_ID.save(storage, &queue_id)?;
+                crate::state::REPLY_DEFERRED_EXEC_ID.save(storage, &None)?;
+                return Ok(Response::new().add_event(
+                    Event::new("handle-deferred-exec-id")
+                        .add_attribute("success", false.to_string()),
+                ));
+            }
+        }
+    }
+
     let queue_item = get_current_processed_dec_queue_id(storage)?;
     let (queue_id, mut queue_item) = match queue_item {
         Some((queue_id, queue_item)) => (queue_id, queue_item),

@@ -6,16 +6,20 @@ use crate::{
     },
 };
 use anyhow::{bail, Context, Result};
-use perpswap::contracts::{
-    factory::entry::MarketsResp,
-    market::{
-        deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
-        entry::{
-            ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp, PositionsQueryFeeApproach,
+use perpswap::{
+    contracts::{
+        factory::entry::MarketsResp,
+        market::{
+            deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
+            entry::{
+                ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp,
+                PositionsQueryFeeApproach,
+            },
+            order::OrderId,
+            position::{PositionId, PositionsResp},
         },
-        order::OrderId,
-        position::{PositionId, PositionsResp},
     },
+    price::PricePoint,
 };
 use perpswap::{namespace::FACTORY_MARKET_LAST_ADDED, time::Timestamp};
 
@@ -187,10 +191,13 @@ impl<'a> State<'a> {
             )
             .with_context(|| format!("Unable to load market status from contract {market_addr}"))?;
 
+        // todo: Crank fee should be refreshed every 24 hours.
         let info = MarketInfo {
             id: status.market_id,
             addr: market_addr,
             token: status.collateral,
+            crank_fee_charged: status.config.crank_fee_charged,
+            crank_fee_surcharge: status.config.crank_fee_surcharge,
         };
         Ok((info, false))
     }
@@ -394,6 +401,23 @@ impl<'a> State<'a> {
             },
         )?;
         Ok(result)
+    }
+
+    pub(crate) fn query_spot_price(&self, market_addr: &Addr) -> Result<PricePoint> {
+        let result = self
+            .querier
+            .query_wasm_smart(market_addr, &MarketQueryMsg::SpotPrice { timestamp: None })?;
+        Ok(result)
+    }
+
+    pub(crate) fn estimate_crank_fee(&self, market: &MarketInfo) -> Result<Collateral> {
+        let estimated_queue_size = 5u32;
+        let fees = market
+            .crank_fee_surcharge
+            .checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
+        let fees = fees.checked_add(market.crank_fee_charged)?;
+        let price = self.query_spot_price(&market.addr)?;
+        Ok(price.usd_to_collateral(fees))
     }
 }
 
