@@ -464,6 +464,13 @@ pub enum DecMarketItem {
         /// Slippage assert
         slippage_assert: Option<SlippageAssert>,
     },
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
 }
 
 /// Token required for the queue item
@@ -499,20 +506,8 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::MarketItem { item, .. } => match *item {
-                DecMarketItem::OpenPosition { .. } => {
-                    // For opening a position, we don't require LP
-                    // token value to be computed.
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionAddCollateralImpactLeverage { .. } => {
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionAddCollateralImpactSize { .. } => {
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionLeverage { .. } => RequiresToken::NoToken {},
-            },
+            // Market item does not require computation of lp token value
+            DecQueueItem::MarketItem { .. } => RequiresToken::NoToken {},
         }
     }
 }

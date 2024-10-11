@@ -373,7 +373,6 @@ fn execute_leader_msg(
                 .add_attribute("amount", amount.to_string());
             increase_collateral_response(storage, state, queue_position, event)
         }
-        // no impact on collateral. only impatcs notional size. crank fees. so dec queue
         MarketExecuteMsg::UpdatePositionLeverage {
             id,
             leverage,
@@ -400,8 +399,21 @@ fn execute_leader_msg(
         MarketExecuteMsg::UpdatePositionMaxGains { .. } => {
             not_supported_response("update-position-max-gains")
         }
-        // crank fees. dec queue.
-        MarketExecuteMsg::UpdatePositionTakeProfitPrice { .. } => todo!(),
+        MarketExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => {
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionTakeProfitPrice { id, price }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("update-position-take-profit-price")
+                .add_attribute("position-id", id.to_string())
+                .add_attribute("price", price.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
         // crank fees. no change.
         MarketExecuteMsg::UpdatePositionStopLossPrice { .. } => todo!(),
         MarketExecuteMsg::SetTriggerOrder { .. } => not_supported_response("set-trigger-order"),
