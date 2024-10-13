@@ -3,7 +3,7 @@
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
 use super::market::{
-    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert},
+    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert, StopLoss},
     position::PositionId,
 };
 use crate::{
@@ -455,6 +455,29 @@ pub enum DecMarketItem {
         /// Slippage assert
         slippage_assert: Option<SlippageAssert>,
     },
+    /// Update position leverage
+    UpdatePositionLeverage {
+        /// ID of position to update
+        id: PositionId,
+        /// New leverage of the position
+        leverage: LeverageToBase,
+        /// Slippage assert
+        slippage_assert: Option<SlippageAssert>,
+    },
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
+    /// Update the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position, or remove
+        stop_loss: StopLoss,
+    },
 }
 
 /// Token required for the queue item
@@ -490,19 +513,8 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::MarketItem { item, .. } => match *item {
-                DecMarketItem::OpenPosition { .. } => {
-                    // For opening a position, we don't require LP
-                    // token value to be computed.
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionAddCollateralImpactLeverage { .. } => {
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionAddCollateralImpactSize { .. } => {
-                    RequiresToken::NoToken {}
-                }
-            },
+            // Market item does not require computation of lp token value
+            DecQueueItem::MarketItem { .. } => RequiresToken::NoToken {},
         }
     }
 }
@@ -754,6 +766,14 @@ impl WorkResp {
             WorkResp::HasWork { work_description } => work_description.is_rebalance(),
         }
     }
+
+    /// Is it compute lp token work ?
+    pub fn is_compute_lp_token(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_compute_lp_token(),
+        }
+    }
 }
 
 /// Work Description
@@ -807,6 +827,19 @@ impl WorkDescription {
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
             WorkDescription::Rebalance { .. } => true,
+        }
+    }
+
+    /// Is it compute lp token work ?
+    pub fn is_compute_lp_token(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => true,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => false,
         }
     }
 

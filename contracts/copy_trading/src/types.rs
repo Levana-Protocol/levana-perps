@@ -460,6 +460,24 @@ pub struct DecQueueResponse {
     pub response: Response,
 }
 
+/// Same as [DecQueueResponse] but tailed for crank fee
+pub struct DecQueueCrankResponse {
+    /// SubMsg that should be part of response on success case
+    pub sub_msg: SubMsg,
+    /// Crank fees
+    pub crank_fees: Collateral,
+    /// Token type for the market actio
+    pub token: Token,
+    /// Event that should be part of response on successful response
+    pub event: Event,
+    /// Queue item that is being processed
+    pub queue_item: DecQueuePosition,
+    /// Corresponding queue id
+    pub queue_id: DecQueuePositionId,
+    /// Successful reponse
+    pub response: Response,
+}
+
 /// Helper type for construcing response
 pub struct IncQueueResponse {
     /// SubMsg that should be part of response on success case

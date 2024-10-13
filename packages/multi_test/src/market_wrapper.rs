@@ -484,6 +484,19 @@ impl PerpsMarket {
         self.exec_defer_wasm_msg(sender, msg)
     }
 
+    /// Estimates crank fee
+    pub fn query_crank_fee(&self) -> Result<Collateral> {
+        let estimated_queue_size = 5u32;
+        let config = self.query_config()?;
+        let fees = config
+            .crank_fee_surcharge
+            .checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
+        let fees = fees.checked_add(config.crank_fee_charged)?;
+        let price = self.query_current_price()?;
+        let crank_fee = price.usd_to_collateral(fees);
+        Ok(crank_fee)
+    }
+
     pub fn make_market_msg_with_funds(
         &self,
         msg: &MarketExecuteMsg,
