@@ -213,7 +213,6 @@ async fn single_market(
             needed_collateral,
             direction,
             leverage,
-            "0.5".parse().unwrap(),
             None,
             None,
             None,

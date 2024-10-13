@@ -199,7 +199,6 @@ async fn single_market(
                 deposit_collateral,
                 direction,
                 leverage,
-                max_gains,
                 None,
                 None,
                 None,
