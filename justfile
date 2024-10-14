@@ -269,12 +269,6 @@ create-nft-mint-relayer-channel path-name juno-port stargaze-port:
 create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override
 
-# Check commits
-check-commits:
-	git fetch origin main --depth=1
-	git log --pretty=format:"%ae" $(git branch --show-current)...origin/main > email
-	awk -f ./.ci/commit-check.awk email
-
 # Build perps-market-params binary in release mode
 cargo-market-params-release:
     cargo build --bin perps-market-params --release --target x86_64-unknown-linux-musl

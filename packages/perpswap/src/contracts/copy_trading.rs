@@ -134,13 +134,6 @@ pub enum ExecuteMsg {
         /// Token type in which amount should be withdrawn
         token: Token,
     },
-    /// Appoint a new administrator
-    AppointAdmin {
-        /// Address of the new administrator
-        admin: RawAddr,
-    },
-    /// Accept appointment of admin
-    AcceptAdmin {},
     /// Update configuration values that is allowed for leader.
     LeaderUpdateConfig(ConfigUpdate),
     /// Update configuration values that is allowed for facotr.
