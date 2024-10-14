@@ -16,6 +16,7 @@ pub(crate) const REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE: u64 = 4;
 pub(crate) const REPLY_ID_UPDATE_POSITION_LEVERAGE: u64 = 5;
 pub(crate) const REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE: u64 = 6;
 pub(crate) const REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE: u64 = 7;
+pub(crate) const REPLY_ID_PLACE_LIMIT_ORDER: u64 = 8;
 
 fn handle_sucess(storage: &mut dyn Storage, msg: SubMsgResponse, event: Event) -> Result<Event> {
     let deferred_exec_id: DeferredExecId = msg
@@ -134,6 +135,26 @@ fn open_position_failure(
     Ok(())
 }
 
+fn place_limit_order_failure(
+    storage: &mut dyn Storage,
+    token: Token,
+    item: Box<DecMarketItem>,
+) -> Result<()> {
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &token)?
+        .context("TOTALS store is empty")?;
+    match *item {
+        DecMarketItem::PlaceLimitOrder { collateral, .. } => {
+            totals.collateral = totals.collateral.checked_add(collateral.raw())?;
+            crate::state::TOTALS.save(storage, &token, &totals)?;
+        }
+        err => {
+            bail!("Impossible: Reply handler got non place limit order: {err:?}")
+        }
+    }
+    Ok(())
+}
+
 fn add_collateral_impact_leverage_failure(
     storage: &mut dyn Storage,
     token: Token,
@@ -213,6 +234,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
         | REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE => match msg.result {
             cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
             cosmwasm_std::SubMsgResult::Err(error) => dec_failure(storage, event, error)?,
+        },
+        REPLY_ID_PLACE_LIMIT_ORDER => match msg.result {
+            cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
+            cosmwasm_std::SubMsgResult::Err(error) => {
+                handle_dec_failure(storage, event, error, place_limit_order_failure)?
+            }
         },
         _ => bail!("Got unknown reply id {}", msg.id),
     };
