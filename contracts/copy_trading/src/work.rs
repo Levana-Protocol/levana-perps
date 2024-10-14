@@ -386,22 +386,22 @@ pub(crate) fn process_queue_item(
                             let market_info = crate::state::MARKETS
                                 .may_load(storage, &market_id)?
                                 .context("MARKETS store is empty")?;
-                            let crank_fee = state.estimate_crank_fee(&market_info)?;
-                            let msg = market_info.token.into_market_execute_msg(
-                                &market_info.addr,
-                                crank_fee,
-                                MarketExecuteMsg::ClosePosition {
-                                    id,
-                                    slippage_assert,
-                                },
-                            )?;
+                            let msg = MarketExecuteMsg::ClosePosition {
+                                id,
+                                slippage_assert,
+                            };
+                            let msg = WasmMsg::Execute {
+                                contract_addr: market_info.addr.to_string(),
+                                msg: to_json_binary(&msg)?,
+                                funds: vec![],
+                            };
                             // We use reply always so that we also handle the error case
                             let sub_msg = SubMsg::reply_always(msg, REPLY_ID_CLOSE_POSITION);
                             let event =
                                 Event::new("close-position").add_attribute("id", id.to_string());
                             let response = IncQueueResponse {
                                 sub_msg,
-                                collateral: Some(crank_fee),
+                                collateral: None,
                                 token,
                                 event,
                                 queue_item,
