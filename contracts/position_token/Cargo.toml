@@ -33,4 +33,4 @@ cw-utils = "2.0.0"
 serde-json-wasm = "0.5"
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true }

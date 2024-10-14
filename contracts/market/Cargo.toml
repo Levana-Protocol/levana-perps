@@ -35,5 +35,5 @@ indoc = "1.0.8"
 pyth-sdk-cw = { workspace = true}
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true }
 proptest = "1.0.0"

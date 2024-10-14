@@ -38,11 +38,6 @@ pub(crate) fn add_cosmos_msg(
             _ => anyhow::bail!("Unknown BankMsg variant"),
         },
         CosmosMsg::Custom(_) => anyhow::bail!("No support for custom"),
-        CosmosMsg::Staking(_) => anyhow::bail!("No support for staking"),
-        CosmosMsg::Distribution(_) => anyhow::bail!("No support for distribution"),
-        #[allow(deprecated)]
-        CosmosMsg::Stargate { .. } => anyhow::bail!("No support for stargate"),
-        CosmosMsg::Ibc(_) => anyhow::bail!("No support for IBC"),
         CosmosMsg::Wasm(wasm) => match wasm {
             WasmMsg::Execute {
                 contract_addr,
@@ -75,7 +70,6 @@ pub(crate) fn add_cosmos_msg(
             WasmMsg::ClearAdmin { contract_addr: _ } => anyhow::bail!("No support for ClearAdmin"),
             _ => anyhow::bail!("Unknown Wasm variant"),
         },
-        CosmosMsg::Gov(_) => anyhow::bail!("No support for gov"),
         _ => anyhow::bail!("Unknown CosmosMsg variant"),
     }
 }
