@@ -1,5 +1,5 @@
 use anyhow::bail;
-use cosmwasm_std::SubMsg;
+use cosmwasm_std::{SubMsg, WasmMsg};
 use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
@@ -13,7 +13,7 @@ use crate::{
     prelude::*,
     reply::{
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
-        REPLY_ID_OPEN_POSITION, REPLY_ID_PLACE_LIMIT_ORDER,
+        REPLY_ID_CANCEL_LIMIT_ORDER, REPLY_ID_OPEN_POSITION, REPLY_ID_PLACE_LIMIT_ORDER,
         REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE,
         REPLY_ID_UPDATE_POSITION_LEVERAGE, REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE,
         REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE,
@@ -379,6 +379,29 @@ pub(crate) fn process_queue_item(
                     token,
                 } => {
                     match *item {
+                        IncMarketItem::CancelLimitOrder { order_id } => {
+                            let market_info = crate::state::MARKETS
+                                .may_load(storage, &market_id)?
+                                .context("MARKETS store is empty")?;
+                            let msg = MarketExecuteMsg::CancelLimitOrder { order_id };
+                            let msg = WasmMsg::Execute {
+                                contract_addr: market_info.addr.to_string(),
+                                msg: to_json_binary(&msg)?,
+                                funds: vec![],
+                            };
+                            let sub_msg = SubMsg::reply_always(msg, REPLY_ID_CANCEL_LIMIT_ORDER);
+                            let event = Event::new("cancel-limit-order")
+                                .add_attribute("order-id", order_id.to_string());
+                            let response = IncQueueResponse {
+                                sub_msg,
+                                collateral: None,
+                                token,
+                                event,
+                                queue_item,
+                                queue_id: queue_pos_id,
+                            };
+                            process_inc_queue(response, storage)
+                        }
                         IncMarketItem::UpdatePositionRemoveCollateralImpactSize {
                             id,
                             amount,

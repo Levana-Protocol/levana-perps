@@ -17,6 +17,7 @@ pub(crate) const REPLY_ID_UPDATE_POSITION_LEVERAGE: u64 = 5;
 pub(crate) const REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE: u64 = 6;
 pub(crate) const REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE: u64 = 7;
 pub(crate) const REPLY_ID_PLACE_LIMIT_ORDER: u64 = 8;
+pub(crate) const REPLY_ID_CANCEL_LIMIT_ORDER: u64 = 9;
 
 fn handle_sucess(storage: &mut dyn Storage, msg: SubMsgResponse, event: Event) -> Result<Event> {
     let deferred_exec_id: DeferredExecId = msg
