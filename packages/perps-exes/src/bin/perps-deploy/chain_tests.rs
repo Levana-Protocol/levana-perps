@@ -114,7 +114,7 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.9")?;
     let leverage = LeverageToBase::from_str("10")?;
-    let take_profit = PriceBaseInQuote::from_str("0.44")?;
+    let take_profit = PriceBaseInQuote::from_str("1.3")?;
 
     let tx = perp_app
         .open_position(
