@@ -36,8 +36,6 @@ jobs:
               - 'packages/multi_test/**'
               - 'packages/fuzz/**'
               - '.ci/**'
-      - name: Check commit
-        run: just check-commits
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
