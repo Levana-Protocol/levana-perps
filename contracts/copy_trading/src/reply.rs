@@ -222,14 +222,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 handle_dec_failure(storage, event, error, add_collateral_impact_size_failure)?
             }
         },
-        REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE | REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE => {
-            match msg.result {
-                cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
-                cosmwasm_std::SubMsgResult::Err(error) => {
-                    handle_inc_failure(storage, event, error)?
-                }
-            }
-        }
+        REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE
+        | REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE
+        | REPLY_ID_CANCEL_LIMIT_ORDER => match msg.result {
+            cosmwasm_std::SubMsgResult::Ok(msg) => handle_sucess(storage, msg, event)?,
+            cosmwasm_std::SubMsgResult::Err(error) => handle_inc_failure(storage, event, error)?,
+        },
         REPLY_ID_UPDATE_POSITION_LEVERAGE
         | REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE
         | REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE => match msg.result {
