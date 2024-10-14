@@ -23,7 +23,7 @@ fn leader_config_update() {
     );
     assert_ne!(
         initial_config.commission_rate,
-        config.commission_rate.clone().unwrap()
+        config.commission_rate.unwrap()
     );
     // Trader cannot update leader config
     market
