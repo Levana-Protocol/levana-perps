@@ -482,8 +482,25 @@ fn execute_leader_msg(
                 Event::new("cancel-limit-order").add_attribute("order-id", order_id.to_string());
             increase_collateral_response(storage, state, queue_position, event)
         }
-        // increase or leave it exactly same.
-        MarketExecuteMsg::ClosePosition { .. } => todo!(),
+        MarketExecuteMsg::ClosePosition {
+            id,
+            slippage_assert,
+        } => {
+            let queue_position = IncQueuePosition {
+                item: copy_trading::IncQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(IncMarketItem::ClosePosition {
+                        id,
+                        slippage_assert,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("close-position").add_attribute("id", id.to_string());
+            increase_collateral_response(storage, state, queue_position, event)
+        }
         MarketExecuteMsg::DepositLiquidity { .. } => not_supported_response("deposit-liqudiity"),
         MarketExecuteMsg::ReinvestYield { .. } => not_supported_response("reinvest yield"),
         MarketExecuteMsg::WithdrawLiquidity { .. } => not_supported_response("withdraw-liquidity"),
