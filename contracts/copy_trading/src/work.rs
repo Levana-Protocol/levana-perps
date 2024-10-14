@@ -703,9 +703,8 @@ pub(crate) fn process_queue_item(
                                 trigger_price,
                                 leverage,
                                 direction,
-                                max_gains: None,
                                 stop_loss_override,
-                                take_profit: Some(take_profit),
+                                take_profit,
                             },
                         )?;
                         // We use reply always so that we also handle the error case

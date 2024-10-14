@@ -475,10 +475,6 @@ fn execute_leader_msg(
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for opening position"),
             };
-            let take_profit = match take_profit {
-                Some(take_profit) => take_profit,
-                None => bail!("take profit is not specified"),
-            };
             let queue_position = DecQueuePosition {
                 item: copy_trading::DecQueueItem::MarketItem {
                     id: market_id,
