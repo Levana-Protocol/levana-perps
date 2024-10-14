@@ -23,6 +23,7 @@ fn rebalance_pagination() {
             &factory,
             &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
                 allowed_rebalance_queries: Some(2),
+                allowed_lp_token_queries: None,
             }),
         )
         .unwrap();
@@ -125,6 +126,7 @@ fn batch_work_rebalance() {
             &factory,
             &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
                 allowed_rebalance_queries: Some(2),
+                allowed_lp_token_queries: None,
             }),
         )
         .unwrap();
