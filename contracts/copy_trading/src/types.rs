@@ -5,7 +5,6 @@ use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
 use perpswap::contracts::copy_trading;
 use perpswap::contracts::market::{
-    deferred_execution::DeferredExecId,
     order::OrderId,
     position::{PositionId, PositionQueryResponse},
 };
@@ -70,23 +69,16 @@ impl Default for MarketWorkInfo {
 }
 
 /// Processing Status
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ProcessingStatus {
     /// Not started Yet
     NotStarted,
     /// The last seen position id. Should be passed to
     /// [perpswap::contracts::position_token::entry::QueryMsg::Tokens]
     OpenPositions(Option<String>),
-    /// The latest deferred exec item we're waiting on. Should be
-    /// passed to
-    /// [perpswap::contracts::market::entry::QueryMsg::ListDeferredExecs]
-    Deferred(Option<DeferredExecId>),
     /// Last seen limit order. Should be passed to
     /// [perpswap::contracts::market::entry::QueryMsg::LimitOrders]
     LimitOrder(Option<OrderId>),
-    /// Last seen limit order. Should be passed to
-    /// [perpswap::contracts::market::entry::QueryMsg::LimitOrderHistory]
-    LimitOrderHistory(Option<String>),
     /// Calculation reset required because a position was opened
     ResetRequired,
     /// Validated that there has been no change in positions
@@ -98,10 +90,38 @@ impl ProcessingStatus {
         match self {
             ProcessingStatus::NotStarted => false,
             ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::Deferred(_) => false,
             ProcessingStatus::LimitOrder(_) => false,
-            ProcessingStatus::LimitOrderHistory(_) => false,
             ProcessingStatus::ResetRequired => true,
+            ProcessingStatus::Validated => false,
+        }
+    }
+
+    pub fn not_started_yet(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => true,
+            ProcessingStatus::OpenPositions(_) => false,
+            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+        }
+    }
+
+    pub fn is_open_positions(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::OpenPositions(_) => true,
+            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+        }
+    }
+
+    pub fn is_limit_order(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::OpenPositions(_) => false,
+            ProcessingStatus::LimitOrder(_) => true,
+            ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
         }
     }
@@ -110,9 +130,7 @@ impl ProcessingStatus {
         match self {
             ProcessingStatus::NotStarted => false,
             ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::Deferred(_) => false,
             ProcessingStatus::LimitOrder(_) => false,
-            ProcessingStatus::LimitOrderHistory(_) => false,
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => true,
         }
@@ -440,6 +458,13 @@ pub enum BatchWork {
         /// Token
         token: Token,
     },
+    /// Continue LP token computation
+    BatchLpTokenValue {
+        /// Which market id to start from
+        start_from: Option<MarketId>,
+        /// Token
+        token: Token
+    }
 }
 
 /// Helper type for construcing response

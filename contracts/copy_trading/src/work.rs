@@ -204,6 +204,11 @@ fn get_batch_work(storage: &dyn Storage) -> Result<WorkResp> {
                     start_from,
                 },
             }),
+            crate::types::BatchWork::BatchLpTokenValue { start_from, token } => {
+                Ok(WorkResp::HasWork {
+                    work_description: WorkDescription::ComputeLpTokenValue { token, start_from },
+                })
+            }
         },
         None => Ok(WorkResp::NoWork),
     }
@@ -302,6 +307,9 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                         if let Some(deferred_exec_id) = deferred_exec_id {
                             return get_inc_deferred_work(storage, state, deferred_exec_id);
                         }
+                        // We do not compute LP token here since we
+                        // want to do some market pre-checks. These
+                        // pre-checks are done down below.
                     }
                 }
                 None => {
@@ -946,9 +954,13 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
     // 1500 positions which resulted in some leader commission.
     let is_approximate_same = diff <= "0.00001".parse().unwrap();
     if is_approximate_same {
+        // We know for a fact that this is a fresh computation of LP
+        // token value, so we need to Reset old stats if present.
+        // todo: do it
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
                 token: token.clone(),
+                start_from: None,
             },
         })
     } else {
