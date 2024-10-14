@@ -215,7 +215,7 @@ async fn single_market(
             leverage,
             None,
             None,
-            None,
+            "0.5".parse().unwrap(),
         )
         .await?;
 
