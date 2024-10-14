@@ -161,8 +161,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             leader_withdrawal(&state, storage, requested_funds, token)
         }
-        ExecuteMsg::AppointAdmin { .. } => todo!(),
-        ExecuteMsg::AcceptAdmin {} => todo!(),
         ExecuteMsg::LeaderUpdateConfig(config) => {
             state.config.ensure_leader(&sender)?;
             funds.require_none()?;
