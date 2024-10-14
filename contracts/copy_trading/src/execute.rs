@@ -29,7 +29,6 @@ enum Funds {
 }
 
 impl Funds {
-    #[allow(dead_code)]
     fn require_none(self) -> Result<()> {
         match self {
             Funds::NoFunds => Ok(()),
@@ -469,8 +468,20 @@ fn execute_leader_msg(
                 Event::new("place-limit-order").add_attribute("collateral", collateral.to_string());
             decrease_collateral_response(storage, state, queue_position, event)
         }
-        // increse collateral
-        MarketExecuteMsg::CancelLimitOrder { .. } => todo!(),
+        MarketExecuteMsg::CancelLimitOrder { order_id } => {
+            let queue_position = IncQueuePosition {
+                item: copy_trading::IncQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(IncMarketItem::CancelLimitOrder { order_id }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event =
+                Event::new("cancel-limit-order").add_attribute("order-id", order_id.to_string());
+            increase_collateral_response(storage, state, queue_position, event)
+        }
         // increase or leave it exactly same.
         MarketExecuteMsg::ClosePosition { .. } => todo!(),
         MarketExecuteMsg::DepositLiquidity { .. } => not_supported_response("deposit-liqudiity"),

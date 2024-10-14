@@ -4,6 +4,7 @@ use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
 use super::market::{
     entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert, StopLoss},
+    order::OrderId,
     position::PositionId,
 };
 use crate::{
@@ -418,6 +419,11 @@ pub enum IncMarketItem {
         /// Slippage alert
         slippage_assert: Option<SlippageAssert>,
     },
+    /// Cancel an open limit order
+    CancelLimitOrder {
+        /// ID of the order
+        order_id: OrderId,
+    },
 }
 
 /// Queue item that needs to be processed
@@ -513,14 +519,7 @@ impl IncQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             IncQueueItem::Deposit { token, .. } => RequiresToken::Token { token },
-            IncQueueItem::MarketItem { item, .. } => match *item {
-                IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { .. } => {
-                    RequiresToken::NoToken {}
-                }
-                IncMarketItem::UpdatePositionRemoveCollateralImpactSize { .. } => {
-                    RequiresToken::NoToken {}
-                }
-            },
+            IncQueueItem::MarketItem { .. } => RequiresToken::NoToken {},
         }
     }
 }
