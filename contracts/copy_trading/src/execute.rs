@@ -163,8 +163,51 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
         ExecuteMsg::AppointAdmin { .. } => todo!(),
         ExecuteMsg::AcceptAdmin {} => todo!(),
-        ExecuteMsg::LeaderUpdateConfig(_) => todo!(),
+        ExecuteMsg::LeaderUpdateConfig(config) => {
+            state.config.ensure_leader(&sender)?;
+            funds.require_none()?;
+            leader_update_config(&state, storage, config)
+        }
     }
+}
+
+fn leader_update_config(
+    state: &State,
+    storage: &mut dyn Storage,
+    config: ConfigUpdate,
+) -> Result<Response> {
+    let ConfigUpdate {
+        name,
+        description,
+        commission_rate,
+    } = config;
+    let mut config = crate::state::CONFIG
+        .may_load(storage)?
+        .context("CONFIG store is empty")?;
+    let mut event = Event::new("leader-update-config");
+    if let Some(commission_rate) = commission_rate {
+        config.commission_rate = commission_rate;
+        event = event
+            .add_attribute(
+                "old-commission-rate",
+                state.config.commission_rate.to_string(),
+            )
+            .add_attribute("new-commission-rate", commission_rate.to_string())
+    }
+    if let Some(description) = description {
+        config.description = description.clone();
+        event = event
+            .add_attribute("old-description", state.config.description.to_string())
+            .add_attribute("new-description", description);
+    }
+    if let Some(name) = name {
+        config.name = name.clone();
+        event = event
+            .add_attribute("old-name", state.config.name.to_string())
+            .add_attribute("new-name", name);
+    }
+    crate::state::CONFIG.save(storage, &config)?;
+    Ok(Response::new().add_event(event))
 }
 
 fn leader_withdrawal(

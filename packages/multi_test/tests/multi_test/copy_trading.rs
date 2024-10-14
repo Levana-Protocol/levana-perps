@@ -1,4 +1,5 @@
 mod batch_work;
+mod config;
 mod leader;
 mod orders;
 mod update_position;
