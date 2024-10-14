@@ -161,14 +161,55 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             leader_withdrawal(&state, storage, requested_funds, token)
         }
-        ExecuteMsg::AppointAdmin { .. } => todo!(),
-        ExecuteMsg::AcceptAdmin {} => todo!(),
+        ExecuteMsg::AppointAdmin { admin } => {
+            funds.require_none()?;
+            let admin = admin.validate(state.api)?;
+            appoint_admin(state, storage, sender, admin)
+        }
+        ExecuteMsg::AcceptAdmin {} => {
+            funds.require_none()?;
+            accept_admin(state, storage, sender)
+        }
         ExecuteMsg::LeaderUpdateConfig(config) => {
             state.config.ensure_leader(&sender)?;
             funds.require_none()?;
             leader_update_config(&state, storage, config)
         }
     }
+}
+
+fn accept_admin(mut state: State, storage: &mut dyn Storage, sender: Addr) -> Result<Response> {
+    ensure!(
+        state.config.pending_admin.as_ref() == Some(&sender),
+        "Cannot accept admin, you're not currently the pending admin"
+    );
+    let old_admin = state.config.admin;
+    state.config.admin = sender.clone();
+    state.config.pending_admin = None;
+    crate::state::CONFIG.save(storage, &state.config)?;
+    Ok(Response::new().add_event(
+        Event::new("accept-admin")
+            .add_attribute("old-admin", old_admin)
+            .add_attribute("new-admin", sender),
+    ))
+}
+
+fn appoint_admin(
+    mut state: State,
+    storage: &mut dyn Storage,
+    sender: Addr,
+    new_admin: Addr,
+) -> Result<Response> {
+    ensure!(
+        state.config.admin == sender,
+        "You are not the admin, you cannot appoint a new admin"
+    );
+    state.config.pending_admin = Some(new_admin.clone());
+    crate::state::CONFIG.save(storage, &state.config)?;
+    Ok(
+        Response::new()
+            .add_event(Event::new("appoint-admin").add_attribute("new-admin", new_admin)),
+    )
 }
 
 fn leader_update_config(

@@ -2639,6 +2639,20 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_copytrading_appoint_admin(&self, new_admin: &Addr) -> Result<AppResponse> {
+        let owner = self.app().factory_addr.clone();
+        self.exec_copytrading(
+            &owner,
+            &CopyTradingExecuteMsg::AppointAdmin {
+                admin: new_admin.into(),
+            },
+        )
+    }
+
+    pub fn exec_copytrading_accept_admin(&self, new_admin: &Addr) -> Result<AppResponse> {
+        self.exec_copytrading(new_admin, &CopyTradingExecuteMsg::AcceptAdmin {})
+    }
+
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {
         self.exec_countertrade(
             sender,

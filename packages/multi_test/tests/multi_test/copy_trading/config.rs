@@ -47,3 +47,22 @@ fn leader_config_update() {
         config.commission_rate.unwrap()
     );
 }
+
+#[test]
+fn change_admin() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+
+    market.exec_copytrading_accept_admin(&lp0).unwrap_err();
+    market.exec_copytrading_appoint_admin(&lp0).unwrap();
+    market.exec_copytrading_accept_admin(&lp1).unwrap_err();
+    market.exec_copytrading_appoint_admin(&lp1).unwrap();
+    market.exec_copytrading_accept_admin(&lp0).unwrap_err();
+    market.exec_copytrading_accept_admin(&lp1).unwrap();
+    market.exec_copytrading_appoint_admin(&lp0).unwrap_err();
+
+    let config = market.query_copy_trading_config().unwrap();
+    assert_eq!(config.admin, lp1);
+    assert_eq!(config.pending_admin, None);
+}
