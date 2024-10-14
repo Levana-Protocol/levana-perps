@@ -424,6 +424,13 @@ pub enum IncMarketItem {
         /// ID of the order
         order_id: OrderId,
     },
+    /// Close a position
+    ClosePosition {
+        /// ID of position to close
+        id: PositionId,
+        /// Assertion that the price has not moved too far
+        slippage_assert: Option<SlippageAssert>,
+    },
 }
 
 /// Queue item that needs to be processed

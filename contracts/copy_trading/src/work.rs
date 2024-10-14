@@ -13,10 +13,10 @@ use crate::{
     prelude::*,
     reply::{
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
-        REPLY_ID_CANCEL_LIMIT_ORDER, REPLY_ID_OPEN_POSITION, REPLY_ID_PLACE_LIMIT_ORDER,
-        REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE,
-        REPLY_ID_UPDATE_POSITION_LEVERAGE, REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE,
-        REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE,
+        REPLY_ID_CANCEL_LIMIT_ORDER, REPLY_ID_CLOSE_POSITION, REPLY_ID_OPEN_POSITION,
+        REPLY_ID_PLACE_LIMIT_ORDER, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
+        REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE, REPLY_ID_UPDATE_POSITION_LEVERAGE,
+        REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE, REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE,
     },
     types::{
         DecQueueCrankResponse, DecQueuePosition, DecQueueResponse, IncQueueResponse, State,
@@ -379,6 +379,36 @@ pub(crate) fn process_queue_item(
                     token,
                 } => {
                     match *item {
+                        IncMarketItem::ClosePosition {
+                            id,
+                            slippage_assert,
+                        } => {
+                            let market_info = crate::state::MARKETS
+                                .may_load(storage, &market_id)?
+                                .context("MARKETS store is empty")?;
+                            let msg = MarketExecuteMsg::ClosePosition {
+                                id,
+                                slippage_assert,
+                            };
+                            let msg = WasmMsg::Execute {
+                                contract_addr: market_info.addr.to_string(),
+                                msg: to_json_binary(&msg)?,
+                                funds: vec![],
+                            };
+                            // We use reply always so that we also handle the error case
+                            let sub_msg = SubMsg::reply_always(msg, REPLY_ID_CLOSE_POSITION);
+                            let event =
+                                Event::new("close-position").add_attribute("id", id.to_string());
+                            let response = IncQueueResponse {
+                                sub_msg,
+                                collateral: None,
+                                token,
+                                event,
+                                queue_item,
+                                queue_id: queue_pos_id,
+                            };
+                            process_inc_queue(response, storage)
+                        }
                         IncMarketItem::CancelLimitOrder { order_id } => {
                             let market_info = crate::state::MARKETS
                                 .may_load(storage, &market_id)?
