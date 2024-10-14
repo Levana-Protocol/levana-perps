@@ -1170,3 +1170,80 @@ fn close_position() {
         .unwrap();
     assert!(leader_queue.items.iter().all(|item| item.status.finish()));
 }
+
+#[test]
+fn close_position_failure() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+
+    // Set some crank fee configration so that crank fee logic is
+    // kicked in
+    market
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("5".parse().unwrap()),
+            crank_fee_surcharge: Some("1".parse().unwrap()),
+            crank_fee_charged: Some("0.1".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "2000").unwrap();
+
+    market
+        .exec_copy_trading_open_position("20", DirectionToBase::Long, "1.5")
+        .unwrap();
+    // Open position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    // Handle deferred exec id
+    market.exec_copytrading_do_work(&trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let position_id = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>()[0];
+
+    market
+        .exec_copytrading_leader(&copy_trading::ExecuteMsg::LeaderMsg {
+            market_id: market.id.clone(),
+            message: Box::new(perpswap::storage::MarketExecuteMsg::ClosePosition {
+                id: position_id.next(),
+                slippage_assert: None,
+            }),
+            collateral: None,
+        })
+        .unwrap();
+    // Close position
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // No work since cranking is not done yet
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let position_id = market
+        .query_position_token_ids(&market.copy_trading_addr)
+        .unwrap()
+        .iter()
+        .map(|item| PositionId::new(item.parse().unwrap()))
+        .collect::<Vec<_>>();
+    // Position is not closed
+    assert_eq!(position_id.len(), 1);
+
+    let final_token = market.query_copy_trading_leader_tokens().unwrap().tokens[0].clone();
+    // No change in balance since no position closed
+    assert_eq!(final_token.collateral, "1980".parse().unwrap());
+
+    let leader_queue = market
+        .query_copy_trading_queue_status(leader.clone().into())
+        .unwrap();
+    assert!(leader_queue.items.iter().any(|item| item.status.failed()));
+}
