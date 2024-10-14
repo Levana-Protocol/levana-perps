@@ -103,7 +103,6 @@ impl PerpApp {
         collateral: NonZero<Collateral>,
         direction: DirectionToBase,
         leverage: LeverageToBase,
-        _max_gains: MaxGainsInQuote,
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit: PriceBaseInQuote,

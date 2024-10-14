@@ -143,7 +143,6 @@ async fn main_inner() -> Result<()> {
                     collateral,
                     direction,
                     leverage,
-                    "2".parse().unwrap(),
                     slippage_assert,
                     None,
                     take_profit,

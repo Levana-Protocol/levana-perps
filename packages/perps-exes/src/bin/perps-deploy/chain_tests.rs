@@ -15,7 +15,6 @@ pub async fn test_funding_market(perp_app: &PerpApp) -> Result<()> {
                 "10".parse()?,
                 DirectionToBase::Long,
                 "5".parse()?,
-                "200".parse()?,
                 Some(SlippageAssert {
                     price: PriceBaseInQuote::from_str("9.9")?,
                     tolerance: "0.01".parse()?,
@@ -58,7 +57,6 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
     // Open position
     let collateral = NonZero::<Collateral>::from_str("100")?;
     let direction = DirectionToBase::Long;
-    let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
     let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.9")?;
@@ -72,7 +70,6 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
             collateral,
             direction,
             leverage,
-            max_gains,
             Some(SlippageAssert {
                 price: entry_price,
                 tolerance,
@@ -113,7 +110,6 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     // Open position
     let collateral = NonZero::<Collateral>::from_str("100")?;
     let direction = DirectionToBase::Long;
-    let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
     let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.9")?;
@@ -125,7 +121,6 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
             collateral,
             direction,
             leverage,
-            max_gains,
             Some(SlippageAssert {
                 price: entry_price,
                 tolerance,
@@ -251,7 +246,6 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     // Open position
     let collateral = "100".parse()?;
     let direction = DirectionToBase::Long;
-    let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
     let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.47")?;
@@ -263,7 +257,6 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
             collateral,
             direction,
             leverage,
-            max_gains,
             Some(SlippageAssert {
                 price: entry_price,
                 tolerance,
@@ -306,7 +299,6 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     // Open position
     let collateral = "100".parse()?;
     let direction = DirectionToBase::Long;
-    let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
     let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.47")?;
@@ -318,7 +310,6 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
             collateral,
             direction,
             leverage,
-            max_gains,
             Some(SlippageAssert {
                 price: entry_price,
                 tolerance,
@@ -383,7 +374,6 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
     // Open position
     let collateral = "100".parse()?;
     let direction = DirectionToBase::Long;
-    let max_gains = MaxGainsInQuote::PosInfinity;
     let leverage = LeverageToBase::from_str("17.5")?;
     let take_profit = "999".parse()?;
 
@@ -395,15 +385,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
     perp_app.crank(None).await?;
 
     perp_app
-        .open_position(
-            collateral,
-            direction,
-            leverage,
-            max_gains,
-            None,
-            None,
-            take_profit,
-        )
+        .open_position(collateral, direction, leverage, None, None, take_profit)
         .await?;
 
     let positions = perp_app.all_open_positions().await?;
