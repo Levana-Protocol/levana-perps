@@ -33,9 +33,11 @@ pub fn instantiate(
                 description,
                 commission_rate,
             },
-        parameters: FactoryConfigUpdate {
-            allowed_rebalance_queries,
-        },
+        parameters:
+            FactoryConfigUpdate {
+                allowed_rebalance_queries,
+                allowed_lp_token_queries,
+            },
     }: InstantiateMsg,
 ) -> Result<Response> {
     // Sender is the factory contract
@@ -52,6 +54,7 @@ pub fn instantiate(
         commission_rate: commission_rate.unwrap_or_else(|| Decimal256::from_ratio(10u32, 100u32)),
         created_at: env.block.time.into(),
         allowed_rebalance_queries: allowed_rebalance_queries.unwrap_or(30),
+        allowed_lp_token_queries: allowed_lp_token_queries.unwrap_or(30),
     };
     config.check()?;
     state::CONFIG

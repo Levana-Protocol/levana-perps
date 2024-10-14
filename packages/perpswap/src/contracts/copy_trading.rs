@@ -53,8 +53,10 @@ pub struct Config {
     pub commission_rate: Decimal256,
     /// Creation time of contract
     pub created_at: Timestamp,
-    /// Allowed smart queries During Rebalance operations
+    /// Allowed smart queries during Rebalance operation
     pub allowed_rebalance_queries: u32,
+    /// Allowed smart queries during token value computation
+    pub allowed_lp_token_queries: u32,
 }
 
 impl Config {
@@ -110,6 +112,7 @@ pub struct ConfigUpdate {
 #[allow(missing_docs)]
 pub struct FactoryConfigUpdate {
     pub allowed_rebalance_queries: Option<u32>,
+    pub allowed_lp_token_queries: Option<u32>,
 }
 
 /// Executions available on the copy trading contract.

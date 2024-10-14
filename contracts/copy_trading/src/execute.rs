@@ -242,6 +242,7 @@ fn factory_update_config(
 ) -> Result<Response> {
     let FactoryConfigUpdate {
         allowed_rebalance_queries,
+        allowed_lp_token_queries,
     } = config;
     let mut config = crate::state::CONFIG
         .may_load(storage)?
@@ -257,6 +258,18 @@ fn factory_update_config(
             .add_attribute(
                 "new-allowed-rebalance-queries",
                 allowed_rebalance_queries.to_string(),
+            );
+    }
+    if let Some(allowed_lp_token_queries) = allowed_lp_token_queries {
+        config.allowed_lp_token_queries = allowed_lp_token_queries;
+        event = event
+            .add_attribute(
+                "old-allowed-lp-token-queries",
+                config.allowed_lp_token_queries.to_string(),
+            )
+            .add_attribute(
+                "new-allowed-lp-token-queries",
+                allowed_lp_token_queries.to_string(),
             );
     }
     crate::state::CONFIG.save(storage, &config)?;
@@ -978,7 +991,6 @@ fn compute_lp_token_value(storage: &mut dyn Storage, state: &State, token: Token
             // The value is not yet stored which means no deposit has
             // happened yet. In this case, the initial value of the
             // token would be one.
-
             let token_value = LpTokenValue {
                 value: OneLpTokenValue(Collateral::one()),
                 status: crate::types::LpTokenStatus::Valid {
