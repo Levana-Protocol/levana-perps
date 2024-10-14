@@ -805,6 +805,8 @@ pub enum WorkDescription {
     ComputeLpTokenValue {
         /// Token
         token: Token,
+        /// Start from specific market id
+        start_from: Option<MarketId>,
     },
     /// Process market
     ProcessMarket {
