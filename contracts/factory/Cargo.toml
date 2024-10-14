@@ -32,4 +32,4 @@ anyhow = "1.0.82"
 enum-iterator = "1.2"
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true }

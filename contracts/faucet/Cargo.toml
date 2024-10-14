@@ -31,4 +31,4 @@ semver = "1.0.15"
 anyhow = "1.0.82"
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true }

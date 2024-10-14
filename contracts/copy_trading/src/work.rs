@@ -1,5 +1,5 @@
 use anyhow::bail;
-use cosmwasm_std::SubMsg;
+use cosmwasm_std::{SubMsg, WasmMsg};
 use perpswap::contracts::{
     copy_trading,
     market::deferred_execution::{DeferredExecId, GetDeferredExecResp},
@@ -13,10 +13,15 @@ use crate::{
     prelude::*,
     reply::{
         REPLY_ID_ADD_COLLATERAL_IMPACT_LEVERAGE, REPLY_ID_ADD_COLLATERAL_IMPACT_SIZE,
-        REPLY_ID_OPEN_POSITION, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
-        REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE,
+        REPLY_ID_CANCEL_LIMIT_ORDER, REPLY_ID_CLOSE_POSITION, REPLY_ID_OPEN_POSITION,
+        REPLY_ID_PLACE_LIMIT_ORDER, REPLY_ID_REMOVE_COLLATERAL_IMPACT_LEVERAGE,
+        REPLY_ID_REMOVE_COLLATERAL_IMPACT_SIZE, REPLY_ID_UPDATE_POSITION_LEVERAGE,
+        REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE, REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE,
     },
-    types::{DecQueuePosition, DecQueueResponse, IncQueueResponse, State, WalletInfo},
+    types::{
+        DecQueueCrankResponse, DecQueuePosition, DecQueueResponse, IncQueueResponse, State,
+        WalletInfo,
+    },
 };
 use perpswap::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 
@@ -374,6 +379,59 @@ pub(crate) fn process_queue_item(
                     token,
                 } => {
                     match *item {
+                        IncMarketItem::ClosePosition {
+                            id,
+                            slippage_assert,
+                        } => {
+                            let market_info = crate::state::MARKETS
+                                .may_load(storage, &market_id)?
+                                .context("MARKETS store is empty")?;
+                            let msg = MarketExecuteMsg::ClosePosition {
+                                id,
+                                slippage_assert,
+                            };
+                            let msg = WasmMsg::Execute {
+                                contract_addr: market_info.addr.to_string(),
+                                msg: to_json_binary(&msg)?,
+                                funds: vec![],
+                            };
+                            // We use reply always so that we also handle the error case
+                            let sub_msg = SubMsg::reply_always(msg, REPLY_ID_CLOSE_POSITION);
+                            let event =
+                                Event::new("close-position").add_attribute("id", id.to_string());
+                            let response = IncQueueResponse {
+                                sub_msg,
+                                collateral: None,
+                                token,
+                                event,
+                                queue_item,
+                                queue_id: queue_pos_id,
+                            };
+                            process_inc_queue(response, storage)
+                        }
+                        IncMarketItem::CancelLimitOrder { order_id } => {
+                            let market_info = crate::state::MARKETS
+                                .may_load(storage, &market_id)?
+                                .context("MARKETS store is empty")?;
+                            let msg = MarketExecuteMsg::CancelLimitOrder { order_id };
+                            let msg = WasmMsg::Execute {
+                                contract_addr: market_info.addr.to_string(),
+                                msg: to_json_binary(&msg)?,
+                                funds: vec![],
+                            };
+                            let sub_msg = SubMsg::reply_always(msg, REPLY_ID_CANCEL_LIMIT_ORDER);
+                            let event = Event::new("cancel-limit-order")
+                                .add_attribute("order-id", order_id.to_string());
+                            let response = IncQueueResponse {
+                                sub_msg,
+                                collateral: None,
+                                token,
+                                event,
+                                queue_item,
+                                queue_id: queue_pos_id,
+                            };
+                            process_inc_queue(response, storage)
+                        }
                         IncMarketItem::UpdatePositionRemoveCollateralImpactSize {
                             id,
                             amount,
@@ -627,6 +685,138 @@ pub(crate) fn process_queue_item(
                     token,
                     item,
                 } => match *item {
+                    DecMarketItem::PlaceLimitOrder {
+                        collateral,
+                        trigger_price,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                    } => {
+                        let market_info = crate::state::MARKETS
+                            .may_load(storage, &market_id)?
+                            .context("MARKETS store is empty")?;
+                        let msg = market_info.token.into_market_execute_msg(
+                            &market_info.addr,
+                            collateral.raw(),
+                            MarketExecuteMsg::PlaceLimitOrder {
+                                trigger_price,
+                                leverage,
+                                direction,
+                                max_gains: None,
+                                stop_loss_override,
+                                take_profit: Some(take_profit),
+                            },
+                        )?;
+                        // We use reply always so that we also handle the error case
+                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_PLACE_LIMIT_ORDER);
+                        let event = Event::new("place-limit-order")
+                            .add_attribute("direction", direction.as_str())
+                            .add_attribute("leverage", leverage.to_string())
+                            .add_attribute("collateral", collateral.to_string())
+                            .add_attribute("trigger-price", trigger_price.to_string())
+                            .add_attribute("take-profit", take_profit.to_string())
+                            .add_attribute("market", market_info.id.as_str());
+                        let response = DecQueueResponse {
+                            sub_msg,
+                            collateral,
+                            token,
+                            event,
+                            queue_item,
+                            queue_id: queue_pos_id,
+                            response,
+                        };
+                        process_dec_queue(response, storage)
+                    }
+                    DecMarketItem::UpdatePositionStopLossPrice { id, stop_loss } => {
+                        let market_info = crate::state::MARKETS
+                            .may_load(storage, &market_id)?
+                            .context("MARKETS store is empty")?;
+                        let crank_fees = state.estimate_crank_fee(&market_info)?;
+                        let msg = market_info.token.into_market_execute_msg(
+                            &market_info.addr,
+                            crank_fees,
+                            MarketExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss },
+                        )?;
+                        // We use reply always so that we also handle the error case
+                        let sub_msg =
+                            SubMsg::reply_always(msg, REPLY_ID_UPDATE_POSITION_STOP_LOSS_PRICE);
+                        let event = Event::new("update-position-stop-loss-price")
+                            .add_attribute("market-id", market_info.id.to_string())
+                            .add_attribute("position-id", id.to_string());
+                        let response = DecQueueCrankResponse {
+                            sub_msg,
+                            crank_fees,
+                            token,
+                            event,
+                            queue_item,
+                            queue_id: queue_pos_id,
+                            response,
+                        };
+                        process_dec_crank_queue(response, storage)
+                    }
+                    DecMarketItem::UpdatePositionTakeProfitPrice { id, price } => {
+                        let market_info = crate::state::MARKETS
+                            .may_load(storage, &market_id)?
+                            .context("MARKETS store is empty")?;
+                        let crank_fees = state.estimate_crank_fee(&market_info)?;
+                        let msg = market_info.token.into_market_execute_msg(
+                            &market_info.addr,
+                            crank_fees,
+                            MarketExecuteMsg::UpdatePositionTakeProfitPrice { id, price },
+                        )?;
+                        // We use reply always so that we also handle the error case
+                        let sub_msg =
+                            SubMsg::reply_always(msg, REPLY_ID_UPDATE_POSITION_TAKE_PROFIT_PRICE);
+                        let event = Event::new("update-position-take-profit-price")
+                            .add_attribute("market-id", market_info.id.to_string())
+                            .add_attribute("price", price.to_string())
+                            .add_attribute("position-id", id.to_string());
+                        let response = DecQueueCrankResponse {
+                            sub_msg,
+                            crank_fees,
+                            token,
+                            event,
+                            queue_item,
+                            queue_id: queue_pos_id,
+                            response,
+                        };
+                        process_dec_crank_queue(response, storage)
+                    }
+                    DecMarketItem::UpdatePositionLeverage {
+                        id,
+                        leverage,
+                        slippage_assert,
+                    } => {
+                        let market_info = crate::state::MARKETS
+                            .may_load(storage, &market_id)?
+                            .context("MARKETS store is empty")?;
+                        let crank_fees = state.estimate_crank_fee(&market_info)?;
+                        let msg = market_info.token.into_market_execute_msg(
+                            &market_info.addr,
+                            crank_fees,
+                            MarketExecuteMsg::UpdatePositionLeverage {
+                                id,
+                                leverage,
+                                slippage_assert,
+                            },
+                        )?;
+                        // We use reply always so that we also handle the error case
+                        let sub_msg = SubMsg::reply_always(msg, REPLY_ID_UPDATE_POSITION_LEVERAGE);
+                        let event = Event::new("update-position-leverage")
+                            .add_attribute("market-id", market_info.id.to_string())
+                            .add_attribute("position-id", id.to_string());
+                        let response = DecQueueCrankResponse {
+                            sub_msg,
+                            crank_fees,
+                            token,
+                            event,
+                            queue_item,
+                            queue_id: queue_pos_id,
+                            response,
+                        };
+                        process_dec_crank_queue(response, storage)
+                    }
                     DecMarketItem::UpdatePositionAddCollateralImpactSize {
                         collateral,
                         id,
@@ -790,6 +980,40 @@ fn process_dec_queue(response: DecQueueResponse, storage: &mut dyn Storage) -> R
         queue_item.status = ProcessingStatus::Failed(FailedReason::NotEnoughCollateral {
             available: totals.collateral,
             requested: response.collateral,
+        });
+        crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
+        crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &response.queue_id)?;
+        return Ok(response.response.add_event(event));
+    }
+    crate::state::TOTALS.save(storage, &token, &totals)?;
+    let mut token_value = crate::state::LP_TOKEN_VALUE
+        .may_load(storage, &token)?
+        .context("LP_TOKEN_VALUE store is empty")?;
+    token_value.set_outdated();
+    crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
+    queue_item.status = ProcessingStatus::InProgress;
+    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
+    let result = response.response.add_event(response.event);
+    let result = result.add_submessage(response.sub_msg);
+    Ok(result)
+}
+
+fn process_dec_crank_queue(
+    response: DecQueueCrankResponse,
+    storage: &mut dyn Storage,
+) -> Result<Response> {
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &response.token)?
+        .context("TOTALS store is empty")?;
+    let mut queue_item = response.queue_item;
+    let token = response.token;
+    if totals.collateral >= response.crank_fees {
+        totals.collateral = totals.collateral.checked_sub(response.crank_fees)?;
+    } else {
+        let event = response.event.add_attribute("failure", true.to_string());
+        queue_item.status = ProcessingStatus::Failed(FailedReason::NotEnoughCrankFee {
+            available: totals.collateral,
+            requested: response.crank_fees,
         });
         crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &response.queue_id, &queue_item)?;
         crate::state::LAST_PROCESSED_DEC_QUEUE_ID.save(storage, &response.queue_id)?;

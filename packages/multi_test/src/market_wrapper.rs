@@ -484,6 +484,19 @@ impl PerpsMarket {
         self.exec_defer_wasm_msg(sender, msg)
     }
 
+    /// Estimates crank fee
+    pub fn query_crank_fee(&self) -> Result<Collateral> {
+        let estimated_queue_size = 5u32;
+        let config = self.query_config()?;
+        let fees = config
+            .crank_fee_surcharge
+            .checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
+        let fees = fees.checked_add(config.crank_fee_charged)?;
+        let price = self.query_current_price()?;
+        let crank_fee = price.usd_to_collateral(fees);
+        Ok(crank_fee)
+    }
+
     pub fn make_market_msg_with_funds(
         &self,
         msg: &MarketExecuteMsg,
@@ -2492,6 +2505,33 @@ impl PerpsMarket {
             direction,
             stop_loss_override: None,
             take_profit: TakeProfitTrader::Finite(take_profit.parse().unwrap()),
+        });
+        let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
+            market_id,
+            message: msg,
+            collateral: Some(amount),
+        };
+        let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+        self.exec_copytrading(&leader, wasm_msg)
+    }
+
+    pub fn exec_copy_trading_place_order(
+        &self,
+        amount: &str,
+        trigger_price: &str,
+        direction: DirectionToBase,
+        take_profit: &str,
+    ) -> Result<AppResponse> {
+        let amount = amount.parse()?;
+        let market_id = self.id.clone();
+        let leverage = "700".parse().unwrap();
+        let msg = Box::new(MarketExecuteMsg::PlaceLimitOrder {
+            trigger_price: trigger_price.parse().unwrap(),
+            leverage,
+            direction,
+            max_gains: None,
+            stop_loss_override: None,
+            take_profit: Some(TakeProfitTrader::Finite(take_profit.parse().unwrap())),
         });
         let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
             market_id,

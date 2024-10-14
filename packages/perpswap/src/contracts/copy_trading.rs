@@ -3,7 +3,8 @@
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
 use super::market::{
-    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert},
+    entry::{ExecuteMsg as MarketExecuteMsg, SlippageAssert, StopLoss},
+    order::OrderId,
     position::PositionId,
 };
 use crate::{
@@ -133,13 +134,6 @@ pub enum ExecuteMsg {
         /// Token type in which amount should be withdrawn
         token: Token,
     },
-    /// Appoint a new administrator
-    AppointAdmin {
-        /// Address of the new administrator
-        admin: RawAddr,
-    },
-    /// Accept appointment of admin
-    AcceptAdmin {},
     /// Update configuration values that is allowed for leader.
     LeaderUpdateConfig(ConfigUpdate),
     /// Update configuration values that is allowed for facotr.
@@ -418,6 +412,18 @@ pub enum IncMarketItem {
         /// Slippage alert
         slippage_assert: Option<SlippageAssert>,
     },
+    /// Cancel an open limit order
+    CancelLimitOrder {
+        /// ID of the order
+        order_id: OrderId,
+    },
+    /// Close a position
+    ClosePosition {
+        /// ID of position to close
+        id: PositionId,
+        /// Assertion that the price has not moved too far
+        slippage_assert: Option<SlippageAssert>,
+    },
 }
 
 /// Queue item that needs to be processed
@@ -455,6 +461,46 @@ pub enum DecMarketItem {
         /// Slippage assert
         slippage_assert: Option<SlippageAssert>,
     },
+    /// Update position leverage
+    UpdatePositionLeverage {
+        /// ID of position to update
+        id: PositionId,
+        /// New leverage of the position
+        leverage: LeverageToBase,
+        /// Slippage assert
+        slippage_assert: Option<SlippageAssert>,
+    },
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
+    /// Update the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position, or remove
+        stop_loss: StopLoss,
+    },
+    /// Set a limit order to open a position when the price of the asset hits
+    /// the specified trigger price.
+    PlaceLimitOrder {
+        /// Collateral for the position
+        collateral: NonZero<Collateral>,
+        /// Price when the order should trigger
+        trigger_price: PriceBaseInQuote,
+        /// Leverage of new position
+        leverage: LeverageToBase,
+        /// Direction of new position
+        direction: DirectionToBase,
+        /// Stop loss price of new position
+        stop_loss_override: Option<PriceBaseInQuote>,
+        /// Take profit price of new position
+        #[serde(alias = "take_profit_override")]
+        take_profit: TakeProfitTrader,
+    },
 }
 
 /// Token required for the queue item
@@ -473,14 +519,7 @@ impl IncQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             IncQueueItem::Deposit { token, .. } => RequiresToken::Token { token },
-            IncQueueItem::MarketItem { item, .. } => match *item {
-                IncMarketItem::UpdatePositionRemoveCollateralImpactLeverage { .. } => {
-                    RequiresToken::NoToken {}
-                }
-                IncMarketItem::UpdatePositionRemoveCollateralImpactSize { .. } => {
-                    RequiresToken::NoToken {}
-                }
-            },
+            IncQueueItem::MarketItem { .. } => RequiresToken::NoToken {},
         }
     }
 }
@@ -490,19 +529,8 @@ impl DecQueueItem {
     pub fn requires_token(self) -> RequiresToken {
         match self {
             DecQueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            DecQueueItem::MarketItem { item, .. } => match *item {
-                DecMarketItem::OpenPosition { .. } => {
-                    // For opening a position, we don't require LP
-                    // token value to be computed.
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionAddCollateralImpactLeverage { .. } => {
-                    RequiresToken::NoToken {}
-                }
-                DecMarketItem::UpdatePositionAddCollateralImpactSize { .. } => {
-                    RequiresToken::NoToken {}
-                }
-            },
+            // Market item does not require computation of lp token value
+            DecQueueItem::MarketItem { .. } => RequiresToken::NoToken {},
         }
     }
 }
@@ -754,6 +782,14 @@ impl WorkResp {
             WorkResp::HasWork { work_description } => work_description.is_rebalance(),
         }
     }
+
+    /// Is it compute lp token work ?
+    pub fn is_compute_lp_token(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_compute_lp_token(),
+        }
+    }
 }
 
 /// Work Description
@@ -807,6 +843,19 @@ impl WorkDescription {
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
             WorkDescription::Rebalance { .. } => true,
+        }
+    }
+
+    /// Is it compute lp token work ?
+    pub fn is_compute_lp_token(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => true,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => false,
         }
     }
 

@@ -29,7 +29,6 @@ enum Funds {
 }
 
 impl Funds {
-    #[allow(dead_code)]
     fn require_none(self) -> Result<()> {
         match self {
             Funds::NoFunds => Ok(()),
@@ -162,10 +161,51 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             leader_withdrawal(&state, storage, requested_funds, token)
         }
-        ExecuteMsg::AppointAdmin { .. } => todo!(),
-        ExecuteMsg::AcceptAdmin {} => todo!(),
-        ExecuteMsg::LeaderUpdateConfig(_) => todo!(),
+        ExecuteMsg::LeaderUpdateConfig(config) => {
+            state.config.ensure_leader(&sender)?;
+            funds.require_none()?;
+            leader_update_config(&state, storage, config)
+        }
     }
+}
+
+fn leader_update_config(
+    state: &State,
+    storage: &mut dyn Storage,
+    config: ConfigUpdate,
+) -> Result<Response> {
+    let ConfigUpdate {
+        name,
+        description,
+        commission_rate,
+    } = config;
+    let mut config = crate::state::CONFIG
+        .may_load(storage)?
+        .context("CONFIG store is empty")?;
+    let mut event = Event::new("leader-update-config");
+    if let Some(commission_rate) = commission_rate {
+        config.commission_rate = commission_rate;
+        event = event
+            .add_attribute(
+                "old-commission-rate",
+                state.config.commission_rate.to_string(),
+            )
+            .add_attribute("new-commission-rate", commission_rate.to_string())
+    }
+    if let Some(description) = description {
+        config.description = description.clone();
+        event = event
+            .add_attribute("old-description", state.config.description.to_string())
+            .add_attribute("new-description", description);
+    }
+    if let Some(name) = name {
+        config.name = name.clone();
+        event = event
+            .add_attribute("old-name", state.config.name.to_string())
+            .add_attribute("new-name", name);
+    }
+    crate::state::CONFIG.save(storage, &config)?;
+    Ok(Response::new().add_event(event))
 }
 
 fn leader_withdrawal(
@@ -259,13 +299,6 @@ fn execute_leader_msg(
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for opening position"),
             };
-            let dec_queue_id = get_next_dec_queue_id(storage)?;
-            let leader = state.config.leader.clone();
-            crate::state::WALLET_QUEUE_ITEMS.save(
-                storage,
-                (&leader, QueuePositionId::DecQueuePositionId(dec_queue_id)),
-                &(),
-            )?;
             let queue_position = DecQueuePosition {
                 item: copy_trading::DecQueueItem::MarketItem {
                     id: market_id,
@@ -282,29 +315,15 @@ fn execute_leader_msg(
                 status: copy_trading::ProcessingStatus::NotProcessed,
                 wallet: state.config.leader.clone(),
             };
-            crate::state::COLLATERAL_DECREASE_QUEUE.save(
-                storage,
-                &dec_queue_id,
-                &queue_position,
-            )?;
-            Ok(Response::new().add_event(
-                Event::new("open-position")
-                    .add_attribute("queue-id", dec_queue_id.to_string())
-                    .add_attribute("collateral", collateral.to_string()),
-            ))
+            let event =
+                Event::new("open-position").add_attribute("collateral", collateral.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
         }
         MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => {
             let collateral = match collateral {
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for updating position"),
             };
-            let dec_queue_id = get_next_dec_queue_id(storage)?;
-            let leader = state.config.leader.clone();
-            crate::state::WALLET_QUEUE_ITEMS.save(
-                storage,
-                (&leader, QueuePositionId::DecQueuePositionId(dec_queue_id)),
-                &(),
-            )?;
             let queue_position = DecQueuePosition {
                 item: copy_trading::DecQueueItem::MarketItem {
                     id: market_id,
@@ -317,17 +336,10 @@ fn execute_leader_msg(
                 status: copy_trading::ProcessingStatus::NotProcessed,
                 wallet: state.config.leader.clone(),
             };
-            crate::state::COLLATERAL_DECREASE_QUEUE.save(
-                storage,
-                &dec_queue_id,
-                &queue_position,
-            )?;
-            Ok(Response::new().add_event(
-                Event::new("update-position-add-collateral-impact-leverage")
-                    .add_attribute("queue-id", dec_queue_id.to_string())
-                    .add_attribute("position-id", id.to_string())
-                    .add_attribute("collateral", collateral.to_string()),
-            ))
+            let event = Event::new("update-position-add-collateral-impact-leverage")
+                .add_attribute("position-id", id.to_string())
+                .add_attribute("collateral", collateral.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
         }
         MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
             id,
@@ -337,13 +349,6 @@ fn execute_leader_msg(
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for updating position"),
             };
-            let dec_queue_id = get_next_dec_queue_id(storage)?;
-            let leader = state.config.leader.clone();
-            crate::state::WALLET_QUEUE_ITEMS.save(
-                storage,
-                (&leader, QueuePositionId::DecQueuePositionId(dec_queue_id)),
-                &(),
-            )?;
             let queue_position = DecQueuePosition {
                 item: copy_trading::DecQueueItem::MarketItem {
                     id: market_id,
@@ -357,17 +362,10 @@ fn execute_leader_msg(
                 status: copy_trading::ProcessingStatus::NotProcessed,
                 wallet: state.config.leader.clone(),
             };
-            crate::state::COLLATERAL_DECREASE_QUEUE.save(
-                storage,
-                &dec_queue_id,
-                &queue_position,
-            )?;
-            Ok(Response::new().add_event(
-                Event::new("update-position-add-collateral-impact-size")
-                    .add_attribute("queue-id", dec_queue_id.to_string())
-                    .add_attribute("position-id", id.to_string())
-                    .add_attribute("collateral", collateral.to_string()),
-            ))
+            let event = Event::new("update-position-add-collateral-impact-size")
+                .add_attribute("position-id", id.to_string())
+                .add_attribute("collateral", collateral.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
         }
         MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             let queue_position = IncQueuePosition {
@@ -409,22 +407,131 @@ fn execute_leader_msg(
                 .add_attribute("amount", amount.to_string());
             increase_collateral_response(storage, state, queue_position, event)
         }
-        // no impact on collateral. only impatcs notional size.
-        MarketExecuteMsg::UpdatePositionLeverage { .. } => todo!(),
-        // no impact. todo: look through the codebase.
-        MarketExecuteMsg::UpdatePositionMaxGains { .. } => todo!(),
-        //
-        MarketExecuteMsg::UpdatePositionTakeProfitPrice { .. } => todo!(),
-        // no impact
-        MarketExecuteMsg::UpdatePositionStopLossPrice { .. } => todo!(),
-        // no impact.
-        MarketExecuteMsg::SetTriggerOrder { .. } => todo!(),
+        MarketExecuteMsg::UpdatePositionLeverage {
+            id,
+            leverage,
+            slippage_assert,
+        } => {
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionLeverage {
+                        id,
+                        leverage,
+                        slippage_assert,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("update-position-leverage")
+                .add_attribute("position-id", id.to_string())
+                .add_attribute("leverage", leverage.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
+        MarketExecuteMsg::UpdatePositionMaxGains { .. } => {
+            not_supported_response("update-position-max-gains")
+        }
+        MarketExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => {
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionTakeProfitPrice { id, price }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("update-position-take-profit-price")
+                .add_attribute("position-id", id.to_string())
+                .add_attribute("price", price.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
+        MarketExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => {
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::UpdatePositionStopLossPrice { id, stop_loss }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("update-position-stop-loss-price")
+                .add_attribute("position-id", id.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
+        MarketExecuteMsg::SetTriggerOrder { .. } => not_supported_response("set-trigger-order"),
         // reduces collateral
-        MarketExecuteMsg::PlaceLimitOrder { .. } => todo!(),
-        // increse collateral
-        MarketExecuteMsg::CancelLimitOrder { .. } => todo!(),
-        // increase or leave it exactly same.
-        MarketExecuteMsg::ClosePosition { .. } => todo!(),
+        MarketExecuteMsg::PlaceLimitOrder {
+            trigger_price,
+            leverage,
+            direction,
+            stop_loss_override,
+            take_profit,
+        } => {
+            let collateral = match collateral {
+                Some(collateral) => collateral,
+                None => bail!("No supplied collateral for opening position"),
+            };
+            let take_profit = match take_profit {
+                Some(take_profit) => take_profit,
+                None => bail!("take profit is not specified"),
+            };
+            let queue_position = DecQueuePosition {
+                item: copy_trading::DecQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(DecMarketItem::PlaceLimitOrder {
+                        collateral,
+                        trigger_price,
+                        leverage,
+                        direction,
+                        stop_loss_override,
+                        take_profit,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event =
+                Event::new("place-limit-order").add_attribute("collateral", collateral.to_string());
+            decrease_collateral_response(storage, state, queue_position, event)
+        }
+        MarketExecuteMsg::CancelLimitOrder { order_id } => {
+            let queue_position = IncQueuePosition {
+                item: copy_trading::IncQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(IncMarketItem::CancelLimitOrder { order_id }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event =
+                Event::new("cancel-limit-order").add_attribute("order-id", order_id.to_string());
+            increase_collateral_response(storage, state, queue_position, event)
+        }
+        MarketExecuteMsg::ClosePosition {
+            id,
+            slippage_assert,
+        } => {
+            let queue_position = IncQueuePosition {
+                item: copy_trading::IncQueueItem::MarketItem {
+                    id: market_id,
+                    token,
+                    item: Box::new(IncMarketItem::ClosePosition {
+                        id,
+                        slippage_assert,
+                    }),
+                },
+                status: copy_trading::ProcessingStatus::NotProcessed,
+                wallet: state.config.leader.clone(),
+            };
+            let event = Event::new("close-position").add_attribute("id", id.to_string());
+            increase_collateral_response(storage, state, queue_position, event)
+        }
         MarketExecuteMsg::DepositLiquidity { .. } => not_supported_response("deposit-liqudiity"),
         MarketExecuteMsg::ReinvestYield { .. } => not_supported_response("reinvest yield"),
         MarketExecuteMsg::WithdrawLiquidity { .. } => not_supported_response("withdraw-liquidity"),
@@ -1057,5 +1164,23 @@ fn increase_collateral_response(
     )?;
     crate::state::COLLATERAL_INCREASE_QUEUE.save(storage, &inc_queue_id, &queue_position)?;
     let event = event.add_attribute("queue-id", inc_queue_id.to_string());
+    Ok(Response::new().add_event(event))
+}
+
+fn decrease_collateral_response(
+    storage: &mut dyn Storage,
+    state: &State,
+    queue_position: DecQueuePosition,
+    event: Event,
+) -> Result<Response> {
+    let dec_queue_id = get_next_dec_queue_id(storage)?;
+    let leader = state.config.leader.clone();
+    crate::state::WALLET_QUEUE_ITEMS.save(
+        storage,
+        (&leader, QueuePositionId::DecQueuePositionId(dec_queue_id)),
+        &(),
+    )?;
+    crate::state::COLLATERAL_DECREASE_QUEUE.save(storage, &dec_queue_id, &queue_position)?;
+    let event = event.add_attribute("queue-id", dec_queue_id.to_string());
     Ok(Response::new().add_event(event))
 }
