@@ -2519,6 +2519,33 @@ impl PerpsMarket {
         self.exec_copytrading(&leader, wasm_msg)
     }
 
+    pub fn exec_copy_trading_place_order(
+        &self,
+        amount: &str,
+        trigger_price: &str,
+        direction: DirectionToBase,
+        take_profit: &str,
+    ) -> Result<AppResponse> {
+        let amount = amount.parse()?;
+        let market_id = self.id.clone();
+        let leverage = "700".parse().unwrap();
+        let msg = Box::new(MarketExecuteMsg::PlaceLimitOrder {
+            trigger_price: trigger_price.parse().unwrap(),
+            leverage,
+            direction,
+            max_gains: None,
+            stop_loss_override: None,
+            take_profit: Some(TakeProfitTrader::Finite(take_profit.parse().unwrap())),
+        });
+        let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
+            market_id,
+            message: msg,
+            collateral: Some(amount),
+        };
+        let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+        self.exec_copytrading(&leader, wasm_msg)
+    }
+
     pub fn exec_copytrading_leader_withdraw(&self, amount: Collateral) -> Result<AppResponse> {
         let amount = NonZero::new(amount).context("amount is zero")?;
         let token = self.get_copytrading_token()?;
