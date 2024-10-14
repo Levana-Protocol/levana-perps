@@ -220,7 +220,7 @@ async fn single_market(
                     None,
                     None,
                 )
-                .await.with_context(|| format!("Opening position with {deposit} deposit, {direction:?}, {leverage}x leverage, and max gains of {max_gains}"))?;
+                .await.with_context(|| format!("Opening position with {deposit} deposit, {direction:?}, {leverage}x leverage"))?;
             format!("Opened new position: {deposit} {direction:?} {leverage}x")
         }
     };

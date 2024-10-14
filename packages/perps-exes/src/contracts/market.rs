@@ -197,17 +197,14 @@ impl MarketContract {
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit_override: PriceBaseInQuote,
     ) -> Result<TxResponse> {
         let msg = MarketExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
             direction,
             stop_loss_override,
-            // TODO remove unwrap
-            take_profit: take_profit_override
-                .map(|x| TakeProfitTrader::Finite(x.into_non_zero()))
-                .unwrap(),
+            take_profit: TakeProfitTrader::Finite(take_profit_override.into_non_zero()),
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await

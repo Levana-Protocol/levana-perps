@@ -276,7 +276,7 @@ fn execute_leader_msg(
                         leverage,
                         direction,
                         stop_loss_override,
-                        take_profit: Some(take_profit),
+                        take_profit,
                     }),
                 },
                 status: copy_trading::ProcessingStatus::NotProcessed,

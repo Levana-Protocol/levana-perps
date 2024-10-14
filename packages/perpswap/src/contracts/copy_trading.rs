@@ -437,7 +437,7 @@ pub enum DecMarketItem {
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitTrader>,
+        take_profit: TakeProfitTrader,
     },
     /// Add collateral to position, causing leverage to decrease
     UpdatePositionAddCollateralImpactLeverage {

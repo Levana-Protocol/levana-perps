@@ -36,9 +36,9 @@ pub(crate) enum Subcommand {
         /// Leverage
         #[clap(long, allow_hyphen_values = true)]
         leverage: LeverageToBase,
-        /// Max gains percentage
+        /// Take profit percentage
         #[clap(long, allow_hyphen_values = true)]
-        max_gains: MaxGainsInQuote,
+        take_profit: PriceBaseInQuote,
         /// Current USD Price
         #[clap(long)]
         current_price: Option<PriceBaseInQuote>,

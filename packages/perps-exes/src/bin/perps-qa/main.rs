@@ -101,7 +101,7 @@ async fn main_inner() -> Result<()> {
         cli::Subcommand::OpenPosition {
             collateral,
             leverage,
-            max_gains,
+            take_profit,
             current_price,
             max_slippage,
             short,
@@ -112,14 +112,14 @@ async fn main_inner() -> Result<()> {
                 DirectionToBase::Long
             };
             // Convert from percentage to ratio representation.
-            let max_gain = match max_gains {
-                MaxGainsInQuote::Finite(x) => MaxGainsInQuote::Finite(
-                    NonZero::new(x.raw() / Decimal256::from_str("100").unwrap()).unwrap(),
-                ),
-                MaxGainsInQuote::PosInfinity => MaxGainsInQuote::PosInfinity,
-            };
+            let take_profit = PriceBaseInQuote::from_non_zero(
+                NumberGtZero::new(
+                    take_profit.into_non_zero().raw() / Decimal256::from_str("100").unwrap(),
+                )
+                .unwrap(),
+            );
             tracing::debug!("Collateral: {collateral}");
-            tracing::debug!("Max gains: {:?}", max_gain);
+            tracing::debug!("Take Profit: {:?}", take_profit);
             tracing::debug!("Leverage: {:?}", leverage);
             tracing::debug!("Direction: {:?}", direction);
 
@@ -143,10 +143,10 @@ async fn main_inner() -> Result<()> {
                     collateral,
                     direction,
                     leverage,
-                    max_gain,
+                    "2".parse().unwrap(),
                     slippage_assert,
                     None,
-                    None,
+                    take_profit,
                 )
                 .await?;
             println!("Transaction hash: {}", tx.txhash);
