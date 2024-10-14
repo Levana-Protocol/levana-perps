@@ -12,7 +12,7 @@ perpswap = { package = "levana_perpswap_cosmos", path = "../perpswap" }
 serde = "1.0.199"
 serde_json = "1.0.93"
 cosmwasm-std = { workspace = true, features = ["abort"] }
-cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true }
 anyhow = { version = "1.0.82", features = ["backtrace"] }
 cw-multi-test = "2.0.1"
 market = {package = "levana_perpswap_cosmos_market", path = "../../contracts/market" }
