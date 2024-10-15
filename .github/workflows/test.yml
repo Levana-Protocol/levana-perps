@@ -99,11 +99,18 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
-      - name: Build and Deploy documentation
+      - name: Build documentation
         if: github.ref == 'refs/heads/main'
-        run: |
-          just build-docs
-          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --size-only --acl public-read --delete
+        run: just build-docs
+      - name: Deploy documentation
+        if: github.ref == 'refs/heads/main'
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: a24f405dad2c41c98a0314f4bb6d5c6f
+          projectName: levana-api-docs
+          directory: .output/temp/doc
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   macos-binary:
     runs-on: macos-latest
