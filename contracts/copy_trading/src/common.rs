@@ -369,7 +369,7 @@ impl<'a> State<'a> {
                 owner: self.my_addr.as_ref().into(),
                 start_after,
                 limit: Some(15),
-                order: None,
+                order: Some(perpswap::storage::OrderInMessage::Ascending),
             },
         )?;
         Ok(result)
