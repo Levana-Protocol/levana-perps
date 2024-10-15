@@ -168,6 +168,18 @@ impl ProcessingStatus {
         }
     }
 
+    pub fn is_validate_open_position_status(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+        }
+    }
+
     pub fn is_process_limit_order(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,

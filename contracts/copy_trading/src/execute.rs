@@ -1119,13 +1119,12 @@ fn validate_single_market(
     }
 
     let mut finished = false;
-    if status.is_validate_status() {
+    if status.is_validate_open_position_status() {
         loop {
             // We have to iterate again entirely, because a position can
             // close.
-            let tokens = state.query_tokens(&market.addr, tokens_start_after)?;
+            let tokens = state.query_tokens(&market.addr, tokens_start_after.clone())?;
             *allowed_queries += 1;
-            tokens_start_after = tokens.start_after;
             if tokens.tokens.is_empty() {
                 finished = true;
                 break;
@@ -1134,10 +1133,13 @@ fn validate_single_market(
             *allowed_queries += 1;
             let total_positions = u64::try_from(positions.positions.len())?;
             total_open_positions += total_positions;
-            if tokens_start_after.is_none() {
+            if tokens.start_after.is_none() {
                 finished = true;
                 break;
             }
+            // We update only after ensuring that it's not None. Only
+            // appliable for tokens and not for orders.
+            tokens_start_after = tokens.start_after.clone();
             if *allowed_queries > total_allowed_queries {
                 break;
             }
@@ -1251,9 +1253,8 @@ fn process_single_market(
     }
     if status.not_started_yet() || status.is_process_open_positions() {
         loop {
-            let tokens = state.query_tokens(&market.addr, tokens_start_after)?;
+            let tokens = state.query_tokens(&market.addr, tokens_start_after.clone())?;
             *allowed_queries += 1;
-            tokens_start_after = tokens.start_after;
             if tokens.tokens.is_empty() {
                 break;
             }
@@ -1266,9 +1267,12 @@ fn process_single_market(
                 work.count_open_positions += 1;
             }
             work.active_collateral = work.active_collateral.checked_add(total_collateral)?;
-            if tokens_start_after.is_none() {
+            if tokens.start_after.is_none() {
                 break;
             }
+            // We update only after ensuring that it's not None. Only
+            // appliable for tokens and not for orders.
+            tokens_start_after = tokens.start_after;
             if *allowed_queries > total_allowed_queries {
                 early_exit = true;
                 break;
