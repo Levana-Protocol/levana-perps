@@ -816,7 +816,7 @@ pub enum WorkDescription {
         /// Start from specific market id in the processing phase
         process_start_from: Option<MarketId>,
         /// Start from specific market id in the validate phase
-        validate_start_from: Option<MarketId>
+        validate_start_from: Option<MarketId>,
     },
     /// Process Queue item
     ProcessQueueItem {
