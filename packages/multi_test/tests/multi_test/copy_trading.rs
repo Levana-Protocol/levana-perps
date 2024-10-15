@@ -143,7 +143,6 @@ pub(crate) fn deposit_money(
     let work = market.query_copy_trading_work().unwrap();
     assert!(work.is_compute_lp_token());
 
-
     // Compute LP token value
     let response = market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual deposit
@@ -160,6 +159,10 @@ pub(crate) fn withdraw_money(market: &PerpsMarket, trader: &Addr, amount: &str) 
     assert_eq!(work, WorkResp::NoWork);
 
     market.exec_copytrading_withdrawal(trader, amount).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    if work.is_reset_status() {
+        market.exec_copytrading_do_work(trader).unwrap();
+    }
     // Process queue item: compute lp token value
     market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual withdrawal
@@ -267,7 +270,6 @@ fn do_withdraw() {
     market
         .exec_copytrading_withdrawal(&trader, "101")
         .unwrap_err();
-
     market.exec_copytrading_withdrawal(&trader, "50").unwrap();
     // Process queue item: Compute lp token value
     market.exec_copytrading_do_work(&trader).unwrap();
@@ -293,10 +295,14 @@ fn do_withdraw() {
         .exec_copytrading_withdrawal(&trader, "51")
         .unwrap_err();
     market.exec_copytrading_withdrawal(&trader, "50").unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_reset_status());
+    market.exec_copytrading_do_work(&trader).unwrap();
     // Compute LP token value
     market.exec_copytrading_do_work(&trader).unwrap();
     // Process queue item: do the actual withdrawal
     market.exec_copytrading_do_work(&trader).unwrap();
+
     market
         .exec_copytrading_withdrawal(&trader, "1")
         .unwrap_err();
