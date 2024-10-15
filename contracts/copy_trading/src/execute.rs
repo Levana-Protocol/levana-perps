@@ -1138,10 +1138,9 @@ fn process_single_market(
     allowed_queries: &mut u32,
 ) -> Result<bool> {
     let total_allowed_queries = state.config.allowed_lp_token_queries;
-    // let mut market_work = crate::state::MARKET_WORK_INFO
-    //     .may_load(storage, &market.id)?
-    //     .unwrap_or_default();
-    let mut market_work = MarketWorkInfo::default();
+    let mut market_work = crate::state::MARKET_WORK_INFO
+        .may_load(storage, &market.id)?
+        .unwrap_or_default();
     let mut early_exit = false;
     let status = market_work.processing_status;
     let mut tokens_start_after = None;

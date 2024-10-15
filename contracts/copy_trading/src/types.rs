@@ -96,6 +96,22 @@ impl ProcessingStatus {
         }
     }
 
+    /// Is this an batch operation status ?
+    pub fn is_batch_operation(&self) -> bool {
+        match self {
+            // This is the initial status
+            ProcessingStatus::NotStarted => false,
+            // This is set intermediate
+            ProcessingStatus::OpenPositions(_) => true,
+            // This is set intermediate
+            ProcessingStatus::LimitOrder(_) => true,
+            // This can be a final status
+            ProcessingStatus::ResetRequired => false,
+            // This can be a final status
+            ProcessingStatus::Validated => false,
+        }
+    }
+
     pub fn not_started_yet(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => true,

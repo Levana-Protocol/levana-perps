@@ -311,7 +311,7 @@ impl<'a> State<'a> {
         })
     }
 
-    /// Load open positions
+    /// Query for open positions
     pub(crate) fn query_positions(
         &self,
         market_addr: &Addr,

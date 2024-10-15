@@ -793,6 +793,14 @@ impl WorkResp {
             WorkResp::HasWork { work_description } => work_description.is_compute_lp_token(),
         }
     }
+
+    /// Is it reset status work ?
+    pub fn is_reset_status(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_reset_status(),
+        }
+    }
 }
 
 /// Work Description
@@ -859,6 +867,19 @@ impl WorkDescription {
             WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => false,
+        }
+    }
+
+    /// Is it reset stats ?
+    pub fn is_reset_status(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => false,
+            WorkDescription::ProcessMarket { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => true,
             WorkDescription::HandleDeferredExecId {} => false,
             WorkDescription::Rebalance { .. } => false,
         }

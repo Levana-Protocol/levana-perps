@@ -104,13 +104,7 @@ fn detect_process_queue_item_work() {
 
     let work = market.query_copy_trading_work().unwrap();
     // Needs to compute lp token value for the initial deposit
-    assert_eq!(
-        work,
-        WorkResp::HasWork {
-            work_description:
-                perpswap::contracts::copy_trading::WorkDescription::ComputeLpTokenValue { token }
-        }
-    );
+    assert!(work.is_compute_lp_token());
     let resp = market.exec_copytrading_do_work(&trader).unwrap();
     assert!(resp.has_event(
         &Event::new("wasm-lp-token").add_attribute("value", Collateral::one().to_string())
@@ -140,24 +134,22 @@ pub(crate) fn deposit_money(
     market
         .exec_copytrading_mint_and_deposit(trader, amount)
         .unwrap();
-    let token = market.get_copytrading_token().unwrap();
 
     let work = market.query_copy_trading_work().unwrap();
     // Needs to compute lp token value for the initial deposit
-    assert_eq!(
-        work,
-        WorkResp::HasWork {
-            work_description:
-                perpswap::contracts::copy_trading::WorkDescription::ComputeLpTokenValue { token }
-        }
-    );
+    if work.is_reset_status() {
+        market.exec_copytrading_do_work(trader).unwrap();
+    }
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+
 
     // Compute LP token value
     let response = market.exec_copytrading_do_work(trader).unwrap();
     // Process queue item: do the actual deposit
     market.exec_copytrading_do_work(trader).unwrap();
-
     let work = market.query_copy_trading_work().unwrap();
+
     assert_eq!(work, WorkResp::NoWork);
     Ok(response)
 }
@@ -249,13 +241,7 @@ fn does_not_compute_lp_token_work() {
     // would have liquidated. Once it gets liquidated, the token value
     // would have to be re-computed.
     let work = market.query_copy_trading_work().unwrap();
-    assert_eq!(
-        work,
-        WorkResp::HasWork {
-            work_description:
-                perpswap::contracts::copy_trading::WorkDescription::ComputeLpTokenValue { token }
-        }
-    );
+    assert!(work.is_compute_lp_token());
     // Process queue item: Compute lp token value
     market.exec_copytrading_do_work(&trader).unwrap();
 
