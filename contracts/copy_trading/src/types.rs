@@ -75,10 +75,26 @@ pub enum ProcessingStatus {
     NotStarted,
     /// The last seen position id. Should be passed to
     /// [perpswap::contracts::position_token::entry::QueryMsg::Tokens]
-    OpenPositions(Option<String>),
+    ProcessOpenPositions(Option<String>),
     /// Last seen limit order. Should be passed to
     /// [perpswap::contracts::market::entry::QueryMsg::LimitOrders]
-    LimitOrder(Option<OrderId>),
+    ProcessLimitOrder(Option<OrderId>),
+    /// The last seen position id during validate step. Should be passed to
+    /// [perpswap::contracts::position_token::entry::QueryMsg::Tokens]
+    ValidateOpenPositions {
+        /// Start after this position id
+        start_after: Option<String>,
+        /// Total open positions seen so far
+        open_positions: u64,
+    },
+    /// Last seen limit order during validate step. Should be passed to
+    /// [perpswap::contracts::market::entry::QueryMsg::LimitOrders]
+    ValidateLimitOrder {
+        /// Start after this position id
+        start_after: Option<OrderId>,
+        /// Total open positions seen so far
+        open_orders: u64,
+    },
     /// Calculation reset required because a position was opened
     ResetRequired,
     /// Validated that there has been no change in positions
@@ -89,10 +105,12 @@ impl ProcessingStatus {
     pub fn reset_required(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
-            ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
             ProcessingStatus::ResetRequired => true,
             ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
         }
     }
 
@@ -102,53 +120,99 @@ impl ProcessingStatus {
             // This is the initial status
             ProcessingStatus::NotStarted => false,
             // This is set intermediate
-            ProcessingStatus::OpenPositions(_) => true,
+            ProcessingStatus::ProcessOpenPositions(_) => true,
             // This is set intermediate
-            ProcessingStatus::LimitOrder(_) => true,
+            ProcessingStatus::ProcessLimitOrder(_) => true,
             // This can be a final status
             ProcessingStatus::ResetRequired => false,
             // This can be a final status
             ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => true,
         }
     }
 
     pub fn not_started_yet(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => true,
-            ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+        }
+    }
+
+    pub fn is_process_status(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::ProcessOpenPositions(_) => true,
+            ProcessingStatus::ProcessLimitOrder(_) => true,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
         }
     }
 
-    pub fn is_open_positions(&self) -> bool {
+    pub fn is_process_open_positions(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
-            ProcessingStatus::OpenPositions(_) => true,
-            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::ProcessOpenPositions(_) => true,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+        }
+    }
+
+    pub fn is_validate_open_positions(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+        }
+    }
+
+    pub fn is_validate_status(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => true,
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
         }
     }
 
-    pub fn is_limit_order(&self) -> bool {
+    pub fn is_process_limit_order(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
-            ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::LimitOrder(_) => true,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => true,
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => todo!(),
+            ProcessingStatus::ValidateLimitOrder { .. } => todo!(),
         }
     }
 
     pub fn is_validated(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
-            ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => true,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
         }
     }
 }
@@ -476,11 +540,13 @@ pub enum BatchWork {
     },
     /// Continue LP token computation
     BatchLpTokenValue {
-        /// Which market id to start from
-        start_from: Option<MarketId>,
+        /// Which market id to start from for the process phase
+        process_start_from: Option<MarketId>,
+        /// Which market id to start from for the validate phase
+        validate_start_from: Option<MarketId>,
         /// Token
-        token: Token
-    }
+        token: Token,
+    },
 }
 
 /// Helper type for construcing response

@@ -198,11 +198,17 @@ fn get_batch_work(storage: &dyn Storage) -> Result<WorkResp> {
                     start_from,
                 },
             }),
-            crate::types::BatchWork::BatchLpTokenValue { start_from, token } => {
-                Ok(WorkResp::HasWork {
-                    work_description: WorkDescription::ComputeLpTokenValue { token, start_from },
-                })
-            }
+            crate::types::BatchWork::BatchLpTokenValue {
+                process_start_from,
+                token,
+                validate_start_from,
+            } => Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ComputeLpTokenValue {
+                    token,
+                    process_start_from,
+                    validate_start_from,
+                },
+            }),
         },
         None => Ok(WorkResp::NoWork),
     }
@@ -964,7 +970,8 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
                 token: token.clone(),
-                start_from: None,
+                process_start_from: None,
+                validate_start_from: None,
             },
         })
     } else {

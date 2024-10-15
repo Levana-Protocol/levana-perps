@@ -637,8 +637,18 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
             let res = res.add_event(event);
             Ok(res)
         }
-        WorkDescription::ComputeLpTokenValue { token, start_from } => {
-            let event = compute_lp_token_value(storage, &state, token, start_from)?;
+        WorkDescription::ComputeLpTokenValue {
+            token,
+            process_start_from,
+            validate_start_from,
+        } => {
+            let event = compute_lp_token_value(
+                storage,
+                &state,
+                token,
+                process_start_from,
+                validate_start_from,
+            )?;
             let res = res.add_event(event);
             Ok(res)
         }
@@ -984,7 +994,8 @@ fn compute_lp_token_value(
     storage: &mut dyn Storage,
     state: &State,
     token: Token,
-    start_from: Option<MarketId>,
+    process_start_from: Option<MarketId>,
+    validate_start_from: Option<MarketId>,
 ) -> Result<Event> {
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
@@ -1011,29 +1022,33 @@ fn compute_lp_token_value(
     if token_value.status.valid(&queue_id) {
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
-    let markets = state.load_market_ids_with_token(storage, &token, start_from)?;
+    let markets = state.load_market_ids_with_token(storage, &token, process_start_from)?;
     let mut allowed_queries = 0u32;
-    let mut early_exit = false;
     for market in &markets {
-        // todo: track operations
-        let exit_early = process_single_market(storage, state, market, &mut allowed_queries)?;
-        if exit_early {
-            early_exit = true;
+        let early_exit = process_single_market(storage, state, market, &mut allowed_queries)?;
+        if early_exit {
+            return Ok(Event::new("lp-token").add_attribute("batched", early_exit.to_string()));
         }
     }
     let mut total_open_position_collateral = Collateral::zero();
+    let markets = state.load_market_ids_with_token(storage, &token, validate_start_from)?;
     for market in &markets {
-        let validation = validate_single_market(storage, state, market)?;
+        let validation = validate_single_market(storage, state, market, &mut allowed_queries)?;
         match validation {
             ValidationStatus::Failed => {
                 return Ok(Event::new("lp-token")
                     .add_attribute("validation", "failed".to_string())
                     .add_attribute("market-id", market.id.to_string())
-                    .add_attribute("batched", early_exit.to_string()));
+                    .add_attribute("batched", false.to_string()));
             }
             ValidationStatus::Success { market } => {
                 total_open_position_collateral =
                     total_open_position_collateral.checked_add(market.active_collateral)?;
+            }
+            ValidationStatus::InProgress => {
+                return Ok(Event::new("lp-token")
+                    .add_attribute("market-id", market.id.to_string())
+                    .add_attribute("batched", true.to_string()));
             }
         }
     }
@@ -1065,13 +1080,14 @@ fn compute_lp_token_value(
         .add_attribute("collateral", total_collateral.to_string())
         .add_attribute("shares", total_shares.to_string())
         .add_attribute("value", token_value.value.to_string())
-        .add_attribute("batched", early_exit.to_string());
+        .add_attribute("batched", false.to_string());
     Ok(event)
 }
 
 enum ValidationStatus {
     Failed,
     Success { market: MarketWorkInfo },
+    InProgress,
 }
 
 /// Validates market to check if the total open positions and open
@@ -1080,54 +1096,133 @@ fn validate_single_market(
     storage: &mut dyn Storage,
     state: &State<'_>,
     market: &MarketInfo,
+    allowed_queries: &mut u32,
 ) -> Result<ValidationStatus> {
-    let mut market_work = crate::state::MARKET_WORK_INFO
+    let total_allowed_queries = state.config.allowed_lp_token_queries;
+    let mut work = crate::state::MARKET_WORK_INFO
         .may_load(storage, &market.id)
         .context("Could not load MARKET_WORK_INFO")?
         .unwrap_or_default();
+    let status = work.processing_status.clone();
     let mut total_open_positions = 0u64;
-    let mut total_orders = 0u64;
     let mut tokens_start_after = None;
-    // todo: need to break if query limit exeeded
-    loop {
-        // We have to iterate again entirely, because a position can
-        // close.
-        let tokens = state.query_tokens(&market.addr, tokens_start_after)?;
-        tokens_start_after = tokens.start_after;
-        // todo: optimize if empty tokens
-        let positions = state.query_positions(&market.addr, tokens.tokens)?;
-        let total_positions = u64::try_from(positions.positions.len())?;
-        total_open_positions += total_positions;
-        if tokens_start_after.is_none() {
-            break;
+    // Validation should not have if it has not been started or if a reset is required.
+    assert!(!status.not_started_yet() || !status.reset_required());
+    if status.is_process_limit_order() {
+        // This means that processing has got over and this is the
+        // first time it's going to be validated
+        tokens_start_after = None;
+    } else {
+        if let ProcessingStatus::ValidateOpenPositions {
+            start_after,
+            open_positions,
+        } = &status
+        {
+            tokens_start_after = start_after.clone();
+            total_open_positions = *open_positions;
         }
     }
-    if total_open_positions != market_work.count_open_positions {
-        market_work.processing_status = ProcessingStatus::ResetRequired;
-        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
-        return Ok(ValidationStatus::Failed);
+    let mut finished = false;
+    if status.is_process_limit_order() || status.is_validate_status() {
+        loop {
+            // We have to iterate again entirely, because a position can
+            // close.
+            let tokens = state.query_tokens(&market.addr, tokens_start_after)?;
+            *allowed_queries += 1;
+            tokens_start_after = tokens.start_after;
+            if tokens.tokens.is_empty() {
+                finished = true;
+                break;
+            }
+            let positions = state.query_positions(&market.addr, tokens.tokens)?;
+            *allowed_queries += 1;
+            let total_positions = u64::try_from(positions.positions.len())?;
+            total_open_positions += total_positions;
+            if tokens_start_after.is_none() {
+                finished = true;
+                break;
+            }
+            if *allowed_queries > total_allowed_queries {
+                break;
+            }
+        }
+        if finished {
+            if total_open_positions != work.count_open_positions {
+                work.processing_status = ProcessingStatus::ResetRequired;
+                crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+                return Ok(ValidationStatus::Failed);
+            }
+        }
+        if *allowed_queries > total_allowed_queries {
+            work.processing_status = ProcessingStatus::ValidateOpenPositions {
+                start_after: tokens_start_after,
+                open_positions: total_open_positions,
+            };
+            crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+            let token = state.to_token(&market.token)?;
+            let batch_work = BatchWork::BatchLpTokenValue {
+                process_start_from: None,
+                validate_start_from: Some(market.id.clone()),
+                token,
+            };
+            crate::state::CURRENT_BATCH_WORK.save(storage, &batch_work)?;
+            return Ok(ValidationStatus::InProgress);
+        }
     }
+
     let mut orders_start_after = None;
+    let mut total_orders = 0u64;
+    if let ProcessingStatus::ValidateLimitOrder {
+        start_after,
+        open_orders,
+    } = status.clone()
+    {
+        orders_start_after = start_after;
+        total_orders = open_orders;
+    }
+    finished = false;
     loop {
         let orders = state.query_orders(&market.addr, orders_start_after)?;
         orders_start_after = orders.next_start_after;
-        // todo: optimize if empty orders
+        if orders.orders.is_empty() {
+            finished = true;
+            break;
+        }
         total_orders += u64::try_from(orders.orders.len())?;
         if orders_start_after.is_none() {
+            finished = true;
+            break;
+        }
+        if *allowed_queries > total_allowed_queries {
             break;
         }
     }
-    if total_orders != market_work.count_orders {
-        market_work.processing_status = ProcessingStatus::ResetRequired;
-        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
-        return Ok(ValidationStatus::Failed);
-    } else {
-        market_work.processing_status = ProcessingStatus::Validated;
+    if finished {
+        if total_orders != work.count_orders {
+            work.processing_status = ProcessingStatus::ResetRequired;
+            crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+            return Ok(ValidationStatus::Failed);
+        } else {
+            work.processing_status = ProcessingStatus::Validated;
+        }
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
     }
-    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
-    Ok(ValidationStatus::Success {
-        market: market_work,
-    })
+    if *allowed_queries > total_allowed_queries {
+        work.processing_status = ProcessingStatus::ValidateLimitOrder {
+            start_after: orders_start_after,
+            open_orders: total_orders,
+        };
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+        let token = state.to_token(&market.token)?;
+        let batch_work = BatchWork::BatchLpTokenValue {
+            process_start_from: None,
+            validate_start_from: Some(market.id.clone()),
+            token,
+        };
+        crate::state::CURRENT_BATCH_WORK.save(storage, &batch_work)?;
+        return Ok(ValidationStatus::InProgress);
+    }
+    Ok(ValidationStatus::Success { market: work })
 }
 
 /// Process open positions and orders for a single market.
@@ -1138,16 +1233,16 @@ fn process_single_market(
     allowed_queries: &mut u32,
 ) -> Result<bool> {
     let total_allowed_queries = state.config.allowed_lp_token_queries;
-    let mut market_work = crate::state::MARKET_WORK_INFO
+    let mut early_exit = false;
+    let mut work = crate::state::MARKET_WORK_INFO
         .may_load(storage, &market.id)?
         .unwrap_or_default();
-    let mut early_exit = false;
-    let status = market_work.processing_status;
+    let status = work.processing_status.clone();
     let mut tokens_start_after = None;
-    if let ProcessingStatus::OpenPositions(start_after) = status.clone() {
+    if let ProcessingStatus::ProcessOpenPositions(start_after) = status.clone() {
         tokens_start_after = start_after;
     }
-    if status.not_started_yet() || status.is_open_positions() {
+    if status.not_started_yet() || status.is_process_open_positions() {
         loop {
             let tokens = state.query_tokens(&market.addr, tokens_start_after)?;
             *allowed_queries += 1;
@@ -1161,11 +1256,9 @@ fn process_single_market(
             for position in positions.positions {
                 total_collateral =
                     total_collateral.checked_add(position.active_collateral.raw())?;
-                market_work.count_open_positions += 1;
+                work.count_open_positions += 1;
             }
-            market_work.active_collateral = market_work
-                .active_collateral
-                .checked_add(total_collateral)?;
+            work.active_collateral = work.active_collateral.checked_add(total_collateral)?;
             if tokens_start_after.is_none() {
                 break;
             }
@@ -1174,25 +1267,26 @@ fn process_single_market(
                 break;
             }
         }
-        market_work.processing_status = ProcessingStatus::OpenPositions(tokens_start_after.clone());
-        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
+        work.processing_status = ProcessingStatus::ProcessOpenPositions(tokens_start_after.clone());
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
     }
     // We have to do the check here too in case if the loop was broken
     // earlier
     if *allowed_queries > total_allowed_queries {
         let token = state.to_token(&market.token)?;
         let batch_work = BatchWork::BatchLpTokenValue {
-            start_from: Some(market.id.clone()),
+            process_start_from: Some(market.id.clone()),
             token,
+            validate_start_from: None,
         };
         crate::state::CURRENT_BATCH_WORK.save(storage, &batch_work)?;
         return Ok(true);
     }
     let mut orders_start_after = None;
-    if let ProcessingStatus::LimitOrder(start_after) = status.clone() {
+    if let ProcessingStatus::ProcessLimitOrder(start_after) = status.clone() {
         orders_start_after = start_after;
     }
-    if !early_exit || status.is_limit_order() {
+    if !early_exit {
         loop {
             let orders = state.query_orders(&market.addr, orders_start_after)?;
             orders_start_after = orders.next_start_after;
@@ -1202,11 +1296,9 @@ fn process_single_market(
             let mut total_collateral = Collateral::zero();
             for order in orders.orders {
                 total_collateral = total_collateral.checked_add(order.collateral.raw())?;
-                market_work.count_orders += 1;
+                work.count_orders += 1;
             }
-            market_work.active_collateral = market_work
-                .active_collateral
-                .checked_add(total_collateral)?;
+            work.active_collateral = work.active_collateral.checked_add(total_collateral)?;
             if orders_start_after.is_none() {
                 break;
             }
@@ -1215,14 +1307,15 @@ fn process_single_market(
                 break;
             }
         }
-        market_work.processing_status = ProcessingStatus::LimitOrder(orders_start_after);
-        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
+        work.processing_status = ProcessingStatus::ProcessLimitOrder(orders_start_after);
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
     }
     if early_exit {
         let token = state.to_token(&market.token)?;
         let batch_work = BatchWork::BatchLpTokenValue {
-            start_from: Some(market.id.clone()),
+            process_start_from: Some(market.id.clone()),
             token,
+            validate_start_from: None,
         };
         crate::state::CURRENT_BATCH_WORK.save(storage, &batch_work)?;
     }
