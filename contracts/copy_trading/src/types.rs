@@ -144,18 +144,6 @@ impl ProcessingStatus {
         }
     }
 
-    pub fn is_process_status(&self) -> bool {
-        match self {
-            ProcessingStatus::NotStarted => false,
-            ProcessingStatus::ProcessOpenPositions(_) => true,
-            ProcessingStatus::ProcessLimitOrder(_) => true,
-            ProcessingStatus::ValidateOpenPositions { .. } => false,
-            ProcessingStatus::ValidateLimitOrder { .. } => false,
-            ProcessingStatus::ResetRequired => false,
-            ProcessingStatus::Validated => false,
-        }
-    }
-
     pub fn is_process_open_positions(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
@@ -164,18 +152,6 @@ impl ProcessingStatus {
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
             ProcessingStatus::ValidateOpenPositions { .. } => false,
-            ProcessingStatus::ValidateLimitOrder { .. } => false,
-        }
-    }
-
-    pub fn is_validate_open_positions(&self) -> bool {
-        match self {
-            ProcessingStatus::NotStarted => false,
-            ProcessingStatus::ProcessOpenPositions(_) => false,
-            ProcessingStatus::ProcessLimitOrder(_) => false,
-            ProcessingStatus::ResetRequired => false,
-            ProcessingStatus::Validated => false,
-            ProcessingStatus::ValidateOpenPositions { .. } => true,
             ProcessingStatus::ValidateLimitOrder { .. } => false,
         }
     }
@@ -199,18 +175,6 @@ impl ProcessingStatus {
             ProcessingStatus::ProcessLimitOrder(_) => true,
             ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
-            ProcessingStatus::ValidateOpenPositions { .. } => todo!(),
-            ProcessingStatus::ValidateLimitOrder { .. } => todo!(),
-        }
-    }
-
-    pub fn is_validated(&self) -> bool {
-        match self {
-            ProcessingStatus::NotStarted => false,
-            ProcessingStatus::ProcessOpenPositions(_) => false,
-            ProcessingStatus::ProcessLimitOrder(_) => false,
-            ProcessingStatus::ResetRequired => false,
-            ProcessingStatus::Validated => true,
             ProcessingStatus::ValidateOpenPositions { .. } => false,
             ProcessingStatus::ValidateLimitOrder { .. } => false,
         }

@@ -1112,16 +1112,15 @@ fn validate_single_market(
         // This means that processing has got over and this is the
         // first time it's going to be validated
         tokens_start_after = None;
-    } else {
-        if let ProcessingStatus::ValidateOpenPositions {
-            start_after,
-            open_positions,
-        } = &status
-        {
-            tokens_start_after = start_after.clone();
-            total_open_positions = *open_positions;
-        }
+    } else if let ProcessingStatus::ValidateOpenPositions {
+        start_after,
+        open_positions,
+    } = &status
+    {
+        tokens_start_after = start_after.clone();
+        total_open_positions = *open_positions;
     }
+
     let mut finished = false;
     if status.is_process_limit_order() || status.is_validate_status() {
         loop {
@@ -1146,12 +1145,10 @@ fn validate_single_market(
                 break;
             }
         }
-        if finished {
-            if total_open_positions != work.count_open_positions {
-                work.processing_status = ProcessingStatus::ResetRequired;
-                crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
-                return Ok(ValidationStatus::Failed);
-            }
+        if finished && total_open_positions != work.count_open_positions {
+            work.processing_status = ProcessingStatus::ResetRequired;
+            crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+            return Ok(ValidationStatus::Failed);
         }
         if *allowed_queries > total_allowed_queries {
             work.processing_status = ProcessingStatus::ValidateOpenPositions {
