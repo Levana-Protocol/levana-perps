@@ -652,7 +652,6 @@ fn do_work(state: State, storage: &mut dyn Storage) -> Result<Response> {
             let res = res.add_event(event);
             Ok(res)
         }
-        WorkDescription::ProcessMarket { .. } => todo!(),
         WorkDescription::ProcessQueueItem { id } => {
             let res = process_queue_item(id, storage, &state, res)?;
             Ok(res)

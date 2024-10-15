@@ -818,11 +818,6 @@ pub enum WorkDescription {
         /// Start from specific market id in the validate phase
         validate_start_from: Option<MarketId>
     },
-    /// Process market
-    ProcessMarket {
-        /// Market id
-        id: MarketId,
-    },
     /// Process Queue item
     ProcessQueueItem {
         /// Id to process
@@ -853,7 +848,6 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => false,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
@@ -866,7 +860,6 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => true,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
@@ -879,7 +872,6 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => false,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => true,
             WorkDescription::HandleDeferredExecId {} => false,
@@ -892,7 +884,6 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => false,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => true,
