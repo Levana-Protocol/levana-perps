@@ -94,7 +94,6 @@ fn initial_no_work() {
 fn detect_process_queue_item_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
-    let token = market.get_copytrading_token().unwrap();
 
     load_markets(&market);
 
@@ -217,7 +216,6 @@ fn do_actual_deposit() {
 fn does_not_compute_lp_token_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
-    let token = market.get_copytrading_token().unwrap();
 
     load_markets(&market);
 

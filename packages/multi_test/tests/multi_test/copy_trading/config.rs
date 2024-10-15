@@ -1,7 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use perpswap::
-    contracts::copy_trading::{ConfigUpdate, FactoryConfigUpdate}
-;
+use perpswap::contracts::copy_trading::{ConfigUpdate, FactoryConfigUpdate};
 
 use crate::copy_trading::load_markets;
 
