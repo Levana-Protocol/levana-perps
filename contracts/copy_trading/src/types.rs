@@ -179,18 +179,6 @@ impl ProcessingStatus {
             ProcessingStatus::Validated => false,
         }
     }
-
-    pub fn is_process_limit_order(&self) -> bool {
-        match self {
-            ProcessingStatus::NotStarted => false,
-            ProcessingStatus::ProcessOpenPositions(_) => false,
-            ProcessingStatus::ProcessLimitOrder(_) => true,
-            ProcessingStatus::ResetRequired => false,
-            ProcessingStatus::Validated => false,
-            ProcessingStatus::ValidateOpenPositions { .. } => false,
-            ProcessingStatus::ValidateLimitOrder { .. } => false,
-        }
-    }
 }
 
 /// Specific position information
@@ -582,7 +570,7 @@ pub(crate) struct ProcessResponse {
     /// Did it exit early
     pub(crate) early_exit: bool,
     /// Event to emit
-    pub(crate) event: Event
+    pub(crate) event: Event,
 }
 
 #[cfg(test)]
