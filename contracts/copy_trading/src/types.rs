@@ -565,6 +565,14 @@ pub struct IncQueueResponse {
     pub queue_id: IncQueuePositionId,
 }
 
+/// Process reponse
+pub(crate) struct ProcessResponse {
+    /// Did it exit early
+    pub(crate) early_exit: bool,
+    /// Event to emit
+    pub(crate) event: Event
+}
+
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::Decimal256;

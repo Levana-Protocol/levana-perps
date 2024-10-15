@@ -428,6 +428,8 @@ fn leader_position_closed_with_profit() {
     market.exec_copytrading_do_work(&trader1).unwrap();
     // Compute lp token value
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token").add_attribute("batched", false.to_string());
+    response.assert_event(&event);
     let token_event = response
         .events
         .iter()
