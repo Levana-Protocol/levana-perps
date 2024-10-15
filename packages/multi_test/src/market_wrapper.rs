@@ -1460,9 +1460,8 @@ impl PerpsMarket {
                 slippage_assert,
                 leverage,
                 direction,
-                max_gains: None,
                 stop_loss_override,
-                take_profit: Some(take_profit),
+                take_profit,
             },
         )?;
 
@@ -1491,9 +1490,8 @@ impl PerpsMarket {
                 slippage_assert,
                 leverage,
                 direction,
-                max_gains: None,
                 stop_loss_override,
-                take_profit: Some(take_profit),
+                take_profit,
             },
         )?;
 
@@ -1740,9 +1738,8 @@ impl PerpsMarket {
                 trigger_price,
                 leverage,
                 direction,
-                max_gains: None,
                 stop_loss_override,
-                take_profit: Some(take_profit),
+                take_profit,
             },
         )?;
 
@@ -2506,9 +2503,8 @@ impl PerpsMarket {
             slippage_assert: None,
             leverage,
             direction,
-            max_gains: None,
             stop_loss_override: None,
-            take_profit: Some(TakeProfitTrader::Finite(take_profit.parse().unwrap())),
+            take_profit: TakeProfitTrader::Finite(take_profit.parse().unwrap()),
         });
         let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
             market_id,
@@ -2533,9 +2529,8 @@ impl PerpsMarket {
             trigger_price: trigger_price.parse().unwrap(),
             leverage,
             direction,
-            max_gains: None,
             stop_loss_override: None,
-            take_profit: Some(TakeProfitTrader::Finite(take_profit.parse().unwrap())),
+            take_profit: TakeProfitTrader::Finite(take_profit.parse().unwrap()),
         });
         let wasm_msg = &CopyTradingExecuteMsg::LeaderMsg {
             market_id,

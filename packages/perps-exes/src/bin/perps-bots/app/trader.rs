@@ -209,7 +209,7 @@ async fn single_market(
             let deposit =
                 NonZero::new(Collateral::from(rand::thread_rng().gen_range(10..=400u64))).unwrap();
             let leverage = rand::thread_rng().gen_range(2..=8);
-            let max_gains = "2".parse()?;
+            let take_profit = "2".parse()?;
             market
                 .open_position(
                     &worker.wallet,
@@ -217,12 +217,11 @@ async fn single_market(
                     deposit,
                     direction,
                     leverage.to_string().parse()?,
-                    max_gains,
                     None,
                     None,
-                    None,
+                    take_profit,
                 )
-                .await.with_context(|| format!("Opening position with {deposit} deposit, {direction:?}, {leverage}x leverage, and max gains of {max_gains}"))?;
+                .await.with_context(|| format!("Opening position with {deposit} deposit, {direction:?}, {leverage}x leverage"))?;
             format!("Opened new position: {deposit} {direction:?} {leverage}x")
         }
     };

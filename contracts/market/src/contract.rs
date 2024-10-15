@@ -141,13 +141,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             sender: _,
         } => anyhow::bail!("Cannot nest a Receive inside another Receive"),
 
-        // TODO: remove this once the deprecated fields are fully removed
-        #[allow(deprecated)]
         ExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
@@ -158,9 +155,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     slippage_assert,
                     leverage,
                     direction,
-                    max_gains,
+                    max_gains: None,
                     stop_loss_override,
-                    take_profit,
+                    take_profit: Some(take_profit),
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
@@ -285,13 +282,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
-        // TODO: remove this once the deprecated fields are fully removed
-        #[allow(deprecated)]
         ExecuteMsg::PlaceLimitOrder {
             trigger_price,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
@@ -302,9 +296,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     trigger_price,
                     leverage,
                     direction,
-                    max_gains,
+                    max_gains: None,
                     stop_loss_override,
-                    take_profit,
+                    take_profit: Some(take_profit),
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),

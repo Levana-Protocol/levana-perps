@@ -135,6 +135,7 @@ async fn single_market(
             (MarketType::CollateralIsBase, DirectionToBase::Long) => MaxGainsInQuote::PosInfinity,
             _ => "2".parse().unwrap(),
         };
+        let take_profit: PriceBaseInQuote = "2".parse().unwrap();
 
         // Determine how large a position we would need to open to hit the midpoint of min and max utilization
         let min_util = status
@@ -199,10 +200,9 @@ async fn single_market(
                 deposit_collateral,
                 direction,
                 leverage,
-                max_gains,
                 None,
                 None,
-                None,
+                take_profit,
             )
             .await
             .with_context(|| desc.clone())?;
