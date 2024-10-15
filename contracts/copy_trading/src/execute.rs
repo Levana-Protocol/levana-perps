@@ -264,7 +264,6 @@ fn factory_update_config(
     Ok(response)
 }
 
-#[allow(deprecated)]
 #[allow(clippy::boxed_local)]
 fn execute_leader_msg(
     storage: &mut dyn Storage,

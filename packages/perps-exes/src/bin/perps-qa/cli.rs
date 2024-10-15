@@ -36,7 +36,7 @@ pub(crate) enum Subcommand {
         /// Leverage
         #[clap(long, allow_hyphen_values = true)]
         leverage: LeverageToBase,
-        /// Take profit percentage
+        /// Take profit price
         #[clap(long, allow_hyphen_values = true)]
         take_profit: PriceBaseInQuote,
         /// Current USD Price

@@ -111,13 +111,6 @@ async fn main_inner() -> Result<()> {
             } else {
                 DirectionToBase::Long
             };
-            // Convert from percentage to ratio representation.
-            let take_profit = PriceBaseInQuote::from_non_zero(
-                NumberGtZero::new(
-                    take_profit.into_non_zero().raw() / Decimal256::from_str("100").unwrap(),
-                )
-                .unwrap(),
-            );
             tracing::debug!("Collateral: {collateral}");
             tracing::debug!("Take Profit: {:?}", take_profit);
             tracing::debug!("Leverage: {:?}", leverage);
