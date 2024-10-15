@@ -195,7 +195,7 @@ migrate-seici:
 build-docs:
 	mkdir -p ./.output/temp/schema/cosmos
 	cargo doc --no-deps --package levana_perpswap_cosmos --target-dir=./.output/temp/
-	echo "<html><body><h1>perpetual swaps</h1></body></html>" > ./.output/temp/index.html
+	echo "<html><body><h1>404 page not found</h1></body></html>" > ./.output/temp/doc/404.html
 
 # Coverage with specific collateral and market token kind
 coverage-test collateral-type token-kind:

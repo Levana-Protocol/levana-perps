@@ -103,10 +103,9 @@ impl PerpApp {
         collateral: NonZero<Collateral>,
         direction: DirectionToBase,
         leverage: LeverageToBase,
-        max_gains: MaxGainsInQuote,
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit: PriceBaseInQuote,
     ) -> Result<TxResponse> {
         let _ = self
             .market
@@ -116,10 +115,9 @@ impl PerpApp {
                 collateral,
                 direction,
                 leverage,
-                max_gains,
                 slippage_assert,
                 stop_loss_override,
-                take_profit_override,
+                take_profit,
             )
             .await?;
         self.crank_single(None).await

@@ -277,7 +277,7 @@ fn factory_update_config(
     Ok(response)
 }
 
-#[allow(deprecated)]
+#[allow(clippy::boxed_local)]
 fn execute_leader_msg(
     storage: &mut dyn Storage,
     state: &State,
@@ -304,7 +304,6 @@ fn execute_leader_msg(
             slippage_assert,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
@@ -312,12 +311,6 @@ fn execute_leader_msg(
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for opening position"),
             };
-            if max_gains.is_some() {
-                bail!("max_gains is deprecated, use take_profit instead")
-            }
-            if take_profit.is_none() {
-                bail!("take profit is not specified")
-            }
             let queue_position = DecQueuePosition {
                 item: copy_trading::DecQueueItem::MarketItem {
                     id: market_id,
@@ -487,20 +480,12 @@ fn execute_leader_msg(
             trigger_price,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
             let collateral = match collateral {
                 Some(collateral) => collateral,
                 None => bail!("No supplied collateral for opening position"),
-            };
-            if max_gains.is_some() {
-                bail!("max_gains is deprecated, use take_profit instead")
-            }
-            let take_profit = match take_profit {
-                Some(take_profit) => take_profit,
-                None => bail!("take profit is not specified"),
             };
             let queue_position = DecQueuePosition {
                 item: copy_trading::DecQueueItem::MarketItem {

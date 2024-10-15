@@ -134,9 +134,6 @@ impl State<'_> {
 
         let market_type = self.market_type(ctx.storage)?;
 
-        // this is kept in case we're executing an order that was already placed in the old system
-        // it shouldn't be needed for any new orders, which do this song and dance in deferred_exec creation
-        // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
         #[allow(deprecated)]
         let take_profit_trader = match (order.take_profit, order.max_gains) {
             (None, None) => {

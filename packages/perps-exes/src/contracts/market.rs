@@ -195,18 +195,16 @@ impl MarketContract {
         deposit: NonZero<Collateral>,
         direction: DirectionToBase,
         leverage: LeverageToBase,
-        max_gains: MaxGainsInQuote,
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit: PriceBaseInQuote,
     ) -> Result<TxResponse> {
         let msg = MarketExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
             direction,
-            max_gains: Some(max_gains),
             stop_loss_override,
-            take_profit: take_profit_override.map(|x| TakeProfitTrader::Finite(x.into_non_zero())),
+            take_profit: TakeProfitTrader::Finite(take_profit.into_non_zero()),
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await
