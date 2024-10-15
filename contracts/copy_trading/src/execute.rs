@@ -1021,14 +1021,16 @@ fn compute_lp_token_value(
     if token_value.status.valid(&queue_id) {
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
-    let markets = state.load_market_ids_with_token(storage, &token, process_start_from)?;
     let mut allowed_queries = 0u32;
+
+    let markets = state.load_market_ids_with_token(storage, &token, process_start_from)?;
     for market in &markets {
         let response = process_single_market(storage, state, market, &mut allowed_queries)?;
         if response.early_exit {
             return Ok(response.event);
         }
     }
+
     let mut total_open_position_collateral = Collateral::zero();
     let markets = state.load_market_ids_with_token(storage, &token, validate_start_from)?;
     for market in &markets {
@@ -1081,6 +1083,7 @@ fn compute_lp_token_value(
     Ok(event)
 }
 
+#[derive(Debug)]
 enum ValidationStatus {
     Failed,
     Success { market: MarketWorkInfo },
@@ -1145,11 +1148,12 @@ fn validate_single_market(
         if finished && total_open_positions != work.count_open_positions {
             work.processing_status = ProcessingStatus::ResetRequired;
             crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+            crate::state::CURRENT_BATCH_WORK.save(storage, &BatchWork::NoWork)?;
             return Ok(ValidationStatus::Failed);
         }
         if *allowed_queries > total_allowed_queries {
             work.processing_status = ProcessingStatus::ValidateOpenPositions {
-                start_after: tokens_start_after,
+                start_after: tokens_start_after.clone(),
                 open_positions: total_open_positions,
             };
             crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
@@ -1163,8 +1167,7 @@ fn validate_single_market(
             let event = Event::new("lp-token")
                 .add_attribute("market-id", market.id.to_string())
                 .add_attribute("batched", true.to_string())
-                .add_attribute("open-positions", work.count_open_positions.to_string())
-                .add_attribute("open-orders", work.count_orders.to_string());
+                .add_attribute("validated-open-positions", total_open_positions.to_string());
             return Ok(ValidationStatus::InProgress { event });
         }
     }
@@ -1200,6 +1203,7 @@ fn validate_single_market(
         if total_orders != work.count_orders {
             work.processing_status = ProcessingStatus::ResetRequired;
             crate::state::MARKET_WORK_INFO.save(storage, &market.id, &work)?;
+            crate::state::CURRENT_BATCH_WORK.save(storage, &BatchWork::NoWork)?;
             return Ok(ValidationStatus::Failed);
         } else {
             work.processing_status = ProcessingStatus::Validated;
@@ -1222,10 +1226,10 @@ fn validate_single_market(
         let event = Event::new("lp-token")
             .add_attribute("market-id", market.id.to_string())
             .add_attribute("batched", true.to_string())
-            .add_attribute("open-positions", work.count_open_positions.to_string())
-            .add_attribute("open-orders", work.count_orders.to_string());
+            .add_attribute("validated-open-orders", total_orders.to_string());
         return Ok(ValidationStatus::InProgress { event });
     }
+    crate::state::CURRENT_BATCH_WORK.save(storage, &BatchWork::NoWork)?;
     Ok(ValidationStatus::Success { market: work })
 }
 
@@ -1298,7 +1302,7 @@ fn process_single_market(
     if let ProcessingStatus::ProcessLimitOrder(start_after) = status.clone() {
         orders_start_after = start_after;
     }
-    if !early_exit {
+    if !early_exit && !status.is_validate_status() {
         loop {
             let orders = state.query_orders(&market.addr, orders_start_after)?;
             orders_start_after = orders.next_start_after;
@@ -1330,6 +1334,8 @@ fn process_single_market(
             validate_start_from: None,
         };
         crate::state::CURRENT_BATCH_WORK.save(storage, &batch_work)?;
+    } else {
+        crate::state::CURRENT_BATCH_WORK.save(storage, &BatchWork::NoWork)?;
     }
     let event = Event::new("lp-token")
         .add_attribute("batched", early_exit.to_string())

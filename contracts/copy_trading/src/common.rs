@@ -284,7 +284,7 @@ impl<'a> State<'a> {
     }
 
     /// Load position ID tokens belonging to this contract. Typically
-    /// used to find all open positions.
+    /// used to find all open positions. Has a default max limit of 10.
     pub(crate) fn query_tokens(
         &self,
         market_addr: &Addr,
