@@ -391,9 +391,13 @@ fn withdraw_bug_perp_4159() {
     // You can still issue full withdrawal since withdrawal action has not been executed yet
     market.exec_copytrading_withdrawal(&trader, "100").unwrap();
 
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
     // Compute LP token value
     market.exec_copytrading_do_work(&trader).unwrap();
     // Does full withdrawal
+    market.exec_copytrading_do_work(&trader).unwrap();
+    // Reset work
     market.exec_copytrading_do_work(&trader).unwrap();
     // Compute LP token value
     let response = market.exec_copytrading_do_work(&trader).unwrap();
