@@ -271,7 +271,7 @@ fn no_deferred_work_lost_for_open_position() {
 }
 
 #[test]
-fn batch_work_lp_token() {
+fn batch_work_lp_token_only_positions() {
     let perps_app = PerpsApp::new_cell().unwrap();
     let factory = perps_app.borrow_mut().factory_addr.clone();
     let market = PerpsMarket::new(perps_app).unwrap();
