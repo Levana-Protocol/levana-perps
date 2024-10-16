@@ -91,7 +91,6 @@ fn order_to_position_does_not_produce_deferred_exec() {
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
     let copy_trading_addr = market.copy_trading_addr.clone();
-    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
 
     load_markets(&market);
 
@@ -156,8 +155,6 @@ fn order_to_position_does_not_produce_deferred_exec() {
 
     // No more orders are present
     assert!(order_ids.is_empty());
-
-    market.set_time(levana_perpswap_multi_test::time::TimeJump::Blocks(1)).unwrap();
 
     let positions = market.query_positions(&copy_trading_addr).unwrap();
     // We have one position now

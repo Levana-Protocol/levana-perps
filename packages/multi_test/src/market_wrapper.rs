@@ -2524,7 +2524,7 @@ impl PerpsMarket {
     ) -> Result<AppResponse> {
         let amount = amount.parse()?;
         let market_id = self.id.clone();
-        let leverage = "700".parse().unwrap();
+        let leverage = "7".parse().unwrap();
         let msg = Box::new(MarketExecuteMsg::PlaceLimitOrder {
             trigger_price: trigger_price.parse().unwrap(),
             leverage,
