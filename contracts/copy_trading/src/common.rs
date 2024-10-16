@@ -1,8 +1,8 @@
 use crate::{
     prelude::*,
     types::{
-        DecQueuePosition, IncQueuePosition, MarketInfo, MarketLoaderStatus, OneLpTokenValue,
-        OpenPositionsResp, PositionCollateral, State, TokenResp, Totals,
+        CrankFeeConfig, DecQueuePosition, IncQueuePosition, MarketInfo, MarketLoaderStatus,
+        OneLpTokenValue, OpenPositionsResp, PositionCollateral, State, TokenResp, Totals,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -191,13 +191,10 @@ impl<'a> State<'a> {
             )
             .with_context(|| format!("Unable to load market status from contract {market_addr}"))?;
 
-        // todo: Crank fee should be refreshed every 24 hours.
         let info = MarketInfo {
             id: status.market_id,
             addr: market_addr,
             token: status.collateral,
-            crank_fee_charged: status.config.crank_fee_charged,
-            crank_fee_surcharge: status.config.crank_fee_surcharge,
         };
         Ok((info, false))
     }
@@ -410,12 +407,24 @@ impl<'a> State<'a> {
         Ok(result)
     }
 
+    fn raw_query_crank_fee(&self, market: &MarketInfo) -> Result<CrankFeeConfig> {
+        let contract = market.addr.clone();
+        let key = perpswap::namespace::CONFIG.as_bytes().to_vec();
+        let result = self
+            .querier
+            .query_wasm_raw(contract, key)?
+            .context("No Config found on market contract")?;
+        let result = cosmwasm_std::from_json(result)?;
+        Ok(result)
+    }
+
     pub(crate) fn estimate_crank_fee(&self, market: &MarketInfo) -> Result<Collateral> {
+        let crank_fee = self.raw_query_crank_fee(&market)?;
         let estimated_queue_size = 5u32;
-        let fees = market
+        let fees = crank_fee
             .crank_fee_surcharge
             .checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
-        let fees = fees.checked_add(market.crank_fee_charged)?;
+        let fees = fees.checked_add(crank_fee.crank_fee_charged)?;
         let price = self.query_spot_price(&market.addr)?;
         Ok(price.usd_to_collateral(fees))
     }

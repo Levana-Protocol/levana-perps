@@ -138,15 +138,6 @@ fn get_work_from_dec_queue(
             let market_infos = state.load_market_ids_with_token(storage, &token, None)?;
 
             for market in market_infos {
-                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
-                let is_pending = deferred_execs
-                    .items
-                    .iter()
-                    .any(|item| item.status.is_pending());
-                if is_pending {
-                    return Ok(WorkResp::NoWork);
-                }
-
                 let work = crate::state::MARKET_WORK_INFO
                     .may_load(storage, &market.id)?
                     .unwrap_or_default();
@@ -158,6 +149,15 @@ fn get_work_from_dec_queue(
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
                     });
+                }
+
+                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
+                let is_pending = deferred_execs
+                    .items
+                    .iter()
+                    .any(|item| item.status.is_pending());
+                if is_pending {
+                    return Ok(WorkResp::NoWork);
                 }
             }
             // We have gone through all the markets here and looks
@@ -320,14 +320,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
             let market_infos = state.load_market_ids_with_token(storage, &token, None)?;
 
             for market in market_infos {
-                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
-                let is_pending = deferred_execs
-                    .items
-                    .iter()
-                    .any(|item| item.status.is_pending());
-                if is_pending {
-                    return Ok(WorkResp::NoWork);
-                }
                 let work = crate::state::MARKET_WORK_INFO
                     .may_load(storage, &market.id)?
                     .unwrap_or_default();
@@ -339,6 +331,15 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
                     });
+                }
+
+                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
+                let is_pending = deferred_execs
+                    .items
+                    .iter()
+                    .any(|item| item.status.is_pending());
+                if is_pending {
+                    return Ok(WorkResp::NoWork);
                 }
             }
             // We have gone through all the markets here and looks
