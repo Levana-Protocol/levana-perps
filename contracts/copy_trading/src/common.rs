@@ -10,7 +10,7 @@ use perpswap::{
     contracts::{
         factory::entry::MarketsResp,
         market::{
-            deferred_execution::{DeferredExecId, GetDeferredExecResp, ListDeferredExecsResp},
+            deferred_execution::{DeferredExecId, GetDeferredExecResp},
             entry::{
                 ClosedPositionCursor, ClosedPositionsResp, LimitOrdersResp,
                 PositionsQueryFeeApproach,
