@@ -887,7 +887,6 @@ fn batch_work_lp_token_invalidate_open_orders() {
         .add_attribute("validation", "success".to_string());
     response.assert_event(&event);
 
-
     // Process deposit
     market.exec_copytrading_do_work(&trader1).unwrap();
     let work = market.query_copy_trading_work().unwrap();
