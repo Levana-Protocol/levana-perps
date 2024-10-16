@@ -2,7 +2,7 @@ use crate::{
     prelude::*,
     types::{
         CrankFeeConfig, DecQueuePosition, IncQueuePosition, MarketInfo, MarketLoaderStatus,
-        OneLpTokenValue, OpenPositionsResp, PositionCollateral, State, TokenResp, Totals,
+        OneLpTokenValue, OpenPositionsResp, State, TokenResp, Totals,
     },
 };
 use anyhow::{bail, Context, Result};
@@ -335,11 +335,7 @@ impl<'a> State<'a> {
             closed.is_empty(),
             "closed is not empty in positions response"
         );
-        let start_after = positions.last().cloned().map(|item| item.id);
-        Ok(OpenPositionsResp {
-            positions,
-            start_after,
-        })
+        Ok(OpenPositionsResp { positions })
     }
 
     pub(crate) fn query_closed_position(
@@ -436,21 +432,6 @@ impl<'a> State<'a> {
 }
 
 impl Totals {
-    /// Convert an amount of shares into collateral.
-    #[allow(dead_code)]
-    pub(crate) fn shares_to_collateral(
-        &self,
-        shares: LpToken,
-        pos: &PositionCollateral,
-    ) -> Result<Collateral> {
-        let total_collateral = self.collateral.checked_add(pos.0)?;
-        let one_share_value = total_collateral
-            .into_decimal256()
-            .checked_div(self.shares.into_decimal256())?;
-        let share_collateral = shares.into_decimal256().checked_mul(one_share_value)?;
-        Ok(Collateral::from_decimal256(share_collateral))
-    }
-
     /// Returns the newly minted share amount
     pub(crate) fn add_collateral(
         &mut self,
@@ -462,29 +443,6 @@ impl Totals {
         self.collateral = self.collateral.checked_add(funds.raw())?;
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
-    }
-
-    /// Returns the collateral removed from the pool
-    #[allow(dead_code)]
-    pub(crate) fn remove_collateral(
-        &mut self,
-        amount: NonZero<LpToken>,
-        pos: &PositionCollateral,
-    ) -> Result<Collateral> {
-        let collateral = self.shares_to_collateral(amount.raw(), pos)?;
-        ensure!(
-            collateral <= self.collateral,
-            "Insufficient collateral for withdrawal. Requested: {collateral}. Available: {}",
-            self.collateral
-        );
-        ensure!(
-            amount.raw() <= self.shares,
-            "Insufficient shares for withdrawal. Requested: {amount}. Available: {}",
-            self.shares
-        );
-        self.collateral = self.collateral.checked_sub(collateral)?;
-        self.shares = self.shares.checked_sub(amount.raw())?;
-        Ok(collateral)
     }
 }
 
