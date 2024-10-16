@@ -373,7 +373,7 @@ impl<'a> State<'a> {
         Ok(result)
     }
 
-    pub(crate) fn get_deferred_exec(
+    pub(crate) fn query_deferred_exec(
         &self,
         market_addr: &Addr,
         id: DeferredExecId,
@@ -381,23 +381,6 @@ impl<'a> State<'a> {
         let result = self
             .querier
             .query_wasm_smart(market_addr, &MarketQueryMsg::GetDeferredExec { id })?;
-        Ok(result)
-    }
-
-    pub(crate) fn query_deferred_execs(
-        &self,
-        market_addr: &Addr,
-        start_after: Option<DeferredExecId>,
-        limit: Option<u32>,
-    ) -> Result<ListDeferredExecsResp> {
-        let result = self.querier.query_wasm_smart(
-            market_addr,
-            &MarketQueryMsg::ListDeferredExecs {
-                addr: self.my_addr.as_ref().into(),
-                start_after,
-                limit,
-            },
-        )?;
         Ok(result)
     }
 

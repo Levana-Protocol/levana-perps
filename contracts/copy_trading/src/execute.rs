@@ -850,7 +850,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
             .may_load(storage, &market_id)?
             .context("MARKETS state is empty")?
             .addr;
-        let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+        let response = state.query_deferred_exec(&market_addr, deferred_exec_id)?;
         let status = match response {
             GetDeferredExecResp::Found { item } => item,
             GetDeferredExecResp::NotFound {} => {
@@ -913,7 +913,7 @@ fn handle_deferred_exec_id(storage: &mut dyn Storage, state: &State) -> Result<R
         .may_load(storage, &market_id)?
         .context("MARKETS state is empty")?
         .addr;
-    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let response = state.query_deferred_exec(&market_addr, deferred_exec_id)?;
     let status = match response {
         GetDeferredExecResp::Found { item } => item,
         GetDeferredExecResp::NotFound {} => {

@@ -85,6 +85,81 @@ fn place_order() {
 }
 
 #[test]
+fn order_to_position_does_not_produce_deferred_exec() {
+    let perps = PerpsApp::new_cell().unwrap();
+    let market = PerpsMarket::new(perps.clone()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let copy_trading_addr = market.copy_trading_addr.clone();
+
+    load_markets(&market);
+
+    deposit_money(&market, &trader, "200").unwrap();
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "200".parse().unwrap());
+
+    // Leader queues to open a limit order
+    market
+        .exec_copy_trading_place_order("10", "0.8", DirectionToBase::Long, "1.2")
+        .unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: WorkDescription::ProcessQueueItem {
+                id: QueuePositionId::DecQueuePositionId(DecQueuePositionId::new(0))
+            }
+        }
+    );
+
+    // Process queue item: place limit order
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let deferred_execs = market.query_deferred_execs(&copy_trading_addr).unwrap();
+    assert!(!deferred_execs.is_empty());
+    assert!(deferred_execs.iter().any(|item| item.status.is_pending()));
+    // We have no work since the deferred exec id is not yet executed
+    // and is in a pending status
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_deferred_work());
+    let deferred_execs = market.query_deferred_execs(&copy_trading_addr).unwrap();
+    // Now it's not pending anymore
+    assert!(!deferred_execs.iter().any(|item| item.status.is_pending()));
+    // Do deferred work
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let order_ids = market
+        .query_limit_orders(&market.copy_trading_addr, None, None, None)
+        .unwrap()
+        .orders;
+
+    assert!(!order_ids.is_empty());
+
+    market.exec_set_price("0.8".try_into().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let order_ids = market
+        .query_limit_orders(&market.copy_trading_addr, None, None, None)
+        .unwrap()
+        .orders;
+
+    assert!(order_ids.is_empty());
+
+    let final_deferred_execs = market.query_deferred_execs(&copy_trading_addr).unwrap();
+    // There are no new deferred exec ids once the new position has opened
+    assert_eq!(deferred_execs, final_deferred_execs);
+}
+
+#[test]
 #[ignore]
 fn place_order_fail() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
