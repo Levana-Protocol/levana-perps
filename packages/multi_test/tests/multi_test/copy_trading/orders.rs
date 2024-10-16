@@ -166,12 +166,22 @@ fn order_to_position_does_not_produce_deferred_exec() {
 }
 
 #[test]
-#[ignore]
 fn place_order_fail() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
     let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
+
+    // Set some crank fee configration so that crank fee logic is
+    // kicked in
+    market
+        .exec_set_config(perpswap::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("5".parse().unwrap()),
+            crank_fee_surcharge: Some("1".parse().unwrap()),
+            crank_fee_charged: Some("0.1".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
 
     load_markets(&market);
 
@@ -182,7 +192,7 @@ fn place_order_fail() {
 
     // Leader queues to open a limit order
     market
-        .exec_copy_trading_place_order("0.1", "0.8", DirectionToBase::Long, "1.2")
+        .exec_copy_trading_place_order("0.0001", "0.8", DirectionToBase::Long, "1.2")
         .unwrap();
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(
