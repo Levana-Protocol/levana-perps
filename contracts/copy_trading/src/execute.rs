@@ -296,6 +296,17 @@ fn execute_leader_msg(
         .may_load(storage, &market_id)?
         .context("MARKETS store is empty")?;
     let token = state.to_token(&market_info.token)?;
+    if let Some(collateral) = collateral {
+        let totals = crate::state::TOTALS
+            .may_load(storage, &token)?
+            .unwrap_or_default();
+        if collateral.raw() > totals.collateral {
+            bail!(FailedReason::NotEnoughCollateral {
+                available: totals.collateral,
+                requested: collateral
+            })
+        }
+    }
     match message {
         MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
         MarketExecuteMsg::Receive { .. } => not_supported_response("receive"),
