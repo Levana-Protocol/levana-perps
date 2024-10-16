@@ -210,7 +210,6 @@ impl OneLpTokenValue {
         &self,
         funds: NonZero<Collateral>,
     ) -> Result<NonZero<LpToken>> {
-        // Todo: Write property test for understanding rounding errors
         let new_shares = LpToken::from_decimal256(
             funds
                 .raw()
@@ -582,9 +581,12 @@ pub(crate) struct CrankFeeConfig {
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::Decimal256;
-    use perpswap::number::Collateral;
+    use perpswap::number::{Collateral, NonZero};
 
     use crate::types::HighWaterMark;
+
+    use super::OneLpTokenValue;
+    use proptest::proptest;
 
     #[test]
     fn high_water_mark_test() {
@@ -691,5 +693,21 @@ mod tests {
         assert_eq!(hwm.hwm, "140".parse().unwrap());
         assert_eq!(commission.0, "4".parse().unwrap());
         assert_eq!(hwm.current, "140".parse().unwrap());
+    }
+
+    proptest! {
+    #[test]
+    fn collateral_to_shares_no_crash(token_value in 0.1f64..2.0, funds in 0.1f64..100.0) {
+        fn float_to_collateral(num: f64) -> Collateral {
+            let num = num.to_string();
+            num.parse().unwrap()
+        }
+        let token_value = float_to_collateral(token_value);
+        let token_value = OneLpTokenValue(token_value);
+
+        let funds = float_to_collateral(funds);
+        let funds = NonZero::new(funds).unwrap();
+        token_value.collateral_to_shares(funds).unwrap();
+      }
     }
 }
