@@ -737,3 +737,21 @@ fn no_double_comission() {
         .approx_eq(total_commission));
     assert_eq!(status.tokens[0].claimed_commission, Collateral::zero());
 }
+
+#[test]
+fn open_position_fail_insufficient_collateral() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200").unwrap();
+
+    // Leader queues to open a position but doesn't have enough collateral
+    market
+        .exec_copy_trading_open_position("200.1", DirectionToBase::Long, "1.5")
+        .unwrap_err();
+
+    market
+        .exec_copy_trading_open_position("199.9", DirectionToBase::Long, "1.5")
+        .unwrap();
+}
