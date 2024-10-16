@@ -43,7 +43,7 @@ fn get_dec_deferred_work(
         .may_load(storage, &market_id)?
         .context("MARKETS state is empty")?
         .addr;
-    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let response = state.query_deferred_exec(&market_addr, deferred_exec_id)?;
     let status = match response {
         GetDeferredExecResp::Found { item } => item,
         GetDeferredExecResp::NotFound {} => {
@@ -76,7 +76,7 @@ fn get_inc_deferred_work(
         .may_load(storage, &market_id)?
         .context("MARKETS state is empty")?
         .addr;
-    let response = state.get_deferred_exec(&market_addr, deferred_exec_id)?;
+    let response = state.query_deferred_exec(&market_addr, deferred_exec_id)?;
     let status = match response {
         GetDeferredExecResp::Found { item } => item,
         GetDeferredExecResp::NotFound {} => {
@@ -149,15 +149,6 @@ fn get_work_from_dec_queue(
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
                     });
-                }
-
-                let deferred_execs = state.query_deferred_execs(&market.addr, None, Some(1))?;
-                let is_pending = deferred_execs
-                    .items
-                    .iter()
-                    .any(|item| item.status.is_pending());
-                if is_pending {
-                    return Ok(WorkResp::NoWork);
                 }
             }
             // We have gone through all the markets here and looks
@@ -331,15 +322,6 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
                     });
-                }
-
-                let deferred_execs = state.query_deferred_execs(&market.addr, None, Some(1))?;
-                let is_pending = deferred_execs
-                    .items
-                    .iter()
-                    .any(|item| item.status.is_pending());
-                if is_pending {
-                    return Ok(WorkResp::NoWork);
                 }
             }
             // We have gone through all the markets here and looks
