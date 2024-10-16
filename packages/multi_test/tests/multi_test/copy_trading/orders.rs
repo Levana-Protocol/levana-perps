@@ -1,9 +1,9 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use perpswap::{
-    contracts::{copy_trading::{
+    contracts::copy_trading::{
         self, DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp,
-    }, market::position::PositionId},
+    },
     storage::DirectionToBase,
 };
 
