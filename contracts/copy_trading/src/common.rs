@@ -419,7 +419,7 @@ impl<'a> State<'a> {
     }
 
     pub(crate) fn estimate_crank_fee(&self, market: &MarketInfo) -> Result<Collateral> {
-        let crank_fee = self.raw_query_crank_fee(&market)?;
+        let crank_fee = self.raw_query_crank_fee(market)?;
         let estimated_queue_size = 5u32;
         let fees = crank_fee
             .crank_fee_surcharge
