@@ -209,6 +209,7 @@ pub enum QueryMsg {
 
 /// Individual response from [QueryMsg::QueueStatus]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
 pub struct QueueResp {
     /// Items in queue for the wallet
     pub items: Vec<QueueItemStatus>,
@@ -220,6 +221,7 @@ pub struct QueueResp {
 
 /// Queue item status
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub struct QueueItemStatus {
     /// Queue item
     pub item: QueueItem,
@@ -229,6 +231,7 @@ pub struct QueueItemStatus {
 
 /// Queue item Processing status
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum ProcessingStatus {
     /// Not started processing yet
     NotProcessed,
@@ -284,6 +287,7 @@ impl ProcessingStatus {
 
 /// Failure reason on why queue processing failed
 #[derive(Error, Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum FailedReason {
     /// Not enough collateral available
     #[error("Collateral not available. Requested {requested}, but only available {available}")]
@@ -337,6 +341,7 @@ pub enum FailedReason {
 
 /// Queue Item
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum QueueItem {
     /// Item that will lead to increase or no change of collateral
     IncCollaleteral {
@@ -356,6 +361,7 @@ pub enum QueueItem {
 
 /// Queue item that needs to be processed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum IncQueueItem {
     /// Deposit the fund and get some [LpToken]
     Deposit {
@@ -377,6 +383,7 @@ pub enum IncQueueItem {
 
 /// Queue item that needs to be processed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum DecQueueItem {
     /// Withdraw via LpToken
     Withdrawal {
@@ -398,6 +405,7 @@ pub enum DecQueueItem {
 
 /// Queue item that needs to be processed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum IncMarketItem {
     /// Remove collateral from a position, causing leverage to increase
     UpdatePositionRemoveCollateralImpactLeverage {
@@ -431,6 +439,7 @@ pub enum IncMarketItem {
 
 /// Queue item that needs to be processed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum DecMarketItem {
     /// Open position
     OpenPosition {
