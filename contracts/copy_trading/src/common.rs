@@ -327,9 +327,14 @@ impl<'a> State<'a> {
                 price: None,
             },
         )?;
-        // todo: Change this to Error
-        assert!(pending_close.is_empty());
-        assert!(closed.is_empty(), "Closed is not empty");
+        ensure!(
+            pending_close.is_empty(),
+            "pending_close is not empty in positions response"
+        );
+        ensure!(
+            closed.is_empty(),
+            "closed is not empty in positions response"
+        );
         let start_after = positions.last().cloned().map(|item| item.id);
         Ok(OpenPositionsResp {
             positions,

@@ -2501,6 +2501,7 @@ dependencies = [
  "cw-storage-plus",
  "cw2",
  "levana_perpswap_cosmos",
+ "proptest",
  "semver",
  "serde",
 ]
