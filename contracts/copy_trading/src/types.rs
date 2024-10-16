@@ -332,16 +332,10 @@ pub(crate) struct TokenResp {
 }
 
 /// Open Positions Response
-#[allow(dead_code)]
 pub(crate) struct OpenPositionsResp {
     /// Fetched tokens
     pub(crate) positions: Vec<PositionQueryResponse>,
-    /// Start after that should be passed for next iteration
-    pub(crate) start_after: Option<PositionId>,
 }
-
-/// Represents total active collateral of open positions in a market
-pub(crate) struct PositionCollateral(pub Collateral);
 
 /// Wallet information
 #[derive(Clone, Debug)]

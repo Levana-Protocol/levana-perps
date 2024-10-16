@@ -146,7 +146,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         } => {
             state.config.ensure_leader(&sender)?;
             funds.require_none()?;
-            execute_leader_msg(storage, &state, market_id, message, collateral)
+            execute_leader_msg(storage, &state, market_id, *message, collateral)
         }
         ExecuteMsg::FactoryUpdateConfig(config) => {
             state.config.ensure_factory(&sender)?;
@@ -277,12 +277,11 @@ fn factory_update_config(
     Ok(response)
 }
 
-#[allow(clippy::boxed_local)]
 fn execute_leader_msg(
     storage: &mut dyn Storage,
     state: &State,
     market_id: MarketId,
-    message: Box<MarketExecuteMsg>,
+    message: MarketExecuteMsg,
     collateral: Option<NonZero<Collateral>>,
 ) -> Result<Response> {
     let not_supported_response = |message: &str| {
@@ -297,7 +296,7 @@ fn execute_leader_msg(
         .may_load(storage, &market_id)?
         .context("MARKETS store is empty")?;
     let token = state.to_token(&market_info.token)?;
-    match *message {
+    match message {
         MarketExecuteMsg::Owner(_) => not_supported_response("owner"),
         MarketExecuteMsg::Receive { .. } => not_supported_response("receive"),
         MarketExecuteMsg::OpenPosition {
