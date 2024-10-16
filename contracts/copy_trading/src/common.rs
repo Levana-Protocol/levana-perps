@@ -383,7 +383,7 @@ impl<'a> State<'a> {
         Ok(result)
     }
 
-    pub(crate) fn load_deferred_execs(
+    pub(crate) fn query_deferred_execs(
         &self,
         market_addr: &Addr,
         start_after: Option<DeferredExecId>,

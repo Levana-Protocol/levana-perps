@@ -151,7 +151,7 @@ fn get_work_from_dec_queue(
                     });
                 }
 
-                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
+                let deferred_execs = state.query_deferred_execs(&market.addr, None, Some(1))?;
                 let is_pending = deferred_execs
                     .items
                     .iter()
@@ -333,7 +333,7 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     });
                 }
 
-                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
+                let deferred_execs = state.query_deferred_execs(&market.addr, None, Some(1))?;
                 let is_pending = deferred_execs
                     .items
                     .iter()
