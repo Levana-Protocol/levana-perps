@@ -1,9 +1,9 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use perpswap::{
-    contracts::copy_trading::{
+    contracts::{copy_trading::{
         self, DecQueuePositionId, QueuePositionId, WorkDescription, WorkResp,
-    },
+    }, market::position::PositionId},
     storage::DirectionToBase,
 };
 
@@ -91,6 +91,7 @@ fn order_to_position_does_not_produce_deferred_exec() {
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
     let copy_trading_addr = market.copy_trading_addr.clone();
+    let leader = Addr::unchecked(TEST_CONFIG.protocol_owner.clone());
 
     load_markets(&market);
 
@@ -101,7 +102,7 @@ fn order_to_position_does_not_produce_deferred_exec() {
 
     // Leader queues to open a limit order
     market
-        .exec_copy_trading_place_order("10", "0.8", DirectionToBase::Long, "1.2")
+        .exec_copy_trading_place_order("10", "0.8", DirectionToBase::Long, "1.9")
         .unwrap();
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(
@@ -137,13 +138,14 @@ fn order_to_position_does_not_produce_deferred_exec() {
     let work = market.query_copy_trading_work().unwrap();
     assert_eq!(work, WorkResp::NoWork);
 
-    let order_ids = market
+    let initial_order_ids = market
         .query_limit_orders(&market.copy_trading_addr, None, None, None)
         .unwrap()
         .orders;
 
-    assert!(!order_ids.is_empty());
+    assert!(!initial_order_ids.is_empty());
 
+    // Set price so that order price is triggered
     market.exec_set_price("0.8".try_into().unwrap()).unwrap();
     market.exec_crank_till_finished(&lp).unwrap();
 
@@ -152,7 +154,14 @@ fn order_to_position_does_not_produce_deferred_exec() {
         .unwrap()
         .orders;
 
+    // No more orders are present
     assert!(order_ids.is_empty());
+
+    market.set_time(levana_perpswap_multi_test::time::TimeJump::Blocks(1)).unwrap();
+
+    let positions = market.query_positions(&copy_trading_addr).unwrap();
+    // We have one position now
+    assert_eq!(positions.len(), 1);
 
     let final_deferred_execs = market.query_deferred_execs(&copy_trading_addr).unwrap();
     // There are no new deferred exec ids once the new position has opened
