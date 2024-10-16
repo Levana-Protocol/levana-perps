@@ -284,8 +284,8 @@ impl<'a> State<'a> {
     }
 
     /// Load position ID tokens belonging to this contract. Typically
-    /// used to find all open positions.
-    pub(crate) fn load_tokens(
+    /// used to find all open positions. Has a default max limit of 10.
+    pub(crate) fn query_tokens(
         &self,
         market_addr: &Addr,
         start_after: Option<String>,
@@ -311,8 +311,8 @@ impl<'a> State<'a> {
         })
     }
 
-    /// Load open positions
-    pub(crate) fn load_positions(
+    /// Query for open positions
+    pub(crate) fn query_positions(
         &self,
         market_addr: &Addr,
         position_ids: Vec<PositionId>,
@@ -358,7 +358,7 @@ impl<'a> State<'a> {
         Ok(result)
     }
 
-    pub(crate) fn load_orders(
+    pub(crate) fn query_orders(
         &self,
         market_addr: &Addr,
         start_after: Option<OrderId>,
@@ -368,8 +368,8 @@ impl<'a> State<'a> {
             &MarketQueryMsg::LimitOrders {
                 owner: self.my_addr.as_ref().into(),
                 start_after,
-                limit: None,
-                order: None,
+                limit: Some(15),
+                order: Some(perpswap::storage::OrderInMessage::Ascending),
             },
         )?;
         Ok(result)

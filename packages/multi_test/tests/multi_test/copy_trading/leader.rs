@@ -424,8 +424,12 @@ fn leader_position_closed_with_profit() {
     let tokens = status.tokens;
     assert!(tokens[0].collateral.diff(tokens_collateral) < "0.1".parse().unwrap());
 
+    // Reset work
+    market.exec_copytrading_do_work(&trader1).unwrap();
     // Compute lp token value
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token").add_attribute("batched", false.to_string());
+    response.assert_event(&event);
     let token_event = response
         .events
         .iter()
@@ -530,6 +534,8 @@ fn leader_position_closed_with_loss() {
 
     assert!(tokens[0].collateral.diff("170".parse().unwrap()) < "0.1".parse().unwrap());
 
+    // Reset work
+    market.exec_copytrading_do_work(&trader1).unwrap();
     // Compute lp token value
     let response = market.exec_copytrading_do_work(&trader1).unwrap();
     let token_event = response
@@ -684,6 +690,10 @@ fn deposit_and_rebalance(market: &PerpsMarket, trader: &Addr) {
     }
     // Rebalance work
     market.exec_copytrading_do_work(trader).unwrap();
+    let work = market.query_copy_trading_work().unwrap();
+    if work.is_reset_status() {
+        market.exec_copytrading_do_work(trader).unwrap();
+    }
     // Compute lp token value
     market.exec_copytrading_do_work(trader).unwrap();
     // Do deposit

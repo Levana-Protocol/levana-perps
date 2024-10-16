@@ -53,8 +53,10 @@ pub struct Config {
     pub commission_rate: Decimal256,
     /// Creation time of contract
     pub created_at: Timestamp,
-    /// Allowed smart queries During Rebalance operations
+    /// Allowed smart queries during Rebalance operation
     pub allowed_rebalance_queries: u32,
+    /// Allowed smart queries during token value computation
+    pub allowed_lp_token_queries: u32,
 }
 
 impl Config {
@@ -110,6 +112,7 @@ pub struct ConfigUpdate {
 #[allow(missing_docs)]
 pub struct FactoryConfigUpdate {
     pub allowed_rebalance_queries: Option<u32>,
+    pub allowed_lp_token_queries: Option<u32>,
 }
 
 /// Executions available on the copy trading contract.
@@ -790,6 +793,14 @@ impl WorkResp {
             WorkResp::HasWork { work_description } => work_description.is_compute_lp_token(),
         }
     }
+
+    /// Is it reset status work ?
+    pub fn is_reset_status(&self) -> bool {
+        match self {
+            WorkResp::NoWork => false,
+            WorkResp::HasWork { work_description } => work_description.is_reset_status(),
+        }
+    }
 }
 
 /// Work Description
@@ -802,11 +813,10 @@ pub enum WorkDescription {
     ComputeLpTokenValue {
         /// Token
         token: Token,
-    },
-    /// Process market
-    ProcessMarket {
-        /// Market id
-        id: MarketId,
+        /// Start from specific market id in the processing phase
+        process_start_from: Option<MarketId>,
+        /// Start from specific market id in the validate phase
+        validate_start_from: Option<MarketId>,
     },
     /// Process Queue item
     ProcessQueueItem {
@@ -838,7 +848,6 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => false,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => false,
@@ -851,9 +860,20 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => true,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
+            WorkDescription::HandleDeferredExecId {} => false,
+            WorkDescription::Rebalance { .. } => false,
+        }
+    }
+
+    /// Is it reset stats ?
+    pub fn is_reset_status(&self) -> bool {
+        match self {
+            WorkDescription::LoadMarket {} => false,
+            WorkDescription::ComputeLpTokenValue { .. } => false,
+            WorkDescription::ProcessQueueItem { .. } => false,
+            WorkDescription::ResetStats { .. } => true,
             WorkDescription::HandleDeferredExecId {} => false,
             WorkDescription::Rebalance { .. } => false,
         }
@@ -864,7 +884,6 @@ impl WorkDescription {
         match self {
             WorkDescription::LoadMarket {} => false,
             WorkDescription::ComputeLpTokenValue { .. } => false,
-            WorkDescription::ProcessMarket { .. } => false,
             WorkDescription::ProcessQueueItem { .. } => false,
             WorkDescription::ResetStats { .. } => false,
             WorkDescription::HandleDeferredExecId {} => true,

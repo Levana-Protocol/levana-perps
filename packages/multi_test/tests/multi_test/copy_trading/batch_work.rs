@@ -23,6 +23,7 @@ fn rebalance_pagination() {
             &factory,
             &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
                 allowed_rebalance_queries: Some(2),
+                allowed_lp_token_queries: None,
             }),
         )
         .unwrap();
@@ -125,6 +126,7 @@ fn batch_work_rebalance() {
             &factory,
             &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
                 allowed_rebalance_queries: Some(2),
+                allowed_lp_token_queries: None,
             }),
         )
         .unwrap();
@@ -266,4 +268,380 @@ fn no_deferred_work_lost_for_open_position() {
         }
     }
     assert_eq!(open_positions, deferred_works);
+}
+
+#[test]
+fn batch_work_lp_token_only_positions() {
+    let perps_app = PerpsApp::new_cell().unwrap();
+    let factory = perps_app.borrow_mut().factory_addr.clone();
+    let market = PerpsMarket::new(perps_app).unwrap();
+    // Have a low limit to allow batching
+    market
+        .exec_copytrading(
+            &factory,
+            &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
+                allowed_rebalance_queries: None,
+                allowed_lp_token_queries: Some(3),
+            }),
+        )
+        .unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "20000").unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "20000".parse().unwrap());
+
+    for _ in 1..32 {
+        // Leader opens a position
+        market
+            .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+            .unwrap();
+        // Process queue item: Open the position
+        market.exec_copytrading_do_work(&trader).unwrap();
+        market.exec_crank_till_finished(&lp).unwrap();
+
+        // Process queue item: Handle deferred exec id
+        market.exec_copytrading_do_work(&trader).unwrap();
+    }
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    // Compute lp token value
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("open-positions", "20".to_string())
+        .add_attribute("open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("open-positions", "31".to_string())
+        .add_attribute("open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "20".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "31".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token").add_attribute("batched", false.to_string());
+    response.assert_event(&event);
+
+    let token_event = response
+        .events
+        .iter()
+        .find(|item| item.ty == "wasm-lp-token")
+        .unwrap();
+    let token_value = token_event
+        .attributes
+        .iter()
+        .find(|item| item.key == "value")
+        .unwrap();
+
+    // Token value has decrease since we only opened positions
+    assert!(Collateral::one() > token_value.value.parse().unwrap());
+    // Do deposit
+    market.exec_copytrading_do_work(&trader1).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+    let shares = tokens.balance[0].shares;
+    // Since token value has decreased, he can buy more shares for the same amount
+    assert!(shares.raw() > "20".parse().unwrap());
+}
+
+#[test]
+fn batch_work_lp_token_only_orders() {
+    let perps_app = PerpsApp::new_cell().unwrap();
+    let factory = perps_app.borrow_mut().factory_addr.clone();
+    let market = PerpsMarket::new(perps_app).unwrap();
+    // Have a low limit to allow batching
+    market
+        .exec_copytrading(
+            &factory,
+            &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
+                allowed_rebalance_queries: None,
+                allowed_lp_token_queries: Some(2),
+            }),
+        )
+        .unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "20000").unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "20000".parse().unwrap());
+
+    for _ in 1..32 {
+        // Leader places an order
+        market
+            .exec_copy_trading_place_order("10", "0.9", DirectionToBase::Long, "1.5")
+            .unwrap();
+        // Process queue item: Place order
+        market.exec_copytrading_do_work(&trader).unwrap();
+        market.exec_crank_till_finished(&lp).unwrap();
+
+        // Process queue item: Handle deferred exec id
+        market.exec_copytrading_do_work(&trader).unwrap();
+    }
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    // Compute lp token value
+
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "0".to_string())
+        .add_attribute("validated-open-orders", "15".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token").add_attribute("batched", false.to_string());
+    response.assert_event(&event);
+
+    let token_event = response
+        .events
+        .iter()
+        .find(|item| item.ty == "wasm-lp-token")
+        .unwrap();
+    let token_value = token_event
+        .attributes
+        .iter()
+        .find(|item| item.key == "value")
+        .unwrap();
+
+    // Token value has decrease since we only opened orders
+    assert_eq!(Collateral::one(), token_value.value.parse().unwrap());
+    // Do deposit
+    market.exec_copytrading_do_work(&trader1).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+    let shares = tokens.balance[0].shares;
+    // Since token value has decreased, he can buy more shares for the same amount
+    assert_eq!(shares.raw(), "20".parse().unwrap());
+}
+
+#[test]
+fn batch_work_lp_token_positions_and_orders() {
+    let perps_app = PerpsApp::new_cell().unwrap();
+    let factory = perps_app.borrow_mut().factory_addr.clone();
+    let market = PerpsMarket::new(perps_app).unwrap();
+    // Have a low limit to allow batching
+    market
+        .exec_copytrading(
+            &factory,
+            &copy_trading::ExecuteMsg::FactoryUpdateConfig(FactoryConfigUpdate {
+                allowed_rebalance_queries: None,
+                allowed_lp_token_queries: Some(1),
+            }),
+        )
+        .unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "20000").unwrap();
+
+    let status = market.query_copy_trading_leader_tokens().unwrap();
+    let tokens = status.tokens;
+    assert_eq!(tokens[0].collateral, "20000".parse().unwrap());
+
+    for _ in 1..32 {
+        // Leader opens a position
+        market
+            .exec_copy_trading_open_position("10", DirectionToBase::Long, "1.5")
+            .unwrap();
+        // Process queue item: Open the position
+        market.exec_copytrading_do_work(&trader).unwrap();
+        market.exec_crank_till_finished(&lp).unwrap();
+
+        // Process queue item: Handle deferred exec id
+        market.exec_copytrading_do_work(&trader).unwrap();
+
+        // Leader places an order
+        market
+            .exec_copy_trading_place_order("10", "0.9", DirectionToBase::Long, "1.5")
+            .unwrap();
+        // Process queue item: Place order
+        market.exec_copytrading_do_work(&trader).unwrap();
+        market.exec_crank_till_finished(&lp).unwrap();
+
+        // Process queue item: Handle deferred exec id
+        market.exec_copytrading_do_work(&trader).unwrap();
+    }
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let trader1 = market.clone_trader(1).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader1, "20")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    // Compute lp token value
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("open-positions", "10".to_string())
+        .add_attribute("open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("open-positions", "20".to_string())
+        .add_attribute("open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("open-positions", "30".to_string())
+        .add_attribute("open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("open-positions", "31".to_string())
+        .add_attribute("open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "10".to_string())
+        .add_attribute("validated-open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "20".to_string())
+        .add_attribute("validated-open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "30".to_string())
+        .add_attribute("validated-open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "31".to_string())
+        .add_attribute("validated-open-orders", "0".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token")
+        .add_attribute("batched", true.to_string())
+        .add_attribute("validated-open-positions", "0".to_string())
+        .add_attribute("validated-open-orders", "15".to_string());
+    response.assert_event(&event);
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    let response = market.exec_copytrading_do_work(&trader1).unwrap();
+    let event = Event::new("wasm-lp-token").add_attribute("batched", false.to_string());
+    response.assert_event(&event);
+
+    let token_event = response
+        .events
+        .iter()
+        .find(|item| item.ty == "wasm-lp-token")
+        .unwrap();
+    let token_value = token_event
+        .attributes
+        .iter()
+        .find(|item| item.key == "value")
+        .unwrap();
+
+    // Token value has decrease since we only opened positions
+    assert!(Collateral::one() > token_value.value.parse().unwrap());
+    // Do deposit
+    market.exec_copytrading_do_work(&trader1).unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    let tokens = market.query_copy_trading_balance(&trader1).unwrap();
+    let shares = tokens.balance[0].shares;
+    // Since token value has decreased, he can buy more shares for the same amount
+    assert!(shares.raw() > "20".parse().unwrap());
 }

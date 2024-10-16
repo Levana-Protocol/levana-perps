@@ -5,7 +5,6 @@ use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
 use perpswap::contracts::copy_trading;
 use perpswap::contracts::market::{
-    deferred_execution::DeferredExecId,
     order::OrderId,
     position::{PositionId, PositionQueryResponse},
 };
@@ -70,23 +69,32 @@ impl Default for MarketWorkInfo {
 }
 
 /// Processing Status
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub enum ProcessingStatus {
     /// Not started Yet
     NotStarted,
     /// The last seen position id. Should be passed to
     /// [perpswap::contracts::position_token::entry::QueryMsg::Tokens]
-    OpenPositions(Option<String>),
-    /// The latest deferred exec item we're waiting on. Should be
-    /// passed to
-    /// [perpswap::contracts::market::entry::QueryMsg::ListDeferredExecs]
-    Deferred(Option<DeferredExecId>),
+    ProcessOpenPositions(Option<String>),
     /// Last seen limit order. Should be passed to
     /// [perpswap::contracts::market::entry::QueryMsg::LimitOrders]
-    LimitOrder(Option<OrderId>),
-    /// Last seen limit order. Should be passed to
-    /// [perpswap::contracts::market::entry::QueryMsg::LimitOrderHistory]
-    LimitOrderHistory(Option<String>),
+    ProcessLimitOrder(Option<OrderId>),
+    /// The last seen position id during validate step. Should be passed to
+    /// [perpswap::contracts::position_token::entry::QueryMsg::Tokens]
+    ValidateOpenPositions {
+        /// Start after this position id
+        start_after: Option<String>,
+        /// Total open positions seen so far
+        open_positions: u64,
+    },
+    /// Last seen limit order during validate step. Should be passed to
+    /// [perpswap::contracts::market::entry::QueryMsg::LimitOrders]
+    ValidateLimitOrder {
+        /// Start after this position id
+        start_after: Option<OrderId>,
+        /// Total open positions seen so far
+        open_orders: u64,
+    },
     /// Calculation reset required because a position was opened
     ResetRequired,
     /// Validated that there has been no change in positions
@@ -97,24 +105,78 @@ impl ProcessingStatus {
     pub fn reset_required(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
-            ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::Deferred(_) => false,
-            ProcessingStatus::LimitOrder(_) => false,
-            ProcessingStatus::LimitOrderHistory(_) => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
             ProcessingStatus::ResetRequired => true,
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+        }
+    }
+
+    /// Is this an batch operation status ?
+    pub fn is_batch_operation(&self) -> bool {
+        match self {
+            // This is the initial status
+            ProcessingStatus::NotStarted => false,
+            // This is set intermediate
+            ProcessingStatus::ProcessOpenPositions(_) => true,
+            // This is set intermediate
+            ProcessingStatus::ProcessLimitOrder(_) => true,
+            // This can be a final status
+            ProcessingStatus::ResetRequired => false,
+            // This can be a final status
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => true,
+        }
+    }
+
+    pub fn not_started_yet(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => true,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+        }
+    }
+
+    pub fn is_process_open_positions(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::ProcessOpenPositions(_) => true,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => false,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
+        }
+    }
+
+    pub fn is_validate_status(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => true,
+            ProcessingStatus::ResetRequired => false,
             ProcessingStatus::Validated => false,
         }
     }
 
-    pub fn is_validated(&self) -> bool {
+    pub fn is_validate_open_position_status(&self) -> bool {
         match self {
             ProcessingStatus::NotStarted => false,
-            ProcessingStatus::OpenPositions(_) => false,
-            ProcessingStatus::Deferred(_) => false,
-            ProcessingStatus::LimitOrder(_) => false,
-            ProcessingStatus::LimitOrderHistory(_) => false,
+            ProcessingStatus::ProcessOpenPositions(_) => false,
+            ProcessingStatus::ProcessLimitOrder(_) => false,
+            ProcessingStatus::ValidateOpenPositions { .. } => true,
+            ProcessingStatus::ValidateLimitOrder { .. } => false,
             ProcessingStatus::ResetRequired => false,
-            ProcessingStatus::Validated => true,
+            ProcessingStatus::Validated => false,
         }
     }
 }
@@ -440,6 +502,15 @@ pub enum BatchWork {
         /// Token
         token: Token,
     },
+    /// Continue LP token computation
+    BatchLpTokenValue {
+        /// Which market id to start from for the process phase
+        process_start_from: Option<MarketId>,
+        /// Which market id to start from for the validate phase
+        validate_start_from: Option<MarketId>,
+        /// Token
+        token: Token,
+    },
 }
 
 /// Helper type for construcing response
@@ -492,6 +563,14 @@ pub struct IncQueueResponse {
     pub queue_item: IncQueuePosition,
     /// Corresponding queue id
     pub queue_id: IncQueuePositionId,
+}
+
+/// Process reponse
+pub(crate) struct ProcessResponse {
+    /// Did it exit early
+    pub(crate) early_exit: bool,
+    /// Event to emit
+    pub(crate) event: Event,
 }
 
 #[cfg(test)]

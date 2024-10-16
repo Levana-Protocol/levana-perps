@@ -135,20 +135,10 @@ fn get_work_from_dec_queue(
                     return check_balance_work(storage, state, &token);
                 }
             }
+            let market_infos = state.load_market_ids_with_token(storage, &token, None)?;
 
-            let market_works =
-                crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
-            for market_work in market_works {
-                let (market_id, work) = market_work?;
-
-                let market_info = crate::state::MARKETS.key(&market_id).load(storage)?;
-                let market_token = state.to_token(&market_info.token)?;
-                if market_token != token {
-                    continue;
-                }
-
-                let deferred_execs = state.load_deferred_execs(&market_info.addr, None, Some(1))?;
-
+            for market in market_infos {
+                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
                 let is_pending = deferred_execs
                     .items
                     .iter()
@@ -157,13 +147,17 @@ fn get_work_from_dec_queue(
                     return Ok(WorkResp::NoWork);
                 }
 
+                let work = crate::state::MARKET_WORK_INFO
+                    .may_load(storage, &market.id)?
+                    .unwrap_or_default();
+
+                // The status cannot be a batch operation.
+                assert!(!work.processing_status.is_batch_operation());
+
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
                     });
-                }
-                if !work.processing_status.is_validated() {
-                    return check_balance_work(storage, state, &token);
                 }
             }
             // We have gone through all the markets here and looks
@@ -202,6 +196,17 @@ fn get_batch_work(storage: &dyn Storage) -> Result<WorkResp> {
                     token,
                     amount: balance,
                     start_from,
+                },
+            }),
+            crate::types::BatchWork::BatchLpTokenValue {
+                process_start_from,
+                token,
+                validate_start_from,
+            } => Ok(WorkResp::HasWork {
+                work_description: WorkDescription::ComputeLpTokenValue {
+                    token,
+                    process_start_from,
+                    validate_start_from,
                 },
             }),
         },
@@ -302,6 +307,9 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                         if let Some(deferred_exec_id) = deferred_exec_id {
                             return get_inc_deferred_work(storage, state, deferred_exec_id);
                         }
+                        // We do not compute LP token here since we
+                        // want to do some market pre-checks. These
+                        // pre-checks are done down below.
                     }
                 }
                 None => {
@@ -309,18 +317,10 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                     return check_balance_work(storage, state, &token);
                 }
             }
-            let market_works =
-                crate::state::MARKET_WORK_INFO.range(storage, None, None, Order::Descending);
-            for market_work in market_works {
-                let (market_id, work) = market_work?;
+            let market_infos = state.load_market_ids_with_token(storage, &token, None)?;
 
-                let market_info = crate::state::MARKETS.key(&market_id).load(storage)?;
-                let market_token = state.to_token(&market_info.token)?;
-                if market_token != token {
-                    continue;
-                }
-                let deferred_execs = state.load_deferred_execs(&market_info.addr, None, Some(1))?;
-
+            for market in market_infos {
+                let deferred_execs = state.load_deferred_execs(&market.addr, None, Some(1))?;
                 let is_pending = deferred_execs
                     .items
                     .iter()
@@ -328,13 +328,17 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
                 if is_pending {
                     return Ok(WorkResp::NoWork);
                 }
+                let work = crate::state::MARKET_WORK_INFO
+                    .may_load(storage, &market.id)?
+                    .unwrap_or_default();
+
+                // The status cannot be a batch operation.
+                assert!(!work.processing_status.is_batch_operation());
+
                 if work.processing_status.reset_required() {
                     return Ok(WorkResp::HasWork {
                         work_description: WorkDescription::ResetStats { token },
                     });
-                }
-                if !work.processing_status.is_validated() {
-                    return check_balance_work(storage, state, &token);
                 }
             }
             // We have gone through all the markets here and looks
@@ -944,9 +948,28 @@ pub fn check_balance_work(storage: &dyn Storage, state: &State, token: &Token) -
     // 1500 positions which resulted in some leader commission.
     let is_approximate_same = diff <= "0.00001".parse().unwrap();
     if is_approximate_same {
+        // We know for a fact that this is a fresh computation of LP
+        // token value, so we need to Reset old stats if present.
+        let market_infos = state.load_market_ids_with_token(storage, token, None)?;
+        for market_info in market_infos {
+            let work = crate::state::MARKET_WORK_INFO
+                .may_load(storage, &market_info.id)?
+                .unwrap_or_default();
+            assert!(!work.processing_status.is_batch_operation());
+            if !work.processing_status.not_started_yet() {
+                // This means it is either Validated or Reset required status
+                return Ok(WorkResp::HasWork {
+                    work_description: WorkDescription::ResetStats {
+                        token: token.clone(),
+                    },
+                });
+            }
+        }
         Ok(WorkResp::HasWork {
             work_description: WorkDescription::ComputeLpTokenValue {
                 token: token.clone(),
+                process_start_from: None,
+                validate_start_from: None,
             },
         })
     } else {
