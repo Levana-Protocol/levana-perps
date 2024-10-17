@@ -122,7 +122,8 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let HandleFunds { funds, msg, sender } = handle_funds(deps.api, info, msg)?;
     let (state, storage) = State::load_mut(deps, &env)?;
-    match msg {
+    sanity(storage, &env);
+    let response = match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit {} => {
             let token = funds.require_token()?;
@@ -166,7 +167,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             funds.require_none()?;
             leader_update_config(&state, storage, config)
         }
-    }
+    };
+    sanity(storage, &env);
+    response
 }
 
 fn leader_update_config(

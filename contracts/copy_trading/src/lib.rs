@@ -8,6 +8,8 @@ mod execute;
 mod prelude;
 mod query;
 mod reply;
+#[cfg(debug_assertions)]
+mod sanity;
 mod state;
 mod types;
 mod work;
@@ -63,12 +65,13 @@ pub fn instantiate(
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)
         .context("Cannot set contract version")?;
+    sanity(deps.storage, &env);
 
     Ok(Response::new())
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
+pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
     let old_cw2 = get_contract_version(deps.storage).context("Could not load contract version")?;
     let old_version: Version = old_cw2
         .version
@@ -78,7 +81,7 @@ pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Re
         .parse()
         .context("Couldn't parse new contract version")?;
 
-    if old_cw2.contract != CONTRACT_NAME {
+    let response = if old_cw2.contract != CONTRACT_NAME {
         Err(anyhow!(
             "Mismatched contract migration name (from {} to {})",
             old_cw2.contract,
@@ -100,5 +103,7 @@ pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Re
             "new_contract_name" => CONTRACT_NAME,
             "new_contract_version" => CONTRACT_VERSION,
         })
-    }
+    };
+    sanity(deps.storage, &env);
+    response
 }

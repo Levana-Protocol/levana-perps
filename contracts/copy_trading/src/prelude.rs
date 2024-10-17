@@ -10,3 +10,10 @@ pub(crate) use perpswap::{
     attr_map,
     storage::{Collateral, LpToken, MarketId, NonZero, Signed, UnsignedDecimal},
 };
+
+/// Perform sanity checks in dev, no-op in prod.
+#[cfg(debug_assertions)]
+pub use crate::sanity::sanity;
+
+#[cfg(not(debug_assertions))]
+pub fn sanity(_: &dyn Storage, _: &Env) {}
