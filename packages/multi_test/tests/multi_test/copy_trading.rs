@@ -412,3 +412,17 @@ fn withdraw_bug_perp_4159() {
     // The invalid withdrawal failed
     assert!(items.items.iter().any(|item| item.status.failed()))
 }
+
+#[test]
+fn no_work_execute_is_error() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+
+    // There should be no work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    market.exec_copytrading_do_work(&trader).unwrap_err();
+}
