@@ -252,7 +252,7 @@ pub struct ApprovalsResponse {
     pub approvals: Vec<Approval>,
 }
 
-/// Response for [QueryMsg::Operators]
+/// Response for [QueryMsg::AllOperators]
 #[cw_serde]
 pub struct OperatorsResponse {
     /// Operator approval information

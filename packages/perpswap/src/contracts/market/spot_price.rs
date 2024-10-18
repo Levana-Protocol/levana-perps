@@ -167,7 +167,7 @@ pub enum SpotPriceConfigInit {
         feeds: Vec<SpotPriceFeedInit>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
         feeds_usd: Vec<SpotPriceFeedInit>,
-        /// See [SpotPriceConfig::volatile_diff_seconds]
+        /// See [SpotPriceConfig::Oracle::volatile_diff_seconds]
         volatile_diff_seconds: Option<u32>,
     },
 }

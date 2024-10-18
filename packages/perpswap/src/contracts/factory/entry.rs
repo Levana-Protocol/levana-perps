@@ -312,7 +312,7 @@ pub struct MarketInfoResponse {
     pub liquidity_token_xlp: Addr,
 }
 
-/// Return value from [QueryMsg::Shutdown]
+/// Return value from [QueryMsg::ShutdownStatus]
 #[cw_serde]
 pub struct ShutdownStatus {
     /// Any parts of the market which have been disabled.

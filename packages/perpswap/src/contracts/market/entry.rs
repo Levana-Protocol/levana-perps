@@ -251,7 +251,7 @@ pub enum ExecuteMsg {
     },
 
     /// Deposits send funds into the unlocked liquidity fund
-    /// Returns [LiquidityDepositResponseData] as response data
+    /// Returns [DepositLiquidity ResponseData] as response data
     DepositLiquidity {
         /// Should we stake the resulting LP tokens into xLP?
         ///
@@ -712,7 +712,7 @@ pub enum QueryMsg {
     ///
     /// Always begins enumeration from the most recent.
     ///
-    /// * returns [ListDeferredExecsResp]
+    /// * returns [crate::contracts::market::deferred_execution::ListDeferredExecsResp]
     #[returns(crate::contracts::market::deferred_execution::ListDeferredExecsResp)]
     ListDeferredExecs {
         /// Trader wallet address
@@ -725,7 +725,7 @@ pub enum QueryMsg {
 
     /// Get a single deferred execution item, if available.
     ///
-    /// * returns [GetDeferredExecResp]
+    /// * returns [crate::contracts::market::deferred_execution::GetDeferredExecResp]
     #[returns(crate::contracts::market::deferred_execution::GetDeferredExecResp)]
     GetDeferredExec {
         /// ID

@@ -196,7 +196,7 @@ pub enum QueryMsg {
     ///
     /// Returns [LeaderStatusResp]
     LeaderStatus {
-        /// Value from [BalanceResp::next_start_after]
+        /// Value from [BalanceResp::start_after]
         start_after: Option<Token>,
         /// How many values to return
         limit: Option<u32>,
@@ -547,7 +547,7 @@ impl DecQueueItem {
     }
 }
 
-/// Individual market response from [QueryMsg::Status]
+/// Individual market response from [QueryMsg::QueueStatus]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct LeaderStatusResp {
@@ -555,7 +555,7 @@ pub struct LeaderStatusResp {
     pub tokens: Vec<TokenStatus>,
 }
 
-/// Individual market response from [QueryMsg::Status]
+/// Individual market response from [QueryMsg::QueueStatus]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct TokenStatus {
@@ -571,7 +571,7 @@ pub struct TokenStatus {
     pub claimed_commission: Collateral,
 }
 
-/// Individual market response from [QueryMsg::Status]
+/// Individual market response from [QueryMsg::QueueStatus]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct StatusResp {
