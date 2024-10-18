@@ -47,6 +47,7 @@ pub(crate) enum TaskLabel {
     HighGas,
     BlockLag,
     CounterTradeBot,
+    CopyTradeBot,
 }
 
 impl TaskLabel {
@@ -69,6 +70,7 @@ impl TaskLabel {
             "high-gas" => Some(TaskLabel::HighGas),
             "block-lag" => Some(TaskLabel::BlockLag),
             "counter-trade-bot" => Some(TaskLabel::CounterTradeBot),
+            "copy-trade-bot" => Some(TaskLabel::CopyTradeBot),
             _ => {
                 // Being lazy, skipping UltraCrank and Trader, they aren't needed
                 let index = s.strip_prefix("crank-run-")?;
@@ -100,6 +102,7 @@ impl TaskLabel {
             TaskLabel::HighGas => true,
             TaskLabel::BlockLag => false,
             TaskLabel::CounterTradeBot => false,
+            TaskLabel::CopyTradeBot => false,
         }
     }
 }
@@ -263,6 +266,7 @@ impl TaskLabel {
             TaskLabel::HighGas => config.high_gas,
             TaskLabel::BlockLag => config.block_lag,
             TaskLabel::CounterTradeBot => config.counter_trade_bot,
+            TaskLabel::CopyTradeBot => config.copy_trade_bot,
         }
     }
 
@@ -294,6 +298,7 @@ impl TaskLabel {
             TaskLabel::HighGas => true,
             TaskLabel::BlockLag => true,
             TaskLabel::CounterTradeBot => false,
+            TaskLabel::CopyTradeBot => false,
         }
     }
 
@@ -319,6 +324,7 @@ impl TaskLabel {
             TaskLabel::HighGas => "high-gas".into(),
             TaskLabel::BlockLag => "block-lag".into(),
             TaskLabel::CounterTradeBot => "counter-trade-bot".into(),
+            TaskLabel::CopyTradeBot => "copy-trade-bot".into(),
         }
     }
 }
