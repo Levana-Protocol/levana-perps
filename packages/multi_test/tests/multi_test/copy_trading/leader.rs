@@ -755,3 +755,39 @@ fn open_position_fail_insufficient_collateral() {
         .exec_copy_trading_open_position("199.9", DirectionToBase::Long, "1.5")
         .unwrap();
 }
+
+#[test]
+fn dec_inc_priority() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    load_markets(&market);
+    deposit_money(&market, &trader, "200").unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    // Perform an action which will put an item in dec queue
+    market.exec_copytrading_withdrawal(&trader, "10").unwrap();
+    // Perform an action which will put an item in inc queue
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "10")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert!(work.is_compute_lp_token());
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    // Tests that inc queue is chosen
+    let work = market.query_copy_trading_work().unwrap();
+    match work {
+        WorkResp::NoWork => panic!("Impossible: expected work"),
+        WorkResp::HasWork { work_description } => match work_description {
+            WorkDescription::ProcessQueueItem { id } => match id {
+                QueuePositionId::IncQueuePositionId(_) => (),
+                QueuePositionId::DecQueuePositionId(_) => panic!("Expected Inc position id"),
+            },
+            work => panic!("Unexpected work description: {work:?}"),
+        },
+    }
+}
