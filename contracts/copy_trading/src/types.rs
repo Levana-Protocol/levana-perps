@@ -13,6 +13,7 @@ use perpswap::{number::Usd, time::Timestamp};
 use crate::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct MarketInfo {
     /// Market id
     pub(crate) id: MarketId,
@@ -32,6 +33,7 @@ pub(crate) struct State<'a> {
 
 /// Total LP share information
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct Totals {
     /// Total collateral still in this contract.
     ///
@@ -43,6 +45,7 @@ pub(crate) struct Totals {
 
 /// Market information related to the work performed
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct MarketWorkInfo {
     pub(crate) processing_status: ProcessingStatus,
     /// Total active collateral in all open positions and pending limit orders.
@@ -66,6 +69,7 @@ impl Default for MarketWorkInfo {
 
 /// Processing Status
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum ProcessingStatus {
     /// Not started Yet
     NotStarted,
@@ -179,6 +183,7 @@ impl ProcessingStatus {
 
 /// Specific position information
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct PositionInfo {
     /// Unique identifier for a position
     pub(crate) id: PositionId,
@@ -192,6 +197,7 @@ pub(crate) struct PositionInfo {
 
 /// Specific wallet fund
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct WalletFund {
     /// LP Shares that is locked
     pub(crate) share: NonZero<LpToken>,
@@ -203,6 +209,7 @@ pub(crate) struct WalletFund {
 
 /// Value of one LPToken
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct OneLpTokenValue(pub(crate) Collateral);
 
 impl OneLpTokenValue {
@@ -236,6 +243,7 @@ impl Display for OneLpTokenValue {
 
 /// LpToken Value
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct LpTokenValue {
     /// Value of one LpToken
     pub(crate) value: OneLpTokenValue,
@@ -251,6 +259,7 @@ impl LpTokenValue {
 
 /// Status of [LpTokenValue]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum LpTokenStatus {
     /// Recently computed and valid for other computations
     Valid {
@@ -279,6 +288,7 @@ impl LpTokenStatus {
 
 /// Queue position pertaining to [crate::state::COLLATERAL_INCREASE_QUEUE]
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct IncQueuePosition {
     /// Queue item that needs to be processed
     pub(crate) item: IncQueueItem,
@@ -290,6 +300,7 @@ pub(crate) struct IncQueuePosition {
 
 /// Queue position pertaining to [crate::state::COLLATERAL_DECREASE_QUEUE]
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) struct DecQueuePosition {
     /// Queue item that needs to be processed
     pub(crate) item: DecQueueItem,
@@ -404,6 +415,7 @@ impl KeyDeserialize for WalletInfo {
 
 /// Status of the market loader
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MarketLoaderStatus {
     /// Not yet started
     #[default]
@@ -437,6 +449,7 @@ pub struct LeaderComissision {
 
 /// High water mark
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct HighWaterMark {
     /// Current net profit
     pub current: Signed<Collateral>,
@@ -446,6 +459,7 @@ pub struct HighWaterMark {
 
 /// Commission stats for the leader
 #[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub struct CommissionStats {
     /// Total unclaimed collateral by the leader
     pub unclaimed: Collateral,
@@ -455,6 +469,7 @@ pub struct CommissionStats {
 
 /// Comissision that should be paid to the leader
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Commission(pub Collateral);
 
 impl HighWaterMark {
@@ -479,6 +494,7 @@ impl HighWaterMark {
 
 /// Current batch work in Progress
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BatchWork {
     /// No work present
     NoWork,
