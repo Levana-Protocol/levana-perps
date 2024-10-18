@@ -3,6 +3,7 @@ use crate::{prelude::*, work::get_work};
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
     let (state, storage) = crate::types::State::load(deps, env.clone())?;
+    sanity(storage, &env);
     match msg {
         QueryMsg::Config {} => to_json_binary(&state.config),
         QueryMsg::Balance {
