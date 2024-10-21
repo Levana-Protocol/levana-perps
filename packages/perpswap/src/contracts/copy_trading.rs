@@ -571,7 +571,6 @@ pub struct TokenStatus {
     pub claimed_commission: Collateral,
 }
 
-
 /// Individual market response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
