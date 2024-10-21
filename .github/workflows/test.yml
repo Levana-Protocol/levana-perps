@@ -3,8 +3,6 @@ name: Test
 on:
   push:
     branches: [main]
-    tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request:
   workflow_dispatch:
 
@@ -104,41 +102,3 @@ jobs:
           projectName: levana-api-docs
           directory: .output/temp/doc
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
-  macos-binary:
-    runs-on: macos-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: de-vri-es/setup-git-credentials@v2
-        with:
-          credentials: "https://levana-bot:${{secrets.GH_BOT_PAT}}@github.com"
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just@1.25.0
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.75.0
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            .
-      - name: Compile
-        run: just cargo-compile
-      - name: Run tests
-        run: just cargo-test-check
-      - name: Clippy
-        run: just cargo-clippy-check
-      - name: Rustfmt
-        run: just cargo-fmt-check
-      - name: Release builds
-        run: |
-          just cargo-release
-          cp target/release/perps-qa target/release/perps-qa-apple-darwin
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: target/release/perps-qa-apple-darwin
-          generate_release_notes: true
