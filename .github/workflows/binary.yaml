@@ -1,0 +1,49 @@
+name: Rust binaries
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  pull_request:
+  schedule:
+    # For cache, run at 9 AM UTC daily
+    - cron: "0 10 * * *"
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  perps-deploy-image:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-binary-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.25.2
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.75.0
+          components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+      - name: Dependencies
+        run: sudo apt install musl-tools -y
+      - name: Build perps-deploy binary
+        run: just cargo-perps-deploy-release
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            target/x86_64-unknown-linux-musl/release/perps-deploy
