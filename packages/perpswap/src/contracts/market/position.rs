@@ -131,7 +131,7 @@ impl LiquidationMargin {
     }
 }
 
-/// Response from [QueryMsg::Positions]
+/// Response from [crate::contracts::market::entry::QueryMsg::Positions]
 #[cw_serde]
 pub struct PositionsResp {
     /// Open positions

@@ -51,9 +51,8 @@ impl ExchangeId {
     /// to the cryptocurrency page of the CMC and try finding the
     /// markets. Then based on the CEX or DEX filter, you can find the
     /// exchange type.
-
-    /// Another way to determine if through the coingecko page. Eg:
-    /// https://www.coingecko.com/en/exchanges/okx
+    /// Another way to determine if through the coingecko page.
+    /// For example: [OKX on CoinGecko](https://www.coingecko.com/en/exchanges/okx)
     ///
     /// Unfortunately, CMC doesn't provide an API for this currently.
     pub(crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {

@@ -229,7 +229,7 @@ async fn worker(
 
 /// Overall market status information
 ///
-/// Returned from [QueryMsg::Status]
+/// Returned from [perpswap::contracts::market::entry::QueryMsg::Status]
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 struct StatusRelaxed {
