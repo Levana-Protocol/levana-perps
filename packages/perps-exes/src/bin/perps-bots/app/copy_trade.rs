@@ -1,9 +1,12 @@
-use std::{fmt::Display, sync::Arc};
+use std::{
+    fmt::Display,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, HasAddress, Wallet};
-use cosmwasm_std::Addr;
 use perpswap::contracts::{
     copy_trading::{
         ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
@@ -12,10 +15,13 @@ use perpswap::contracts::{
 };
 
 use crate::watcher::{
-    Heartbeat, ParallelCopyTradingWatcher, WatchedTask, WatchedTaskOutput, WatchedTaskPerCopyTradingParallel
+    ParallelCopyTradingWatcher, WatchedTaskOutput, WatchedTaskPerCopyTradingParallel,
 };
 
-use super::{factory::FactoryInfo, App, AppBuilder};
+use super::{
+    factory::{CopyTrading, FactoryInfo},
+    App, AppBuilder,
+};
 
 #[derive(Clone)]
 pub(crate) struct CopyTradeBot;
@@ -29,9 +35,10 @@ impl AppBuilder {
 
 pub(crate) async fn get_copy_trading_addresses(
     factory: &Contract,
-) -> Result<(Vec<Addr>, Option<CopyTradingInfoRaw>)> {
+    start_after: Option<CopyTradingInfoRaw>,
+) -> Result<CopyTrading> {
     let mut result = vec![];
-    let mut start_after = None;
+    let mut start_after = start_after;
     loop {
         let CopyTradingResp { addresses } =
             fetch_copy_trading_address(&factory, start_after.clone()).await?;
@@ -44,10 +51,16 @@ pub(crate) async fn get_copy_trading_addresses(
         });
         for copy_trading_addr in addresses {
             let contract = copy_trading_addr.contract.0;
+            let contract = contract.to_string().parse()?;
             result.push(contract);
         }
     }
-    Ok((result, start_after))
+    let result = CopyTrading {
+        addresses: result,
+        start_after,
+        last_checked: Instant::now(),
+    };
+    Ok(result)
 }
 
 #[async_trait]
@@ -55,9 +68,24 @@ impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
     async fn run_single_copy_trading(
         self: Arc<Self>,
         app: &App,
-        _: &FactoryInfo,
-        address: &Addr,
+        factory: &FactoryInfo,
+        address: &Address,
     ) -> Result<WatchedTaskOutput> {
+        let one_hour = 60 * 60;
+        if factory.copy_trading.last_checked.elapsed() > Duration::from_secs(one_hour) {
+            let mut copy_trading = factory.copy_trading.clone();
+            let factory_contract = app.cosmos.make_contract(factory.factory);
+            let remaining_copy_trading =
+                get_copy_trading_addresses(&factory_contract, copy_trading.start_after.clone())
+                    .await?;
+            if !remaining_copy_trading.is_empty() {
+                copy_trading.merge(remaining_copy_trading);
+                let mut new_factory: FactoryInfo = factory.clone();
+                new_factory.copy_trading = copy_trading;
+                app.set_factory_info(new_factory).await;
+            }
+        }
+
         let copy_trading = address.to_string().parse()?;
         let contract = app.cosmos.make_contract(copy_trading);
         let wallet = app.get_pool_wallet().await;
@@ -120,6 +148,7 @@ async fn do_all_copy_trading_work(
             if let Err(err) = response {
                 is_error = true;
                 errors.push(err);
+                break;
             }
         } else {
             break;

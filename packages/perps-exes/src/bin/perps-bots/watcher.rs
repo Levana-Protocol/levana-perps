@@ -11,7 +11,6 @@ use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
 
 use cosmos::Address;
-use cosmwasm_std::Addr;
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
@@ -868,7 +867,7 @@ pub(crate) trait WatchedTaskPerCopyTradingParallel: Send + Sync + 'static {
         self: Arc<Self>,
         app: &App,
         factory_info: &FactoryInfo,
-        address: &Addr,
+        address: &Address,
     ) -> Result<WatchedTaskOutput>;
 }
 
@@ -897,7 +896,7 @@ impl<T: WatchedTaskPerCopyTradingParallel> WatchedTask for ParallelCopyTradingWa
         let mut total_skip_delay = false;
 
         let mut set = JoinSet::new();
-        for copy_trading in factory.copy_trading_addresses.clone() {
+        for copy_trading in factory.copy_trading.addresses.clone() {
             let factory = factory.clone();
             let inner = self.0.clone();
             let app = app.clone();
