@@ -54,7 +54,6 @@ impl CopyTrading {
     }
 }
 
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct FrontendInfoTestnet {
