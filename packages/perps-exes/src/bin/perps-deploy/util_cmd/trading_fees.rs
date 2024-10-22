@@ -16,7 +16,7 @@ pub(super) struct TradingFeesOpt {
     #[clap(
         long,
         env = "LEVANA_FEES_BUFF_DIR",
-        default_value = ".cache/trading-incentives"
+        default_value = ".cache/trading-fees"
     )]
     pub(crate) buff_dir: PathBuf,
     /// How many separate worker tasks to create for parallel loading
