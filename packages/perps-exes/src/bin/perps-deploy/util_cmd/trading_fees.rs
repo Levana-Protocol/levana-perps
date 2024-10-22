@@ -4,11 +4,9 @@ use std::path::PathBuf;
 
 use crate::cli::Opt;
 use crate::util_cmd::{open_position_csv, OpenPositionCsvOpt, PositionRecord};
-use anyhow::{bail, Result};
+use anyhow::Result;
 use chrono::Utc;
 use cosmos::Address;
-use cosmos::CosmosNetwork;
-use perps_exes::{config::MainnetFactories, PerpsNetwork};
 use perpswap::storage::{UnsignedDecimal, Usd};
 use reqwest::Url;
 
@@ -30,51 +28,9 @@ pub(super) struct TradingFeesOpt {
     /// Factory identifier
     #[clap(long, default_value = "osmomainnet1", env = "LEVANA_FEES_FACTORY")]
     factory: String,
-    /// Provide gRPC endpoint override for osmosis mainnet
-    #[clap(
-        long,
-        env = "LEVANA_FEES_OSMOSIS_MAINNET_PRIMARY_GRPC",
-        default_value = "https://osmo-priv-grpc.kingnodes.com"
-    )]
-    osmosis_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for osmosis mainnet
-    #[clap(
-        long,
-        env = "LEVANA_FEES_OSMOSIS_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.osmosis-1.mesa-grpc.newmetric.xyz,http://146.190.0.132:9090,https://grpc.osmosis.zone,http://osmosis-grpc.polkachu.com:12590",
-        value_delimiter = ','
-    )]
-    osmosis_mainnet_fallbacks_grpc: Vec<Url>,
-    /// Provide gRPC endpoint override for injective mainnet
-    #[clap(
-        long,
-        env = "LEVANA_FEES_INJECTIVE_MAINNET_PRIMARY_GRPC",
-        default_value = "https://inj-priv-grpc.kingnodes.com"
-    )]
-    injective_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for injective mainnet
-    #[clap(
-        long,
-        env = "LEVANA_FEES_INJECTIVE_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.injective-1.mesa-grpc.newmetric.xyz,http://injective-grpc.polkachu.com:14390",
-        value_delimiter = ','
-    )]
-    injective_mainnet_fallbacks_grpc: Vec<Url>,
-    /// Provide gRPC endpoint override for neutron mainnet
-    #[clap(
-        long,
-        env = "LEVANA_FEES_NEUTRON_MAINNET_PRIMARY_GRPC",
-        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
-    )]
-    neutron_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for neutron mainnet
-    #[clap(
-        long,
-        env = "LEVANA_FEES_NEUTRON_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://neutron-grpc.rpc.p2p.world:3001,http://grpc-kralum.neutron-1.neutron.org",
-        value_delimiter = ','
-    )]
-    neutron_mainnet_fallbacks_grpc: Vec<Url>,
+    /// Provide optional gRPC fallbacks URLs for factory
+    #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
+    cosmos_grpc_fallbacks: Vec<Url>,
 }
 
 impl TradingFeesOpt {
@@ -89,49 +45,26 @@ async fn go(
         workers,
         retries,
         factory,
-        osmosis_mainnet_primary_grpc,
-        osmosis_mainnet_fallbacks_grpc,
-        injective_mainnet_primary_grpc,
-        injective_mainnet_fallbacks_grpc,
-        neutron_mainnet_primary_grpc,
-        neutron_mainnet_fallbacks_grpc,
+        cosmos_grpc_fallbacks,
     }: TradingFeesOpt,
     opt: Opt,
 ) -> Result<()> {
-    let mainnet_factories = MainnetFactories::load()?;
-    let (factory_name, factory) = (factory.clone(), mainnet_factories.get(&factory)?);
-
-    let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory_name.clone()));
+    let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
 
     if let Some(parent) = csv_filename.parent() {
         fs_err::create_dir_all(parent)?;
     }
 
-    let (factory_primary_grpc, factory_fallbacks_grpc) = match factory.network {
-        PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => (
-            osmosis_mainnet_primary_grpc.clone(),
-            osmosis_mainnet_fallbacks_grpc.clone(),
-        ),
-        PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => (
-            injective_mainnet_primary_grpc.clone(),
-            injective_mainnet_fallbacks_grpc.clone(),
-        ),
-        PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => (
-            neutron_mainnet_primary_grpc.clone(),
-            neutron_mainnet_fallbacks_grpc.clone(),
-        ),
-        _ => bail!("Unsupported network: {}", factory.network),
-    };
     let mut attempted_retries = 0;
     while let Err(e) = open_position_csv(
         opt.clone(),
         OpenPositionCsvOpt {
-            factory: factory_name.clone(),
+            factory: factory.clone(),
             csv: csv_filename.clone(),
             workers,
-            factory_primary_grpc: Some(factory_primary_grpc.clone()),
-            factory_fallbacks_grpc: factory_fallbacks_grpc.clone(),
+            factory_primary_grpc: opt.cosmos_grpc.clone(),
+            factory_fallbacks_grpc: cosmos_grpc_fallbacks.clone(),
         },
     )
     .await
