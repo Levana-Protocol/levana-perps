@@ -1,12 +1,11 @@
 use std::{
-    fmt::Display,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Contract, HasAddress, Wallet};
+use cosmos::{Address, Contract, Wallet};
 use perpswap::contracts::{
     copy_trading::{
         ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
@@ -41,7 +40,7 @@ pub(crate) async fn get_copy_trading_addresses(
     let mut start_after = start_after;
     loop {
         let CopyTradingResp { addresses } =
-            fetch_copy_trading_address(&factory, start_after.clone()).await?;
+            fetch_copy_trading_address(factory, start_after.clone()).await?;
         if addresses.is_empty() {
             break;
         }
@@ -90,15 +89,14 @@ impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
         let contract = app.cosmos.make_contract(copy_trading);
         let wallet = app.get_pool_wallet().await;
         let response = do_all_copy_trading_work(&contract, &wallet).await?;
-        if response.is_err() {
-            let mut msg = String::new();
-            for error in response.errors {
-                msg.push_str(&format!("{error}"));
+        match response.error {
+            Some(error) => {
+                let message = format!("{error}");
+                Ok(WatchedTaskOutput::new(message).set_error())
             }
-            Ok(WatchedTaskOutput::new(msg).set_error())
-        } else {
-            let msg = format!("Successfully finished executing all works");
-            Ok(WatchedTaskOutput::new(msg))
+            None => Ok(WatchedTaskOutput::new(
+                "Successfully finished executing all works",
+            )),
         }
     }
 }
@@ -116,21 +114,7 @@ async fn fetch_copy_trading_address(
 }
 
 pub(crate) struct ContractResponse {
-    is_error: bool,
-    contract: Address,
-    errors: Vec<cosmos::Error>,
-}
-
-impl Display for ContractResponse {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Contract {} \n errors: {:?}", self.contract, self.errors)
-    }
-}
-
-impl ContractResponse {
-    pub fn is_err(&self) -> bool {
-        self.is_error
-    }
+    error: Option<cosmos::Error>,
 }
 
 async fn do_all_copy_trading_work(
@@ -139,24 +123,16 @@ async fn do_all_copy_trading_work(
 ) -> Result<ContractResponse> {
     let query_msg = CopyTradingQueryMsg::HasWork {};
     let execute_msg = CopyTradingExecuteMsg::DoWork {};
-    let mut is_error = false;
-    let mut errors = vec![];
     loop {
         let work: WorkResp = contract.query(&query_msg).await?;
         if work.has_work() {
             let response = contract.execute(wallet, vec![], &execute_msg).await;
-            if let Err(err) = response {
-                is_error = true;
-                errors.push(err);
-                break;
+            match response {
+                Ok(_) => continue,
+                Err(error) => return Ok(ContractResponse { error: Some(error) }),
             }
         } else {
-            break;
+            return Ok(ContractResponse { error: None });
         }
     }
-    Ok(ContractResponse {
-        is_error,
-        errors,
-        contract: contract.get_address(),
-    })
 }
