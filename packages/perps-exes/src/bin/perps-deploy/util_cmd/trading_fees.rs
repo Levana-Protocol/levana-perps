@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::cli::Opt;
 use crate::util_cmd::{open_position_csv, OpenPositionCsvOpt, PositionRecord};
 use anyhow::Result;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use cosmos::Address;
 use perpswap::storage::{UnsignedDecimal, Usd};
 use reqwest::Url;
@@ -85,7 +85,8 @@ async fn go(
         .and_utc();
     let end_date = start_date + chrono::Duration::days(1);
 
-    let mut fees: HashMap<Address, Usd> = HashMap::new();
+    let mut fees: HashMap<Address, WalletFees> = HashMap::new();
+    let mut timestamp: DateTime<Utc> = DateTime::default();
     for record in csv::Reader::from_path(&csv_filename)?.into_deserialize() {
         let PositionRecord {
             closed_at,
@@ -101,17 +102,22 @@ async fn go(
             continue;
         }
         let entry = fees.entry(owner).or_default();
-        *entry = entry.checked_add(trading_fee_usd)?;
+        *entry = WalletFees {
+            fees: entry.fees.checked_add(trading_fee_usd)?,
+            timestamp: entry.timestamp.max(closed_at),
+        };
+        timestamp = timestamp.max(closed_at);
     }
 
     let value = serde_json::json!(
         {
-            "timestamp": start_date,
+            "timestamp": timestamp,
             "wallets": fees
                 .into_iter()
-                .map(|(recipient, amount)| serde_json::json!({
+                .map(|(recipient, WalletFees { fees, timestamp })| serde_json::json!({
+                    "timestamp": timestamp,
                     "wallet": recipient.to_string(),
-                    "trading_fees_in_usd": amount.to_string(),
+                    "trading_fees_in_usd": fees.to_string(),
                 }))
                 .collect::<Vec<_>>()
         }
@@ -126,4 +132,10 @@ async fn go(
     output.flush()?;
 
     Ok(())
+}
+
+#[derive(Default)]
+struct WalletFees {
+    fees: Usd,
+    timestamp: DateTime<Utc>,
 }
