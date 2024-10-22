@@ -3,6 +3,7 @@ use std::{fmt::Display, sync::Arc};
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, HasAddress, Wallet};
+use cosmwasm_std::Addr;
 use perpswap::contracts::{
     copy_trading::{
         ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
@@ -10,64 +11,66 @@ use perpswap::contracts::{
     factory::entry::{CopyTradingInfoRaw, CopyTradingResp, QueryMsg as FactoryQueryMsg},
 };
 
-use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
+use crate::watcher::{
+    Heartbeat, ParallelCopyTradingWatcher, WatchedTask, WatchedTaskOutput, WatchedTaskPerCopyTradingParallel
+};
 
-use super::{App, AppBuilder};
+use super::{factory::FactoryInfo, App, AppBuilder};
 
 #[derive(Clone)]
 pub(crate) struct CopyTradeBot;
 
 impl AppBuilder {
     pub(super) fn start_copytrading_bot(&mut self) -> Result<()> {
-        self.watch_periodic(crate::watcher::TaskLabel::CopyTradeBot, CopyTradeBot)
+        let watcher = ParallelCopyTradingWatcher::new(CopyTradeBot);
+        self.watch_periodic(crate::watcher::TaskLabel::CopyTradeBot, watcher)
     }
 }
 
-#[async_trait]
-impl WatchedTask for CopyTradeBot {
-    async fn run_single(
-        &mut self,
-        app: Arc<App>,
-        _heartbeat: Heartbeat,
-    ) -> Result<WatchedTaskOutput> {
-        let factory = app.get_factory_info().await;
-        let factory = factory.factory;
-        let cosmos = app.cosmos.clone();
-        let factory_contract = cosmos.make_contract(factory);
-        let mut start_after = None;
-        let mut result = vec![];
-        let mut total_contracts = 0;
-        loop {
-            let CopyTradingResp { addresses } =
-                fetch_copy_trading_address(&factory_contract, start_after.clone()).await?;
-            if addresses.is_empty() {
-                break;
-            }
-            start_after = addresses.last().cloned().map(|item| CopyTradingInfoRaw {
-                leader: item.leader.0.into(),
-                contract: item.contract.0.into(),
-            });
-            for copy_trading_addr in addresses {
-                total_contracts += 1;
-                let contract = copy_trading_addr.contract.0;
-                let contract = contract.to_string().parse()?;
-                let copy_trading_contract = cosmos.make_contract(contract);
-                let wallet = app.get_pool_wallet().await;
-                let response = do_all_copy_trading_work(&copy_trading_contract, &wallet).await?;
-                if response.is_err() {
-                    result.push(response);
-                }
-            }
+pub(crate) async fn get_copy_trading_addresses(
+    factory: &Contract,
+) -> Result<(Vec<Addr>, Option<CopyTradingInfoRaw>)> {
+    let mut result = vec![];
+    let mut start_after = None;
+    loop {
+        let CopyTradingResp { addresses } =
+            fetch_copy_trading_address(&factory, start_after.clone()).await?;
+        if addresses.is_empty() {
+            break;
         }
-        if result.is_empty() {
-            let msg = format!("Successfully finished executing a single round (Total contracts: {total_contracts})");
-            Ok(WatchedTaskOutput::new(msg))
-        } else {
+        start_after = addresses.last().cloned().map(|item| CopyTradingInfoRaw {
+            leader: item.leader.0.into(),
+            contract: item.contract.0.into(),
+        });
+        for copy_trading_addr in addresses {
+            let contract = copy_trading_addr.contract.0;
+            result.push(contract);
+        }
+    }
+    Ok((result, start_after))
+}
+
+#[async_trait]
+impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
+    async fn run_single_copy_trading(
+        self: Arc<Self>,
+        app: &App,
+        _: &FactoryInfo,
+        address: &Addr,
+    ) -> Result<WatchedTaskOutput> {
+        let copy_trading = address.to_string().parse()?;
+        let contract = app.cosmos.make_contract(copy_trading);
+        let wallet = app.get_pool_wallet().await;
+        let response = do_all_copy_trading_work(&contract, &wallet).await?;
+        if response.is_err() {
             let mut msg = String::new();
-            for error in result {
+            for error in response.errors {
                 msg.push_str(&format!("{error}"));
             }
             Ok(WatchedTaskOutput::new(msg).set_error())
+        } else {
+            let msg = format!("Successfully finished executing all works");
+            Ok(WatchedTaskOutput::new(msg))
         }
     }
 }

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress};
+use cosmwasm_std::Addr;
 use perps_exes::PerpsNetwork;
 use perpswap::storage::MarketId;
 
@@ -33,6 +34,7 @@ pub(crate) struct FactoryInfoJson<'a> {
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
     pub(crate) markets: HashMap<&'a MarketId, Address>,
+    pub(crate) copy_trading_addresses: Vec<Addr>
 }
 
 impl<'a> From<&'a FactoryInfo> for FactoryInfoJson<'a> {
@@ -42,6 +44,7 @@ impl<'a> From<&'a FactoryInfo> for FactoryInfoJson<'a> {
             updated,
             is_static,
             markets,
+            copy_trading_addresses,
         }: &'a FactoryInfo,
     ) -> Self {
         FactoryInfoJson {
@@ -52,6 +55,7 @@ impl<'a> From<&'a FactoryInfo> for FactoryInfoJson<'a> {
                 .iter()
                 .map(|market| (&market.market_id, market.market.get_address()))
                 .collect(),
+            copy_trading_addresses: copy_trading_addresses.to_vec()
         }
     }
 }
