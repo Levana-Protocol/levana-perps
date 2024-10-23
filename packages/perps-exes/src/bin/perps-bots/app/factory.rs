@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Instant;
 
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
+use perpswap::contracts::factory::entry::CopyTradingInfoRaw;
 use perpswap::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
 use perpswap::prelude::*;
 use perpswap::{
@@ -19,13 +21,37 @@ use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
+use super::copy_trade::get_copy_trading_addresses;
 use super::{App, AppBuilder};
 
+#[derive(Clone)]
 pub(crate) struct FactoryInfo {
     pub(crate) factory: Address,
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
     pub(crate) markets: Vec<Market>,
+    pub(crate) copy_trading: CopyTrading,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct CopyTrading {
+    pub(crate) addresses: Vec<Address>,
+    pub(crate) start_after: Option<CopyTradingInfoRaw>,
+    #[serde(skip)]
+    pub(crate) last_checked: Instant,
+}
+
+impl CopyTrading {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.addresses.is_empty()
+    }
+
+    pub(crate) fn merge(&mut self, mut new: CopyTrading) {
+        self.addresses.append(&mut new.addresses);
+        self.start_after = new.start_after;
+        self.last_checked = new.last_checked;
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -110,12 +136,15 @@ pub(crate) async fn get_factory_info_mainnet(
     let message = format!("Using hard-coded factory address {factory}");
 
     let markets = get_markets(cosmos, &cosmos.make_contract(factory), ignored_markets).await?;
+    let factory_contract = cosmos.make_contract(factory);
+    let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
 
     let factory_info = FactoryInfo {
         factory,
         updated: Utc::now(),
         is_static: false,
         markets,
+        copy_trading,
     };
     Ok((message, factory_info))
 }
@@ -156,12 +185,15 @@ pub(crate) async fn get_factory_info_testnet(
     };
 
     let rpc = get_rpc_info(cosmos, client, referer, rpc_nodes).await?;
+    let factory_contract = cosmos.make_contract(factory);
+    let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
 
     let factory_info = FactoryInfo {
         factory,
         updated: Utc::now(),
         is_static: false,
         markets,
+        copy_trading,
     };
     let frontend_info_testnet = FrontendInfoTestnet {
         faucet,
