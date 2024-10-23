@@ -10,6 +10,7 @@ use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
 
+use cosmos::Address;
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
@@ -860,11 +861,102 @@ pub(crate) trait WatchedTaskPerMarketParallel: Send + Sync + 'static {
     ) -> Result<WatchedTaskOutput>;
 }
 
+#[async_trait]
+pub(crate) trait WatchedTaskPerCopyTradingParallel: Send + Sync + 'static {
+    async fn run_single_copy_trading(
+        self: Arc<Self>,
+        app: &App,
+        factory_info: &FactoryInfo,
+        address: &Address,
+    ) -> Result<WatchedTaskOutput>;
+}
+
 pub(crate) struct ParallelWatcher<T>(Arc<T>);
 
 impl<T> ParallelWatcher<T> {
     pub(crate) fn new(t: T) -> Self {
         ParallelWatcher(Arc::new(t))
+    }
+}
+
+pub(crate) struct ParallelCopyTradingWatcher<T>(Arc<T>);
+
+impl<T> ParallelCopyTradingWatcher<T> {
+    pub(crate) fn new(t: T) -> Self {
+        ParallelCopyTradingWatcher(Arc::new(t))
+    }
+}
+
+#[async_trait]
+impl<T: WatchedTaskPerCopyTradingParallel> WatchedTask for ParallelCopyTradingWatcher<T> {
+    async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
+        let factory = app.get_factory_info().await;
+        let mut successes = vec![];
+        let mut errors = vec![];
+        let mut total_skip_delay = false;
+
+        let mut set = JoinSet::new();
+        for copy_trading in factory.copy_trading.addresses.clone() {
+            let factory = factory.clone();
+            let inner = self.0.clone();
+            let app = app.clone();
+            set.spawn(async move {
+                let market_start_time = Utc::now();
+                let res = inner
+                    .run_single_copy_trading(&app, &factory, &copy_trading)
+                    .await;
+                let time_used = Utc::now() - market_start_time;
+                tracing::debug!(
+                    "Time used for single copy trading {}: {time_used}.",
+                    copy_trading
+                );
+                (copy_trading, res)
+            });
+        }
+
+        while let Some(res_outer) = set.join_next().await {
+            match res_outer {
+                Ok((copy_trading, res)) => match res {
+                    Ok(WatchedTaskOutput {
+                        skip_delay,
+                        message,
+                        suppress,
+                        expire_alert: _,
+                        error,
+                    }) => {
+                        if suppress {
+                            errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
+                        }
+                        if error {
+                            errors.push(message.into_owned());
+                        } else {
+                            successes.push(format!("{copy_trading} : {message}",));
+                        }
+                        total_skip_delay = skip_delay || total_skip_delay;
+                    }
+                    Err(e) => errors.push(format!("{copy_trading}: {e:?}",)),
+                },
+                Err(panic) => errors.push(format!(
+                    "Code bug, panic occurred in parallel market watcher: {panic:?}"
+                )),
+            }
+        }
+        if errors.is_empty() {
+            Ok(WatchedTaskOutput {
+                skip_delay: total_skip_delay,
+                message: successes.join("\n").into(),
+                suppress: false,
+                expire_alert: None,
+                error: false,
+            })
+        } else {
+            let mut msg = String::new();
+            for line in errors.iter().chain(successes.iter()) {
+                msg += line;
+                msg += "\n";
+            }
+            Err(anyhow::anyhow!("{msg}"))
+        }
     }
 }
 

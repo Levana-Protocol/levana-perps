@@ -2103,6 +2103,20 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_factory_add_copy_trading(&self) -> Result<AppResponse> {
+        let name = "some_name".to_owned();
+        let desc = "some_description".to_owned();
+        self.exec_factory_as(
+            &Addr::unchecked(TEST_CONFIG.protocol_owner.clone()),
+            &FactoryExecuteMsg::AddCopyTrading {
+                new_copy_trading: NewCopyTradingParams {
+                    name: name.clone(),
+                    description: desc.clone(),
+                },
+            },
+        )
+    }
+
     pub fn exec_factory(&self, msg: &FactoryExecuteMsg) -> Result<AppResponse> {
         self.exec_factory_as(&Addr::unchecked(&TEST_CONFIG.protocol_owner), msg)
     }

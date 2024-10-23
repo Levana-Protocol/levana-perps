@@ -120,7 +120,7 @@ impl Timestamp {
     }
 
     #[cfg(feature = "chrono")]
-    /// Convert into a chrono DateTime<Utc>
+    /// Convert into a chrono [`DateTime<Utc>`]
     pub fn try_into_chrono_datetime(self) -> Result<DateTime<Utc>> {
         let secs = self.0 / 1_000_000_000;
         let nanos = self.0 % 1_000_000_000;

@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Binary};
+use cosmwasm_std::{Addr, Attribute, Binary, Event};
 use levana_perpswap_multi_test::{
     config::TEST_CONFIG, market_wrapper::PerpsMarket, time::TimeJump, PerpsApp,
 };
@@ -7,8 +7,10 @@ use perpswap::{
         factory::entry::{CopyTradingInfoRaw, CopyTradingResp},
         market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
     },
+    namespace::FACTORY_MARKET_LAST_ADDED,
     prelude::FactoryExecuteMsg,
-    {namespace::FACTORY_MARKET_LAST_ADDED, storage::MarketId, time::Timestamp},
+    storage::{FactoryQueryMsg, MarketId},
+    time::Timestamp,
 };
 
 #[test]
@@ -180,4 +182,102 @@ fn test_copy_trading_leader_pagination() {
         .query_factory_copy_contracts_leader(&Addr::unchecked(TEST_CONFIG.protocol_owner.clone()))
         .unwrap();
     assert_eq!(resp.addresses.len(), 1);
+}
+
+fn get_copy_trading_addr(events: Vec<Event>) -> Attribute {
+    events
+        .into_iter()
+        .find(|item| item.ty == "wasm-instantiate-copy-trading")
+        .unwrap()
+        .attributes
+        .into_iter()
+        .find(|item| item.key == "contract")
+        .unwrap()
+}
+
+#[test]
+fn instantiate_copy_trading_event() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    // We start from one because the test framework already has one
+    // copy trading contract
+    let response = market.exec_factory_add_copy_trading().unwrap();
+    let copy_trading = get_copy_trading_addr(response.events);
+
+    let contract = market.query_factory_copy_contracts().unwrap();
+    // Index one because test framework already creates a contract
+    assert_eq!(
+        contract.addresses[1].contract.0.to_string(),
+        copy_trading.value
+    );
+}
+
+#[test]
+fn query_factory_copy_trading_order_mid_query() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    // We start from one because the test framework already has one
+    // copy trading contract
+    let initial_response = market.query_factory_copy_contracts().unwrap();
+
+    assert!(initial_response.addresses.len() == 1);
+    let mut result = vec![];
+    result.push(initial_response.addresses[0].contract.0.to_string());
+    for _ in 0..=1 {
+        market.exec_factory_add_copy_trading().unwrap();
+    }
+
+    let mid_response = market.query_factory_copy_contracts().unwrap();
+    assert_eq!(mid_response.addresses.len(), 3);
+
+    let cursor = mid_response
+        .addresses
+        .last()
+        .cloned()
+        .map(|item| CopyTradingInfoRaw {
+            leader: item.leader.0.into(),
+            contract: item.contract.0.into(),
+        });
+
+    for _ in 0..=1 {
+        let response = market.exec_factory_add_copy_trading().unwrap();
+        let addr = get_copy_trading_addr(response.events);
+        result.push(addr.value);
+    }
+
+    let res: CopyTradingResp = market
+        .query_factory(&FactoryQueryMsg::CopyTrading {
+            start_after: cursor,
+            limit: None,
+        })
+        .unwrap();
+
+    let response = market.query_factory_copy_contracts().unwrap();
+    assert_eq!(response.addresses.len(), 5);
+
+    assert_eq!(res.addresses.len(), 2);
+}
+
+#[test]
+fn query_factory_copy_trading_order() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    // We start from one because the test framework already has one
+    // copy trading contract
+    let initial_response = market.query_factory_copy_contracts().unwrap();
+
+    assert!(initial_response.addresses.len() == 1);
+    let mut result = vec![];
+    result.push(initial_response.addresses[0].contract.0.to_string());
+    for _ in 0..5 {
+        let response = market.exec_factory_add_copy_trading().unwrap();
+        let addr = get_copy_trading_addr(response.events);
+        result.push(addr.value);
+    }
+
+    let final_response = market.query_factory_copy_contracts().unwrap();
+    let final_response = final_response
+        .addresses
+        .iter()
+        .map(|item| item.contract.0.to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(final_response, result);
 }

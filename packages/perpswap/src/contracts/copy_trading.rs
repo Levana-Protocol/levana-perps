@@ -8,7 +8,7 @@ use super::market::{
     position::PositionId,
 };
 use crate::{
-    number::{Collateral, LpToken, NonZero, Usd},
+    number::{Collateral, LpToken, NonZero},
     price::{PriceBaseInQuote, PricePoint, TakeProfitTrader},
     storage::{DirectionToBase, LeverageToBase, MarketId, RawAddr},
     time::Timestamp,
@@ -196,7 +196,7 @@ pub enum QueryMsg {
     ///
     /// Returns [LeaderStatusResp]
     LeaderStatus {
-        /// Value from [BalanceResp::next_start_after]
+        /// Value from [TokenStatus::token]
         start_after: Option<Token>,
         /// How many values to return
         limit: Option<u32>,
@@ -547,7 +547,7 @@ impl DecQueueItem {
     }
 }
 
-/// Individual market response from [QueryMsg::Status]
+/// Individual response from [QueryMsg::LeaderStatus]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct LeaderStatusResp {
@@ -555,7 +555,7 @@ pub struct LeaderStatusResp {
     pub tokens: Vec<TokenStatus>,
 }
 
-/// Individual market response from [QueryMsg::Status]
+/// Individual response from [QueryMsg::LeaderStatus]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct TokenStatus {
@@ -569,22 +569,6 @@ pub struct TokenStatus {
     pub unclaimed_commission: Collateral,
     /// Claimed commission
     pub claimed_commission: Collateral,
-}
-
-/// Individual market response from [QueryMsg::Status]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct StatusResp {
-    /// Market id
-    pub market_id: MarketId,
-    /// Sum of deposit collateral of all open positions
-    pub tvl_open_positions_usd: Usd,
-    /// Sum of deposit collateral of all closed positions
-    pub tvl_closed_positions_usd: Usd,
-    /// Total profit so far in the closed positions
-    pub profit_in_usd: Usd,
-    /// Total loss so far in the closed postions
-    pub loss_in_usd: Usd,
 }
 
 /// Individual market response from [QueryMsg::Balance]
