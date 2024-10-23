@@ -90,10 +90,7 @@ impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
         let wallet = app.get_pool_wallet().await;
         let response = do_all_copy_trading_work(&contract, &wallet).await?;
         match response.error {
-            Some(error) => {
-                let message = format!("{error}");
-                Ok(WatchedTaskOutput::new(message).set_error())
-            }
+            Some(error) => Ok(WatchedTaskOutput::new(error.to_string()).set_error()),
             None => Ok(WatchedTaskOutput::new(
                 "Successfully finished executing all works",
             )),
@@ -127,9 +124,8 @@ async fn do_all_copy_trading_work(
         let work: WorkResp = contract.query(&query_msg).await?;
         if work.has_work() {
             let response = contract.execute(wallet, vec![], &execute_msg).await;
-            match response {
-                Ok(_) => continue,
-                Err(error) => return Ok(ContractResponse { error: Some(error) }),
+            if let Err(error) = response {
+                return Ok(ContractResponse { error: Some(error) });
             }
         } else {
             return Ok(ContractResponse { error: None });
