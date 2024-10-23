@@ -27,7 +27,7 @@ use crate::state::{
 
 use super::state::*;
 use anyhow::Result;
-use copy_trading::COPY_TRADING_CODE_ID;
+use copy_trading::{store_new_copy_trading_contract, COPY_TRADING_CODE_ID};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -369,11 +369,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                             .leader,
                     );
                     let contract = CopyTradingAddr(addr.clone());
-                    crate::state::copy_trading::COPY_TRADING_ADDRS.save(
-                        ctx.storage,
-                        (leader.clone(), contract),
-                        &(),
-                    )?;
+                    store_new_copy_trading_contract(ctx.storage, leader.clone(), contract)?;
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CopyTrading)?;
                     ctx.response.add_event(
                         Event::new("instantiate-copy-trading")
@@ -494,19 +490,27 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 Some(start_after) => {
                     let leader = start_after.leader.validate(state.api)?;
                     let contract = start_after.contract.validate(state.api)?;
-                    Some((LeaderAddr(leader), CopyTradingAddr(contract)))
+                    let (leader, contract) = (LeaderAddr(leader), CopyTradingAddr(contract));
+                    let copy_trading_id =
+                        copy_trading::COPY_TRADING_ADDRS.may_load(store, (leader, contract))?;
+                    match copy_trading_id {
+                        Some(copy_trading_id) => Some(copy_trading_id),
+                        None => {
+                            bail!("Invalid combination of leader and contract passed")
+                        }
+                    }
                 }
                 None => None,
             };
-            let result = copy_trading::COPY_TRADING_ADDRS
-                .keys(
+            let result = copy_trading::COPY_TRADING_ADDRS_REVERSE
+                .range(
                     store,
-                    start_after.map(Bound::exclusive),
+                    start_after.as_ref().map(Bound::exclusive),
                     None,
                     cosmwasm_std::Order::Ascending,
                 )
                 .take(limit.try_into()?)
-                .map(|res| res.map(|(leader, contract)| CopyTradingInfo { leader, contract }))
+                .map(|res| res.map(|(_, (leader, contract))| CopyTradingInfo { leader, contract }))
                 .collect::<Result<Vec<_>, _>>()?;
             let result = CopyTradingResp { addresses: result };
             let result = to_json_binary(&result)?;
