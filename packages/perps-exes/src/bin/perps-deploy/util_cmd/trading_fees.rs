@@ -4,9 +4,11 @@ use std::path::PathBuf;
 
 use crate::cli::Opt;
 use crate::util_cmd::{open_position_csv, OpenPositionCsvOpt, PositionRecord};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use cosmos::Address;
+use perps_exes::config::MainnetFactories;
+use perps_exes::PerpsNetwork;
 use perpswap::storage::{UnsignedDecimal, Usd};
 use reqwest::Url;
 
@@ -28,9 +30,6 @@ pub(super) struct TradingFeesOpt {
     /// Factory identifier
     #[clap(long, default_value = "osmomainnet1", env = "LEVANA_FEES_FACTORY")]
     factory: String,
-    /// Provide optional gRPC fallbacks URLs for factory
-    #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
-    cosmos_grpc_fallbacks: Vec<Url>,
 }
 
 impl TradingFeesOpt {
@@ -45,12 +44,21 @@ async fn go(
         workers,
         retries,
         factory,
-        cosmos_grpc_fallbacks,
     }: TradingFeesOpt,
     opt: Opt,
 ) -> Result<()> {
+    let mainnet_factories = MainnetFactories::load()?;
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
+    let cosmos_network = {
+        let factory = mainnet_factories.get(&factory)?;
+        if let PerpsNetwork::Regular(cosmos_network) = factory.network {
+            cosmos_network
+        } else {
+            bail!("Unsupported network: {}", factory.network);
+        }
+    };
+    let builder = cosmos_network.builder_with_config().await?;
 
     if let Some(parent) = csv_filename.parent() {
         fs_err::create_dir_all(parent)?;
@@ -63,8 +71,12 @@ async fn go(
             factory: factory.clone(),
             csv: csv_filename.clone(),
             workers,
-            factory_primary_grpc: opt.cosmos_grpc.clone(),
-            factory_fallbacks_grpc: cosmos_grpc_fallbacks.clone(),
+            factory_primary_grpc: Some(Url::parse(builder.grpc_url())?),
+            factory_fallbacks_grpc: builder
+                .grpc_fallback_urls()
+                .iter()
+                .map(|url| Ok(Url::parse(url.as_ref())?))
+                .collect::<anyhow::Result<Vec<_>>>()?,
         },
     )
     .await
