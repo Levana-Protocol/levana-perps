@@ -10,8 +10,8 @@ pub(crate) const COPY_TRADING_CODE_ID: Item<u64> = Item::new(namespace::COPY_TRA
 pub(crate) const COPY_TRADING_ADDRS: Map<(LeaderAddr, CopyTradingAddr), CopyTradingId> =
     Map::new(namespace::COPY_TRADING_ADDRS);
 
-pub(crate) const COPY_TRADING_ADDRS_REVERSE: Map<&CopyTradingId, (LeaderAddr, CopyTradingAddr)> =
-    Map::new(namespace::COPY_TRADING_ADDRS);
+pub(crate) const COPY_TRADING_ADDRS_REVERSE: Map<CopyTradingId, (LeaderAddr, CopyTradingAddr)> =
+    Map::new(namespace::COPY_TRADING_ADDRS_REVERSE);
 
 /// Total copy trading contracts inserted so far
 pub(crate) const COPY_TRADING_TOTAL_CONTRACTS: Item<u64> =
@@ -88,7 +88,7 @@ pub(crate) fn store_new_copy_trading_contract(
         None => CopyTradingId::new(0),
     };
     COPY_TRADING_ADDRS.save(storage, (leader.clone(), contract.clone()), &contract_index)?;
-    COPY_TRADING_ADDRS_REVERSE.save(storage, &contract_index, &(leader, contract))?;
+    COPY_TRADING_ADDRS_REVERSE.save(storage, contract_index, &(leader, contract))?;
     let new_total = contract_index.next();
     COPY_TRADING_TOTAL_CONTRACTS.save(storage, &new_total.u64())?;
     Ok(())

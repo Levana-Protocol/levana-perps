@@ -505,7 +505,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let result = copy_trading::COPY_TRADING_ADDRS_REVERSE
                 .range(
                     store,
-                    start_after.as_ref().map(Bound::exclusive),
+                    start_after.map(Bound::exclusive),
                     None,
                     cosmwasm_std::Order::Ascending,
                 )
