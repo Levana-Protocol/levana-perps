@@ -1,16 +1,18 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
-use perpswap::contracts::{
-    copy_trading::{
-        ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
+use cosmwasm_std::Binary;
+use perpswap::{
+    contracts::{
+        copy_trading::{
+            ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
+        },
+        factory::entry::{CopyTradingInfoRaw, CopyTradingResp, QueryMsg as FactoryQueryMsg},
     },
-    factory::entry::{CopyTradingInfoRaw, CopyTradingResp, QueryMsg as FactoryQueryMsg},
+    namespace::COPY_TRADING_LAST_ADDED,
+    time::Timestamp,
 };
 
 use crate::watcher::{
@@ -30,6 +32,15 @@ impl AppBuilder {
         let watcher = ParallelCopyTradingWatcher::new(CopyTradeBot);
         self.watch_periodic(crate::watcher::TaskLabel::CopyTradeBot, watcher)
     }
+}
+
+pub(crate) async fn query_copy_trading_last_updated(
+    factory: &Contract,
+) -> Result<Option<Timestamp>> {
+    let key = COPY_TRADING_LAST_ADDED.as_bytes().to_vec();
+    let result = factory.query_raw(Binary::new(key)).await?;
+    let time: Option<Timestamp> = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    Ok(time)
 }
 
 pub(crate) async fn get_copy_trading_addresses(
@@ -54,10 +65,15 @@ pub(crate) async fn get_copy_trading_addresses(
             result.push(contract);
         }
     }
+    let last_updated = if result.is_empty() {
+        None
+    } else {
+        query_copy_trading_last_updated(factory).await?
+    };
     let result = CopyTrading {
         addresses: result,
         start_after,
-        last_checked: Instant::now(),
+        last_updated,
     };
     Ok(result)
 }
@@ -70,18 +86,26 @@ impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
         factory: &FactoryInfo,
         address: &Address,
     ) -> Result<WatchedTaskOutput> {
-        let one_hour = 60 * 60;
-        if factory.copy_trading.last_checked.elapsed() > Duration::from_secs(one_hour) {
-            let mut copy_trading = factory.copy_trading.clone();
-            let factory_contract = app.cosmos.make_contract(factory.factory);
-            let remaining_copy_trading =
-                get_copy_trading_addresses(&factory_contract, copy_trading.start_after.clone())
-                    .await?;
-            if !remaining_copy_trading.is_empty() {
-                copy_trading.merge(remaining_copy_trading);
-                let mut new_factory: FactoryInfo = factory.clone();
-                new_factory.copy_trading = copy_trading;
-                app.set_factory_info(new_factory).await;
+        let factory_contract = app.cosmos.make_contract(factory.factory);
+        let last_updated = query_copy_trading_last_updated(&factory_contract).await?;
+        if let Some(last_updated) = last_updated {
+            let old_last_updated = factory.copy_trading.last_updated;
+            let should_refetch = match old_last_updated {
+                Some(old_last_updated) => old_last_updated < last_updated,
+                None => true,
+            };
+            if should_refetch {
+                tracing::info!("New copy trading contracts added at {last_updated}");
+                let mut copy_trading = factory.copy_trading.clone();
+                let remaining_copy_trading =
+                    get_copy_trading_addresses(&factory_contract, copy_trading.start_after.clone())
+                        .await?;
+                if !remaining_copy_trading.is_empty() {
+                    copy_trading.merge(remaining_copy_trading);
+                    let mut new_factory: FactoryInfo = factory.clone();
+                    new_factory.copy_trading = copy_trading;
+                    app.set_factory_info(new_factory).await;
+                }
             }
         }
 

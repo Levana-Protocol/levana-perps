@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Instant;
 
 use axum::async_trait;
 use chrono::{DateTime, Utc};
@@ -39,7 +38,7 @@ pub(crate) struct CopyTrading {
     pub(crate) addresses: Vec<Address>,
     pub(crate) start_after: Option<CopyTradingInfoRaw>,
     #[serde(skip)]
-    pub(crate) last_checked: Instant,
+    pub(crate) last_updated: Option<Timestamp>,
 }
 
 impl CopyTrading {
@@ -50,7 +49,7 @@ impl CopyTrading {
     pub(crate) fn merge(&mut self, mut new: CopyTrading) {
         self.addresses.append(&mut new.addresses);
         self.start_after = new.start_after;
-        self.last_checked = new.last_checked;
+        self.last_updated = new.last_updated;
     }
 }
 
