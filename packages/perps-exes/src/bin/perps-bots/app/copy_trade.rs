@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
 use cosmwasm_std::Binary;
@@ -20,7 +20,7 @@ use crate::watcher::{
 };
 
 use super::{
-    factory::{CopyTrading, FactoryInfo},
+    factory::CopyTrading,
     App, AppBuilder,
 };
 

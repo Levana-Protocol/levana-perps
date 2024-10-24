@@ -20,7 +20,7 @@ use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
-use super::copy_trade::get_copy_trading_addresses;
+use super::copy_trade::{get_copy_trading_addresses, query_copy_trading_last_updated};
 use super::{App, AppBuilder};
 
 #[derive(Clone)]
@@ -41,10 +41,9 @@ pub(crate) struct CopyTrading {
 }
 
 impl CopyTrading {
-    pub(crate) fn merge(&mut self, mut new: CopyTrading) {
-        self.addresses.append(&mut new.addresses);
-        self.start_after = new.start_after;
-        self.last_updated = new.last_updated;
+    pub(crate) fn merge(&self, mut new: CopyTrading) -> CopyTrading {
+        new.addresses.extend(self.addresses.clone());
+        new
     }
 }
 
@@ -118,8 +117,32 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
         }
     };
     let output = WatchedTaskOutput::new(message);
+    let factory = info.factory.clone();
     app.set_factory_info(info).await;
+    optimized_copy_trading_update(&app.cosmos, app, factory).await?;
     Ok(output)
+}
+
+async fn optimized_copy_trading_update(cosmos: &Cosmos, app: &App, factory: Address) -> Result<()> {
+    let factory_contract = cosmos.make_contract(factory);
+    let copy_trading = app.get_copy_trading().await;
+    if let Some(ref copy_trading) = copy_trading {
+        let last_updated = query_copy_trading_last_updated(&factory_contract).await?;
+        if copy_trading.last_updated == last_updated {
+            // No new contracts have been added
+            return Ok(());
+        }
+    }
+    let start_after = copy_trading.clone().map(|item| item.start_after.clone());
+    let remaining_copy_trading = get_copy_trading_addresses(&factory_contract, start_after).await?;
+    if let Some(remaining_copy_trading) = remaining_copy_trading {
+        let final_copy_trading = match copy_trading {
+            Some(copy_trading) => copy_trading.merge(remaining_copy_trading),
+            None => remaining_copy_trading,
+        };
+        app.set_copy_trading(final_copy_trading).await;
+    }
+    Ok(())
 }
 
 pub(crate) async fn get_factory_info_mainnet(
@@ -130,8 +153,6 @@ pub(crate) async fn get_factory_info_mainnet(
     let message = format!("Using hard-coded factory address {factory}");
 
     let markets = get_markets(cosmos, &cosmos.make_contract(factory), ignored_markets).await?;
-    let factory_contract = cosmos.make_contract(factory);
-    let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
 
     let factory_info = FactoryInfo {
         factory,
@@ -178,8 +199,6 @@ pub(crate) async fn get_factory_info_testnet(
     };
 
     let rpc = get_rpc_info(cosmos, client, referer, rpc_nodes).await?;
-    let factory_contract = cosmos.make_contract(factory);
-    let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
 
     let factory_info = FactoryInfo {
         factory,
