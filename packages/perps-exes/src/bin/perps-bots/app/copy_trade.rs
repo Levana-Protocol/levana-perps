@@ -19,10 +19,7 @@ use crate::watcher::{
     ParallelCopyTradingWatcher, WatchedTaskOutput, WatchedTaskPerCopyTradingParallel,
 };
 
-use super::{
-    factory::CopyTrading,
-    App, AppBuilder,
-};
+use super::{factory::CopyTrading, App, AppBuilder};
 
 #[derive(Clone)]
 pub(crate) struct CopyTradeBot;
