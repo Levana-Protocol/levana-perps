@@ -79,8 +79,6 @@ pub(crate) struct BotConfig {
     pub(crate) crank_tasks: usize,
     /// Countertrade Config
     pub(crate) countertrade: Option<CounterTradeBotConfig>,
-    /// Run copy trading bot
-    pub(crate) run_copy_trade: bool,
     /// Wallet used for very high gas situations, derived from price wallet seed
     pub(crate) high_gas_wallet: Option<Arc<Wallet>>,
     pub(crate) watcher: WatcherConfig,
@@ -250,7 +248,6 @@ impl Opt {
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
             countertrade,
-            run_copy_trade: self.enable_copy_trade,
         };
 
         Ok(FullBotConfig {
@@ -358,7 +355,6 @@ impl Opt {
             countertrade: self
                 .countertrade
                 .map(|contract| CounterTradeBotConfig { contract }),
-            run_copy_trade: self.enable_copy_trade,
         };
         Ok(FullBotConfig {
             config,
