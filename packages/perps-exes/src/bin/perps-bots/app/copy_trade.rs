@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
 use cosmwasm_std::Binary;
@@ -34,19 +34,19 @@ impl AppBuilder {
     }
 }
 
-pub(crate) async fn query_copy_trading_last_updated(
-    factory: &Contract,
-) -> Result<Option<Timestamp>> {
+// This function should only be called when we know for a fact that
+// there is atleast one copy trading contract in the factory.
+pub(crate) async fn query_copy_trading_last_updated(factory: &Contract) -> Result<Timestamp> {
     let key = COPY_TRADING_LAST_ADDED.as_bytes().to_vec();
     let result = factory.query_raw(Binary::new(key)).await?;
-    let time: Option<Timestamp> = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    let time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
     Ok(time)
 }
 
 pub(crate) async fn get_copy_trading_addresses(
     factory: &Contract,
     start_after: Option<CopyTradingInfoRaw>,
-) -> Result<CopyTrading> {
+) -> Result<Option<CopyTrading>> {
     let mut result = vec![];
     let mut start_after = start_after;
     loop {
@@ -65,17 +65,18 @@ pub(crate) async fn get_copy_trading_addresses(
             result.push(contract);
         }
     }
-    let last_updated = if result.is_empty() {
-        None
-    } else {
-        query_copy_trading_last_updated(factory).await?
-    };
-    let result = CopyTrading {
-        addresses: result,
-        start_after,
-        last_updated,
-    };
-    Ok(result)
+    match start_after {
+        Some(start_after) => {
+            let last_updated = query_copy_trading_last_updated(factory).await?;
+            let result = CopyTrading {
+                addresses: result,
+                start_after,
+                last_updated,
+            };
+            Ok(Some(result))
+        }
+        None => Ok(None),
+    }
 }
 
 #[async_trait]
@@ -83,32 +84,8 @@ impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
     async fn run_single_copy_trading(
         self: Arc<Self>,
         app: &App,
-        factory: &FactoryInfo,
         address: &Address,
     ) -> Result<WatchedTaskOutput> {
-        let factory_contract = app.cosmos.make_contract(factory.factory);
-        let last_updated = query_copy_trading_last_updated(&factory_contract).await?;
-        if let Some(last_updated) = last_updated {
-            let old_last_updated = factory.copy_trading.last_updated;
-            let should_refetch = match old_last_updated {
-                Some(old_last_updated) => old_last_updated < last_updated,
-                None => true,
-            };
-            if should_refetch {
-                tracing::info!("New copy trading contracts added at {last_updated}");
-                let mut copy_trading = factory.copy_trading.clone();
-                let remaining_copy_trading =
-                    get_copy_trading_addresses(&factory_contract, copy_trading.start_after.clone())
-                        .await?;
-                if !remaining_copy_trading.is_empty() {
-                    copy_trading.merge(remaining_copy_trading);
-                    let mut new_factory: FactoryInfo = factory.clone();
-                    new_factory.copy_trading = copy_trading;
-                    app.set_factory_info(new_factory).await;
-                }
-            }
-        }
-
         let copy_trading = address.to_string().parse()?;
         let contract = app.cosmos.make_contract(copy_trading);
         let wallet = app.get_pool_wallet().await;

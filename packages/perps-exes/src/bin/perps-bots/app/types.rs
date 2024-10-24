@@ -27,7 +27,8 @@ use crate::util::oracle::PythPriceStats;
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::Watcher;
 
-use super::factory::{FactoryInfo, FrontendInfoTestnet};
+use super::copy_trade::get_copy_trading_addresses;
+use super::factory::{CopyTrading, FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 use super::price::pyth_market_hours::PythMarketHours;
 
@@ -147,6 +148,7 @@ pub(crate) struct App {
     pub(crate) epoch_last_seen: Mutex<Option<Instant>>,
     pub(crate) wallet_pool: WalletPool,
     pub(crate) pyth_stats: PythPriceStats,
+    pub(crate) copy_trading: RwLock<Option<Arc<CopyTrading>>>,
 }
 
 /// Helper data structure for building up an application.
@@ -268,6 +270,10 @@ impl Opt {
                 .with_max_gas_price(inner.higher_very_high_max_gas_price),
         };
 
+        let factory_contract = cosmos.make_contract(factory.factory);
+        let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
+        let copy_trading = RwLock::new(copy_trading.map(Arc::new));
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
@@ -287,6 +293,7 @@ impl Opt {
             epoch_last_seen: Mutex::new(None),
             wallet_pool,
             pyth_stats: PythPriceStats::default(),
+            copy_trading,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
@@ -351,6 +358,14 @@ impl App {
 
     pub(crate) async fn set_factory_info(&self, info: FactoryInfo) {
         *self.factory.write().await = Arc::new(info);
+    }
+
+    pub(crate) async fn get_copy_trading(&self) -> Option<Arc<CopyTrading>> {
+        self.copy_trading.read().await.clone()
+    }
+
+    pub(crate) async fn set_copy_trading(&self, copy_trading: CopyTrading) {
+        *self.copy_trading.write().await = Some(Arc::new(copy_trading));
     }
 
     pub(crate) async fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {

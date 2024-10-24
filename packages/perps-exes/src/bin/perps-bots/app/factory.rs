@@ -29,23 +29,18 @@ pub(crate) struct FactoryInfo {
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
     pub(crate) markets: Vec<Market>,
-    pub(crate) copy_trading: CopyTrading,
 }
 
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CopyTrading {
     pub(crate) addresses: Vec<Address>,
-    pub(crate) start_after: Option<CopyTradingInfoRaw>,
+    pub(crate) start_after: CopyTradingInfoRaw,
     #[serde(skip)]
-    pub(crate) last_updated: Option<Timestamp>,
+    pub(crate) last_updated: Timestamp,
 }
 
 impl CopyTrading {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.addresses.is_empty()
-    }
-
     pub(crate) fn merge(&mut self, mut new: CopyTrading) {
         self.addresses.append(&mut new.addresses);
         self.start_after = new.start_after;
@@ -143,7 +138,6 @@ pub(crate) async fn get_factory_info_mainnet(
         updated: Utc::now(),
         is_static: false,
         markets,
-        copy_trading,
     };
     Ok((message, factory_info))
 }
@@ -192,7 +186,6 @@ pub(crate) async fn get_factory_info_testnet(
         updated: Utc::now(),
         is_static: false,
         markets,
-        copy_trading,
     };
     let frontend_info_testnet = FrontendInfoTestnet {
         faucet,
