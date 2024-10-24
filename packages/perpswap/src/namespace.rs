@@ -165,3 +165,4 @@ pub const COPY_TRADING_CODE_ID: &str = "ff";
 pub const COPY_TRADING_ADDRS: &str = "fg";
 pub const COPY_TRADING_TOTAL_CONTRACTS: &str = "fh";
 pub const COPY_TRADING_ADDRS_REVERSE: &str = "fi";
+pub const COPY_TRADING_LAST_ADDED: &str = "fj";

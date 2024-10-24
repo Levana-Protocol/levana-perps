@@ -7,7 +7,7 @@ use perpswap::{
         factory::entry::{CopyTradingInfoRaw, CopyTradingResp},
         market::entry::{InitialPrice, NewCopyTradingParams, NewMarketParams},
     },
-    namespace::FACTORY_MARKET_LAST_ADDED,
+    namespace::{COPY_TRADING_LAST_ADDED, FACTORY_MARKET_LAST_ADDED},
     prelude::FactoryExecuteMsg,
     storage::{FactoryQueryMsg, MarketId},
     time::Timestamp,
@@ -60,6 +60,15 @@ fn factory_has_copy_trading_contract() {
     let resp = market.query_factory_copy_contracts().unwrap();
     assert!(resp.addresses.len() == 1);
     assert_eq!(market.copy_trading_addr, resp.addresses[0].contract.0);
+
+    let now = market.now();
+    let key = COPY_TRADING_LAST_ADDED.as_bytes().to_vec();
+    let result = market
+        .query_factory_raw(Binary::new(key.clone()))
+        .unwrap()
+        .unwrap();
+    let old_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    assert!(now > old_time);
 }
 
 #[test]
@@ -280,4 +289,33 @@ fn query_factory_copy_trading_order() {
         .collect::<Vec<_>>();
 
     assert_eq!(final_response, result);
+}
+
+#[test]
+fn copy_trading_timestamp_updated() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let resp = market.query_factory_copy_contracts().unwrap();
+    assert!(resp.addresses.len() == 1);
+    assert_eq!(market.copy_trading_addr, resp.addresses[0].contract.0);
+
+    let now = market.now();
+    let key = COPY_TRADING_LAST_ADDED.as_bytes().to_vec();
+    let result = market
+        .query_factory_raw(Binary::new(key.clone()))
+        .unwrap()
+        .unwrap();
+    let old_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    assert!(now > old_time);
+
+    market.set_time(TimeJump::Blocks(1)).unwrap();
+    market.exec_factory_add_copy_trading().unwrap();
+
+    let result = market
+        .query_factory_raw(Binary::new(key.clone()))
+        .unwrap()
+        .unwrap();
+    let last_updated_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    assert_ne!(old_time, last_updated_time);
+    assert!(last_updated_time > old_time);
 }
