@@ -148,7 +148,7 @@ pub(crate) struct App {
     pub(crate) epoch_last_seen: Mutex<Option<Instant>>,
     pub(crate) wallet_pool: WalletPool,
     pub(crate) pyth_stats: PythPriceStats,
-    pub(crate) copy_trading: RwLock<Option<Arc<CopyTrading>>>,
+    pub(crate) copy_trading: RwLock<Option<CopyTrading>>,
 }
 
 /// Helper data structure for building up an application.
@@ -272,7 +272,7 @@ impl Opt {
 
         let factory_contract = cosmos.make_contract(factory.factory);
         let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
-        let copy_trading = RwLock::new(copy_trading.map(Arc::new));
+        let copy_trading = RwLock::new(copy_trading);
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -360,12 +360,12 @@ impl App {
         *self.factory.write().await = Arc::new(info);
     }
 
-    pub(crate) async fn get_copy_trading(&self) -> Option<Arc<CopyTrading>> {
+    pub(crate) async fn get_copy_trading(&self) -> Option<CopyTrading> {
         self.copy_trading.read().await.clone()
     }
 
     pub(crate) async fn set_copy_trading(&self, copy_trading: CopyTrading) {
-        *self.copy_trading.write().await = Some(Arc::new(copy_trading));
+        *self.copy_trading.write().await = Some(copy_trading);
     }
 
     pub(crate) async fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {

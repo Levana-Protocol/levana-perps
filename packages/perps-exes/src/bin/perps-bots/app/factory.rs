@@ -41,9 +41,10 @@ pub(crate) struct CopyTrading {
 }
 
 impl CopyTrading {
-    pub(crate) fn merge(&self, mut new: CopyTrading) -> CopyTrading {
-        new.addresses.extend(self.addresses.clone());
-        new
+    pub(crate) fn merge(&mut self, new: CopyTrading) {
+        self.addresses.extend(new.addresses);
+        self.last_updated = new.last_updated;
+        self.start_after = new.start_after;
     }
 }
 
@@ -137,7 +138,10 @@ async fn optimized_copy_trading_update(cosmos: &Cosmos, app: &App, factory: Addr
     let remaining_copy_trading = get_copy_trading_addresses(&factory_contract, start_after).await?;
     if let Some(remaining_copy_trading) = remaining_copy_trading {
         let final_copy_trading = match copy_trading {
-            Some(copy_trading) => copy_trading.merge(remaining_copy_trading),
+            Some(mut copy_trading) => {
+                copy_trading.merge(remaining_copy_trading);
+                copy_trading
+            }
             None => remaining_copy_trading,
         };
         app.set_copy_trading(final_copy_trading).await;
