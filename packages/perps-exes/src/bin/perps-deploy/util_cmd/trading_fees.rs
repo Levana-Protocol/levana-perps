@@ -30,6 +30,9 @@ pub(super) struct TradingFeesOpt {
     /// Factory identifier
     #[clap(long, default_value = "osmomainnet1", env = "LEVANA_FEES_FACTORY")]
     factory: String,
+    /// Directory containing all trading fees reports
+    #[clap(long, default_value = "app/data", env = "LEVANA_FEES_REPORTS_DIR")]
+    reports_dir: PathBuf,
 }
 
 impl TradingFeesOpt {
@@ -44,6 +47,7 @@ async fn go(
         workers,
         retries,
         factory,
+        reports_dir,
     }: TradingFeesOpt,
     opt: Opt,
 ) -> Result<()> {
@@ -135,7 +139,8 @@ async fn go(
         }
     );
 
-    let output = format!("{}-trading-fees.json", start_date.date_naive());
+    let mut output = reports_dir.clone();
+    output.push(format!("{}-trading-fees.json", start_date.date_naive()));
     let mut output = {
         let file = std::fs::File::create(output)?;
         BufWriter::new(file)
