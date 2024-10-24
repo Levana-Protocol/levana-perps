@@ -118,7 +118,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
         }
     };
     let output = WatchedTaskOutput::new(message);
-    let factory = info.factory.clone();
+    let factory = info.factory;
     app.set_factory_info(info).await;
     optimized_copy_trading_update(&app.cosmos, app, factory).await?;
     Ok(output)
