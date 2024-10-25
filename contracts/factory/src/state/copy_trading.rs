@@ -2,6 +2,7 @@ use cosmwasm_std::{StdResult, Storage, Uint64};
 use cw_storage_plus::{IntKey, Item, Key, KeyDeserialize, Map, PrimaryKey};
 use perpswap::contracts::factory::entry::{CopyTradingAddr, LeaderAddr};
 use perpswap::namespace;
+use perpswap::time::Timestamp;
 
 /// Code ID of the copy trading contract
 pub(crate) const COPY_TRADING_CODE_ID: Item<u64> = Item::new(namespace::COPY_TRADING_CODE_ID);
@@ -10,12 +11,17 @@ pub(crate) const COPY_TRADING_CODE_ID: Item<u64> = Item::new(namespace::COPY_TRA
 pub(crate) const COPY_TRADING_ADDRS: Map<(LeaderAddr, CopyTradingAddr), CopyTradingId> =
     Map::new(namespace::COPY_TRADING_ADDRS);
 
+/// Reverse of the COPY_TRADING_ADDRS store
 pub(crate) const COPY_TRADING_ADDRS_REVERSE: Map<CopyTradingId, (LeaderAddr, CopyTradingAddr)> =
     Map::new(namespace::COPY_TRADING_ADDRS_REVERSE);
 
 /// Total copy trading contracts inserted so far
 pub(crate) const COPY_TRADING_TOTAL_CONTRACTS: Item<u64> =
     Item::new(namespace::COPY_TRADING_TOTAL_CONTRACTS);
+
+/// Timestamp when new copy trading contract was added last
+pub(crate) const COPY_TRADING_LAST_ADDED: Item<Timestamp> =
+    Item::new(namespace::COPY_TRADING_LAST_ADDED);
 
 /// Queue position number
 #[derive(

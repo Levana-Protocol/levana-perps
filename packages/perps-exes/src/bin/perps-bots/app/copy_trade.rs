@@ -1,26 +1,25 @@
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
-use perpswap::contracts::{
-    copy_trading::{
-        ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
+use cosmwasm_std::Binary;
+use perpswap::{
+    contracts::{
+        copy_trading::{
+            ExecuteMsg as CopyTradingExecuteMsg, QueryMsg as CopyTradingQueryMsg, WorkResp,
+        },
+        factory::entry::{CopyTradingInfoRaw, CopyTradingResp, QueryMsg as FactoryQueryMsg},
     },
-    factory::entry::{CopyTradingInfoRaw, CopyTradingResp, QueryMsg as FactoryQueryMsg},
+    namespace::COPY_TRADING_LAST_ADDED,
+    time::Timestamp,
 };
 
 use crate::watcher::{
     ParallelCopyTradingWatcher, WatchedTaskOutput, WatchedTaskPerCopyTradingParallel,
 };
 
-use super::{
-    factory::{CopyTrading, FactoryInfo},
-    App, AppBuilder,
-};
+use super::{factory::CopyTrading, App, AppBuilder};
 
 #[derive(Clone)]
 pub(crate) struct CopyTradeBot;
@@ -32,10 +31,19 @@ impl AppBuilder {
     }
 }
 
+// This function should only be called when we know for a fact that
+// there is atleast one copy trading contract in the factory.
+pub(crate) async fn query_copy_trading_last_updated(factory: &Contract) -> Result<Timestamp> {
+    let key = COPY_TRADING_LAST_ADDED.as_bytes().to_vec();
+    let result = factory.query_raw(Binary::new(key)).await?;
+    let time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    Ok(time)
+}
+
 pub(crate) async fn get_copy_trading_addresses(
     factory: &Contract,
     start_after: Option<CopyTradingInfoRaw>,
-) -> Result<CopyTrading> {
+) -> Result<Option<CopyTrading>> {
     let mut result = vec![];
     let mut start_after = start_after;
     loop {
@@ -54,12 +62,18 @@ pub(crate) async fn get_copy_trading_addresses(
             result.push(contract);
         }
     }
-    let result = CopyTrading {
-        addresses: result,
-        start_after,
-        last_checked: Instant::now(),
-    };
-    Ok(result)
+    match start_after {
+        Some(start_after) => {
+            let last_updated = query_copy_trading_last_updated(factory).await?;
+            let result = CopyTrading {
+                addresses: result,
+                start_after,
+                last_updated,
+            };
+            Ok(Some(result))
+        }
+        None => Ok(None),
+    }
 }
 
 #[async_trait]
@@ -67,24 +81,8 @@ impl WatchedTaskPerCopyTradingParallel for CopyTradeBot {
     async fn run_single_copy_trading(
         self: Arc<Self>,
         app: &App,
-        factory: &FactoryInfo,
         address: &Address,
     ) -> Result<WatchedTaskOutput> {
-        let one_hour = 60 * 60;
-        if factory.copy_trading.last_checked.elapsed() > Duration::from_secs(one_hour) {
-            let mut copy_trading = factory.copy_trading.clone();
-            let factory_contract = app.cosmos.make_contract(factory.factory);
-            let remaining_copy_trading =
-                get_copy_trading_addresses(&factory_contract, copy_trading.start_after.clone())
-                    .await?;
-            if !remaining_copy_trading.is_empty() {
-                copy_trading.merge(remaining_copy_trading);
-                let mut new_factory: FactoryInfo = factory.clone();
-                new_factory.copy_trading = copy_trading;
-                app.set_factory_info(new_factory).await;
-            }
-        }
-
         let copy_trading = address.to_string().parse()?;
         let contract = app.cosmos.make_contract(copy_trading);
         let wallet = app.get_pool_wallet().await;

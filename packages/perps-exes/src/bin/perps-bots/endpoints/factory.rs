@@ -42,7 +42,6 @@ impl<'a> From<&'a FactoryInfo> for FactoryInfoJson<'a> {
             updated,
             is_static,
             markets,
-            copy_trading: _,
         }: &'a FactoryInfo,
     ) -> Self {
         FactoryInfoJson {

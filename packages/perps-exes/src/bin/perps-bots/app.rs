@@ -46,14 +46,11 @@ impl AppBuilder {
         self.start_factory_task()?;
         self.track_stale()?;
         self.track_block_lag()?;
+        self.start_copytrading_bot()?;
 
         if self.app.config.run_optional_services {
             self.track_stats()?;
             self.track_balance()?;
-        }
-
-        if self.app.config.run_copy_trade {
-            self.start_copytrading_bot()?;
         }
 
         // These services are tied together closely, see docs on the

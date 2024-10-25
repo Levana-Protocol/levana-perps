@@ -866,7 +866,6 @@ pub(crate) trait WatchedTaskPerCopyTradingParallel: Send + Sync + 'static {
     async fn run_single_copy_trading(
         self: Arc<Self>,
         app: &App,
-        factory_info: &FactoryInfo,
         address: &Address,
     ) -> Result<WatchedTaskOutput>;
 }
@@ -890,21 +889,24 @@ impl<T> ParallelCopyTradingWatcher<T> {
 #[async_trait]
 impl<T: WatchedTaskPerCopyTradingParallel> WatchedTask for ParallelCopyTradingWatcher<T> {
     async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
-        let factory = app.get_factory_info().await;
+        let copy_trading = app.get_copy_trading().await;
         let mut successes = vec![];
         let mut errors = vec![];
         let mut total_skip_delay = false;
 
         let mut set = JoinSet::new();
-        for copy_trading in factory.copy_trading.addresses.clone() {
-            let factory = factory.clone();
+
+        let addresses = match &copy_trading {
+            Some(copy_trading) => copy_trading.addresses.clone(),
+            None => return Ok(WatchedTaskOutput::new("No copy trading contracts present")),
+        };
+
+        for copy_trading in addresses {
             let inner = self.0.clone();
             let app = app.clone();
             set.spawn(async move {
                 let market_start_time = Utc::now();
-                let res = inner
-                    .run_single_copy_trading(&app, &factory, &copy_trading)
-                    .await;
+                let res = inner.run_single_copy_trading(&app, &copy_trading).await;
                 let time_used = Utc::now() - market_start_time;
                 tracing::debug!(
                     "Time used for single copy trading {}: {time_used}.",

@@ -371,6 +371,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     let contract = CopyTradingAddr(addr.clone());
                     store_new_copy_trading_contract(ctx.storage, leader.clone(), contract)?;
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CopyTrading)?;
+                    copy_trading::COPY_TRADING_LAST_ADDED
+                        .save(ctx.storage, &Timestamp::from(state.env.block.time))?;
                     ctx.response.add_event(
                         Event::new("instantiate-copy-trading")
                             .add_attribute("leader", leader.0.to_string())
