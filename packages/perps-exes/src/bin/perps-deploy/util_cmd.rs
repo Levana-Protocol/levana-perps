@@ -5,6 +5,7 @@ mod list_contracts;
 mod lp_history;
 mod token_balances;
 mod top_traders;
+mod trading_fees;
 mod trading_incentives;
 mod tvl_report;
 
@@ -98,6 +99,11 @@ enum Sub {
         #[clap(flatten)]
         inner: top_traders::TopTradersOpt,
     },
+    /// Publish the number of active traders in 24 hours
+    TradingFees {
+        #[clap(flatten)]
+        inner: trading_fees::TradingFeesOpt,
+    },
     /// Export a CSV with trading and rekt incentives
     TradingIncentivesCsv {
         #[clap(flatten)]
@@ -128,6 +134,7 @@ impl UtilOpt {
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
             Sub::TopTraders { inner } => inner.go(opt).await,
+            Sub::TradingFees { inner } => inner.go(opt).await,
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
             Sub::GovDistribute { inner } => inner.go(opt).await,
             Sub::CounterTrade { inner } => inner.go(opt).await,
