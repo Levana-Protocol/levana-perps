@@ -32,8 +32,8 @@ pub(super) struct SyncConfigOpts {
     #[clap(long)]
     factory: String,
     /// Markets to sync, if empty syncs all
-    #[clap(long)]
-    market: Vec<MarketId>,
+    #[clap(long = "market")]
+    market_ids: Vec<MarketId>,
 }
 impl SyncConfigOpts {
     pub(super) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
@@ -43,7 +43,10 @@ impl SyncConfigOpts {
 
 async fn go(
     opt: crate::cli::Opt,
-    SyncConfigOpts { factory, market }: SyncConfigOpts,
+    SyncConfigOpts {
+        factory,
+        market_ids,
+    }: SyncConfigOpts,
 ) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
@@ -56,10 +59,10 @@ async fn go(
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
     let markets = factory.get_markets().await?;
-    let markets = if market.is_empty() {
+    let markets = if market_ids.is_empty() {
         markets
     } else {
-        let market = market.into_iter().collect::<HashSet<_>>();
+        let market = market_ids.into_iter().collect::<HashSet<_>>();
         markets
             .into_iter()
             .filter(|x| market.contains(&x.market_id))
