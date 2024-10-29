@@ -192,6 +192,22 @@ delta_neutrality_fee_sensitivity = "50000000000"
 delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
+[markets.allBTC_USD]
+initial-borrow-fee-rate = "0.05"
+
+[markets.allBTC_USD.config]
+max_leverage = "50"
+carry_leverage = "7"
+funding_rate_sensitivity = "1"
+funding_rate_max_annualized = "0.45"
+borrow_fee_rate_min_annualized = "0.03"
+borrow_fee_rate_max_annualized = "0.3"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.3"
+delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
+liquidity_cooldown_seconds = 86400
+
 [markets.BTC_USDT]
 initial-borrow-fee-rate = "0.05"
 

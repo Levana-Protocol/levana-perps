@@ -149,6 +149,18 @@ inverted = false
 key = "BTC_USD"
 inverted = false
 
+[[networks.osmosis-mainnet.allBTC_USD.feeds]]
+
+[networks.osmosis-mainnet.allBTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.allBTC_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.allBTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
 [[networks.osmosis-mainnet.CNH_USDC.feeds]]
 
 [networks.osmosis-mainnet.CNH_USDC.feeds.pyth]
@@ -852,6 +864,18 @@ inverted = false
 [[networks.osmosis-testnet.BTC_USD.feeds-usd]]
 
 [networks.osmosis-testnet.BTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.allBTC_USD.feeds]]
+
+[networks.osmosis-testnet.allBTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.allBTC_USD.feeds-usd]]
+
+[networks.osmosis-testnet.allBTC_USD.feeds-usd.pyth]
 key = "BTC_USD"
 inverted = false
 
