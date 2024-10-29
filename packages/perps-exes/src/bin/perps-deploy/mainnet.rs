@@ -467,10 +467,10 @@ struct AddMarketOpts {
     factory: String,
     /// New market ID to add
     #[clap(long, required = true)]
-    market_id: Vec<MarketId>,
+    market: Vec<MarketId>,
 }
 
-async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
+async fn add_market(opt: Opt, AddMarketOpts { factory, market }: AddMarketOpts) -> Result<()> {
     let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
     let factories = MainnetFactories::load()?;
@@ -488,7 +488,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     let factory = Factory::from_contract(factory);
     let owner = factory.query_owner().await?;
 
-    for market_id in market_id {
+    for market_id in market {
         let ConfigUpdateAndBorrowFee {
             config: mut market_config_update,
             initial_borrow_fee_rate,

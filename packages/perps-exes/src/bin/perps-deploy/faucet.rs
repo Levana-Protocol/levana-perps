@@ -74,7 +74,7 @@ impl Faucet {
             "stATOM" => "1000",
             "USDC" => "20000",
             "USDT" => "20000",
-            "BTC" | "wBTC" => "1",
+            "BTC" | "wBTC" | "allBTC" => "1",
             "OSMO" => "2000",
             "stOSMO" => "2000",
             "SEI" => "2000",

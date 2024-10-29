@@ -116,6 +116,10 @@ decimal-places = 6
 denom = "factory/osmo1z0qrq605sjgcqpylfl4aa6s90x738j7m58wyatt0tdzflg2ha26q67k743/wbtc"
 decimal-places = 8
 
+[osmosis-mainnet.assets.allBTC]
+denom = "factory/osmo1z6r6qdknhgsc0zeracktgpcxf43j6sekq07nw8sxduc9lg0qjjlqfu25e3/alloyed/allBTC"
+decimal-places = 8
+
 [osmosis-mainnet.assets.nBTC]
 denom = "ibc/75345531D87BD90BF108BE7240BD721CB2CB0A1F16D4EBA71B09EC3C43E15C8F"
 decimal-places = 14
