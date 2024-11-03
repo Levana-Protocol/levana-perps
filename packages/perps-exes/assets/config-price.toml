@@ -1250,12 +1250,12 @@ inverted = false
 key = "BTC_USD"
 inverted = false
 
-[[networks.osmosis-testnet.ryETH_USD.feeds]]
+# [[networks.osmosis-testnet.ryETH_USD.feeds]]
 
-[networks.osmosis-testnet.ryETH_USD.feeds.simple]
-contract = "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur"
-inverted = false
-age_tolerance = 604800
+# [networks.osmosis-testnet.ryETH_USD.feeds.simple]
+# contract = "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur"
+# inverted = false
+# age_tolerance = 604800
 
 [[networks.osmosis-testnet.ryETH_USD.feeds]]
 
@@ -1263,12 +1263,12 @@ age_tolerance = 604800
 key = "ETH_USD"
 inverted = false
 
-[[networks.osmosis-testnet.ryETH_USD.feeds-usd]]
+# [[networks.osmosis-testnet.ryETH_USD.feeds-usd]]
 
-[networks.osmosis-testnet.ryETH_USD.feeds-usd.simple]
-contract = "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur"
-inverted = false
-age_tolerance = 604800
+# [networks.osmosis-testnet.ryETH_USD.feeds-usd.simple]
+# contract = "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur"
+# inverted = false
+# age_tolerance = 604800
 
 [[networks.osmosis-testnet.ryETH_USD.feeds-usd]]
 
@@ -1372,12 +1372,12 @@ age_tolerance = 31536000
 key = "DYM_USD"
 inverted = false
 
-[[networks.osmosis-testnet.stOSMO_USD.feeds]]
-
-[networks.osmosis-testnet.stOSMO_USD.feeds.stride]
-denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
-inverted = false
-age_tolerance = 31536000
+# [[networks.osmosis-testnet.stOSMO_USD.feeds]]
+#
+# [networks.osmosis-testnet.stOSMO_USD.feeds.stride]
+# denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
+# inverted = false
+# age_tolerance = 31536000
 
 [[networks.osmosis-testnet.stOSMO_USD.feeds]]
 
@@ -1385,12 +1385,12 @@ age_tolerance = 31536000
 key = "OSMO_USD"
 inverted = false
 
-[[networks.osmosis-testnet.stOSMO_USD.feeds-usd]]
+# [[networks.osmosis-testnet.stOSMO_USD.feeds-usd]]
 
-[networks.osmosis-testnet.stOSMO_USD.feeds-usd.stride]
-denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
-inverted = false
-age_tolerance = 31536000
+# [networks.osmosis-testnet.stOSMO_USD.feeds-usd.stride]
+# denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
+# inverted = false
+# age_tolerance = 31536000
 
 [[networks.osmosis-testnet.stOSMO_USD.feeds-usd]]
 
