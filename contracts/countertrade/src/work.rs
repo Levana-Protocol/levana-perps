@@ -727,8 +727,7 @@ fn compute_delta_notional(
                 // Make sure we're providing more collateral than the crank fee.
                 // As an arbitrary metric, we make sure we always have at least 5x the crank fee,
                 // otherwise we'll just bleed funds into fees.
-                let crank_fee_collateral = price
-                    .usd_to_collateral(status.config.crank_fee_charged)
+                let crank_fee_collateral = estimate_crank_fee_from_status(status, price)?
                     .checked_mul_dec(Decimal256::from_ratio(5u8, 1u8))?;
                 if crank_fee_collateral >= collateral {
                     return Ok(None);
@@ -1058,6 +1057,10 @@ fn estimate_crank_fee(
             &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
         )
         .with_context(|| format!("Unable to load market status from contract {}", market.addr))?;
+    estimate_crank_fee_from_status(&status, price)
+}
+
+fn estimate_crank_fee_from_status(status: &StatusResp, price: &PricePoint) -> Result<Collateral> {
     let crank_fee_surcharge = status.config.crank_fee_surcharge;
     let crank_fee_charged = status.config.crank_fee_charged;
     let estimated_queue_size = 5u32;
