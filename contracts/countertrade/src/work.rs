@@ -724,6 +724,15 @@ fn compute_delta_notional(
                 }
             }
             Capital::AddCollateral { collateral, pos_id } => {
+                // Make sure we're providing more collateral than the crank fee.
+                // As an arbitrary metric, we make sure we always have at least 5x the crank fee,
+                // otherwise we'll just bleed funds into fees.
+                let crank_fee_collateral = price
+                    .usd_to_collateral(status.config.crank_fee_charged)
+                    .checked_mul_dec(Decimal256::from_ratio(5u8, 1u8))?;
+                if crank_fee_collateral >= collateral {
+                    return Ok(None);
+                }
                 WorkDescription::UpdatePositionAddCollateralImpactSize {
                     pos_id,
                     amount: NonZero::new(collateral).context("add_collateral is zero")?,

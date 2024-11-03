@@ -224,7 +224,7 @@ impl State<'_> {
             | DeferredExecItem::UpdatePositionAddCollateralImpactSize { id, amount, .. } => {
                 // Take the crank fee from the submitted amount
                 debug_assert!(funds_attached.is_err());
-                *amount = amount.checked_sub(new_crank_fee)?;
+                *amount = amount.checked_sub(new_crank_fee).with_context(|| format!("Insufficient added collateral {amount} to cover required crank fee of {new_crank_fee}"))?;
 
                 // Update the position to reflect the crank fee charged
                 let mut pos = get_position(ctx.storage, *id)?;
