@@ -92,7 +92,7 @@ pub fn instantiate(
     ctx.into_response(&state)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[cfg_attr(all(feature = "sudo", not(feature = "library")), entry_point)]
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response> {
     let (mut state, ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
