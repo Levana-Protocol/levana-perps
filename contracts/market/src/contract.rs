@@ -93,6 +93,32 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: DepsMut, env: Env, info: MessageInfo, msg: SudoMsg) -> Result<Response> {
+    let (mut state, ctx) = StateContext::new(deps, env)?;
+    #[cfg(feature = "sanity")]
+    state.sanity_check(ctx.storage);
+
+    state.assert_auth(&info.sender, AuthCheck::Owner)?;
+
+    match msg {
+        SudoMsg::ConfigUpdate { update } => {
+            update_config(&mut state.config, state.api, ctx.storage, *update)?;
+        }
+    }
+
+    #[cfg(feature = "sanity")]
+    crate::state::sanity::sanity_check_post_execute(
+        &state,
+        ctx.storage,
+        &state.env,
+        &state.querier,
+        &ctx.fund_transfers,
+    );
+
+    ctx.into_response(&state)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
