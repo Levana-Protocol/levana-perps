@@ -93,12 +93,10 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn sudo(deps: DepsMut, env: Env, info: MessageInfo, msg: SudoMsg) -> Result<Response> {
+pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response> {
     let (mut state, ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
-
-    state.assert_auth(&info.sender, AuthCheck::Owner)?;
 
     match msg {
         SudoMsg::ConfigUpdate { update } => {
