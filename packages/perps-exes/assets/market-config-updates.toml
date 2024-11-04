@@ -18,7 +18,7 @@ initial-borrow-fee-rate = "0.1"
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
 max_leverage = "4"
-carry_leverage = "5"
+carry_leverage = "2"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.06"
 liquifunding_delay_seconds = 21600
@@ -139,7 +139,7 @@ initial-borrow-fee-rate = "0.2"
 
 [markets.BONK_USDC.config]
 max_leverage = "10"
-carry_leverage = "7"
+carry_leverage = "5"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.1"
 target_utilization = "0.5"
@@ -913,7 +913,7 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.06"
 
 [markets.stDYDX_USD.config]
-carry_leverage = "7"
+carry_leverage = "5"
 max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
