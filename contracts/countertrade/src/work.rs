@@ -817,10 +817,11 @@ fn optimize_capital_efficiency(
                 // We should reduce collateral
                 let estimated_crank_fee = estimate_crank_fee(state, market_info, price)?;
                 let collateral = diff.abs_unsigned();
-                let countertrade_final_deposit_collateral = countertrade_position
-                    .deposit_collateral
+                let countertrade_final_active_collateral = countertrade_position
+                    .active_collateral
+                    .into_signed()
                     .checked_sub(collateral.into_signed())?;
-                let max_deduct = if countertrade_final_deposit_collateral
+                let max_deduct = if countertrade_final_active_collateral
                     >= min_deposit_collateral.into_signed()
                 {
                     collateral
