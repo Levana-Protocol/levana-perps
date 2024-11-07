@@ -106,6 +106,29 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         )
     }
 
+    execute_msg(deps, env, Some(info), msg)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: DepsMut, env: Env, msg: ExecuteMsg) -> Result<Response> {
+    if get_owner(deps.storage).is_some() {
+        perp_bail!(
+            ErrorId::Auth,
+            ErrorDomain::Default,
+            "Sudo entrypoint is only available for the factory which does not have owner",
+        )
+    }
+
+    execute_msg(deps, env, None, msg)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+fn execute_msg(
+    deps: DepsMut,
+    env: Env,
+    info: Option<MessageInfo>,
+    msg: ExecuteMsg,
+) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match msg {
@@ -155,7 +178,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams { name, description },
         } => {
-            let leader = info.sender;
+            let leader = if let Some(info) = info {
+                info.sender
+            } else {
+                anyhow::bail!("Message Info should be provided");
+            };
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COPY_TRADING.save(
                 ctx.storage,
@@ -238,8 +265,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             markets,
             impacts,
             effect,
-        } => shutdown(&mut ctx, &info, markets, impacts, effect)?,
+        } => {
+            if let Some(info) = info {
+                shutdown(&mut ctx, &info, markets, impacts, effect)?
+            } else {
+                anyhow::bail!("Message info should be provided")
+            }
+        }
         ExecuteMsg::RegisterReferrer { addr } => {
+            let info = if let Some(info) = info {
+                info
+            } else {
+                anyhow::bail!("Message info should be provided");
+            };
             let referrer = addr.validate(state.api)?;
             anyhow::ensure!(
                 info.sender != referrer,
