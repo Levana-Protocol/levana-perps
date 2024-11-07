@@ -122,7 +122,6 @@ pub fn sudo(deps: DepsMut, env: Env, msg: ExecuteMsg) -> Result<Response> {
     execute_msg(deps, env, None, msg)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 fn execute_msg(
     deps: DepsMut,
     env: Env,
