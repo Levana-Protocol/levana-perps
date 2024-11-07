@@ -284,7 +284,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct FactoryOwnerResp {
     /// Owner of the factory
-    pub owner: Addr,
+    pub owner: Option<Addr>,
     /// Migration admin of the factory
     pub admin_migration: Addr,
     /// Wallet that receives DAO/protocol fees for all markets

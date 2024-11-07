@@ -13,8 +13,8 @@ const KILL_SWITCH_ADDR: Item<Addr> = Item::new(namespace::KILL_SWITCH_ADDR);
 /// Wind down address
 const WIND_DOWN_ADDR: Item<Addr> = Item::new(namespace::WIND_DOWN_ADDR);
 
-pub(crate) fn get_owner(store: &dyn Storage) -> Result<Addr> {
-    OWNER_ADDR.load(store).map_err(|err| err.into())
+pub(crate) fn get_owner(store: &dyn Storage) -> Option<Addr> {
+    OWNER_ADDR.load(store).ok()
 }
 
 pub(crate) fn get_dao(store: &dyn Storage) -> Result<Addr> {

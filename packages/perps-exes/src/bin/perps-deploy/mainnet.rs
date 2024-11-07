@@ -486,7 +486,12 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market }: AddMarketOpts) 
     let network = factory.network;
     let factory = app.cosmos.make_contract(factory.address);
     let factory = Factory::from_contract(factory);
-    let owner = factory.query_owner().await?;
+    let owner = factory.query_owner().await;
+    let owner = if let Some(owner) = owner {
+        owner
+    } else {
+        anyhow::bail!("The factory owner is not provided");
+    };
 
     for market_id in market {
         let ConfigUpdateAndBorrowFee {
