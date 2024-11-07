@@ -19,7 +19,6 @@ crate-type = ["cdylib", "rlib"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 sanity = []
-sudo = []
 
 
 [dependencies]
