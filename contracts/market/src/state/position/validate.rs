@@ -223,13 +223,3 @@ impl State<'_> {
         }
     }
 }
-
-struct Currently<T>(Option<T>);
-impl<T: Display> Display for Currently<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match &self.0 {
-            Some(x) => write!(f, " (currently {x})"),
-            None => Ok(()),
-        }
-    }
-}

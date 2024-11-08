@@ -9,6 +9,7 @@ const TAPPED_ONCE: Map<(&Addr, &Addr), ()> = Map::new(namespace::TC_TAPPED_ONCE)
 pub(crate) enum AlreadyTappedTradingCompetition {
     NotTradingCompetition,
     AlreadyTapped(Addr),
+    #[allow(dead_code)]
     DidNotTap(Addr),
 }
 

@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
-use cosmos::{Address, Contract};
+use cosmos::Address;
 use cosmwasm_std::Uint256;
 use parking_lot::RwLock;
 use perps_exes::pyth::fetch_json_with_retry;
@@ -17,12 +17,6 @@ use pyth_sdk_cw::PriceIdentifier;
 use crate::app::App;
 
 use super::markets::Market;
-
-#[derive(Clone)]
-pub struct PythOracle {
-    pub contract: Contract,
-    pub endpoint: String,
-}
 
 #[derive(Clone)]
 pub(crate) struct OffchainPriceData {
