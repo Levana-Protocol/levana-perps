@@ -67,17 +67,11 @@ cargo-full-check:
 build-contracts:
 	./.ci/contracts.sh
 
-build-contracts-sei:
-	env SEI="true" ./.ci/contracts.sh
-
 # Build contracts with Cosmos Docker tooling for arm64
 # only for development purposes, not deploying mainnet contracts
 # as per the docker tool's internal rules, these builds will have the architecture extension in the name
 build-contracts-arm64:
 	env OPTIMIZER_ARM64="true" ./.ci/contracts.sh
-
-build-contracts-sei-arm64:
-	env SEI="true" OPTIMIZER_ARM64="true" ./.ci/contracts.sh
 
 # Build contracts with native tooling
 # only for development purposes, not deploying mainnet contracts
@@ -85,9 +79,6 @@ build-contracts-sei-arm64:
 # deployed with our tooling easily
 build-contracts-native:
 	./.ci/native-contract-build.sh
-
-build-contracts-native-sei:
-	env SEI="true" ./.ci/native-contract-build.sh
 
 # Deploy contracts to LocalOsmosis
 local-deploy:
@@ -112,8 +103,8 @@ contracts-test-wasmd:
 # Cache docker images by saving it under wasm
 cache-docker-images:
 	mkdir -p wasm/images
-	-docker load -i ./wasm/images/workspace_0.15.1.tar
-	-[ -f wasm/images/workspace_0.15.1.tar ] || docker pull cosmwasm/workspace-optimizer:0.15.1 && docker save cosmwasm/workspace-optimizer:0.15.1 > wasm/images/workspace_0.15.1.tar
+	-docker load -i ./wasm/images/workspace_0.16.1.tar
+	-[ -f wasm/images/workspace_0.15.1.tar ] || docker pull cosmwasm/optimizer:0.16.1 && docker save cosmwasm/optimizer:0.16.1 > wasm/images/workspace_0.16.1.tar
 
 # Typescript check for CI which needs deps installed
 typescript-check:
@@ -172,24 +163,10 @@ deploy-osmosis-ci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet instantiate --family osmoci
 
-# Deploy to Sei ci
-deploy-sei-ci:
-	cargo run --bin perps-deploy testnet store-code --network sei-testnet
-	cargo run --bin perps-deploy testnet instantiate --family seici
-
-# Deploy to Sei tesntet
-deploy-sei-testnet:
-	cargo run --bin perps-deploy testnet store-code --network sei-testnet
-
 # Migrate osmoci
 migrate-osmoci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet migrate --family osmoci
-
-# Migrate seici
-migrate-seici:
-	cargo run --bin perps-deploy testnet store-code --network sei-testnet
-	cargo run --bin perps-deploy testnet migrate --family seici
 
 # Build documentations
 build-docs:
@@ -296,7 +273,3 @@ build-perps-deploy-image:
 # Push perps-deploy docker image
 push-perps-deploy-image:
 	docker push ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
-
-quant:
-  nodemon -e rs --exec "env MARKET_COLLATERAL_TYPE=base MARKET_TOKEN_KIND=native cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::denom_bug_perp_4149 --exact --show-output -- --nocapture"
-  # nodemon -e rs --exec "env MARKET_COLLATERAL_TYPE=quote MARKET_TOKEN_KIND=cw20 cargo test --package levana_perpswap_multi_test --test multi_test -- countertrade::smart_search_bug_perp_4098 --exact --show-output -- --nocapture"
