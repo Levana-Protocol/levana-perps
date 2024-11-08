@@ -370,7 +370,6 @@ mod test {
 
     proptest! {
         #[test]
-        #[cfg_attr(not(feature = "proptest"), ignore)]
         fn delta_neutrality_fee_amount(
             cap in 0.0f32..1.0,
             sensitivity in 1.0f32..10.0,

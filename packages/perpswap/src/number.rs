@@ -159,7 +159,7 @@
 mod convert;
 mod ops;
 mod serialize;
-use schemars::schema::{InstanceType, Metadata, SchemaObject};
+use schemars::schema::{InstanceType, SchemaObject};
 use schemars::JsonSchema;
 mod nonzero;
 pub use self::types::*;
@@ -184,10 +184,7 @@ impl<T: UnsignedDecimal> JsonSchema for Signed<T> {
             ..Default::default()
         };
 
-        let mut meta = match obj.metadata {
-            None => Box::<Metadata>::default(),
-            Some(m) => m,
-        };
+        let mut meta = obj.metadata.unwrap_or_default();
 
         // would be nice to re-use the doc comments above...
         meta.description = Some(

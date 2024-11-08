@@ -24,10 +24,7 @@ pub(crate) fn config_init(
 ) -> Result<()> {
     let mut init_config = Config::new(convert_spot_price_init(api, spot_price)?);
 
-    let update = match config {
-        None => ConfigUpdate::default(),
-        Some(update) => update,
-    };
+    let update = config.unwrap_or_default();
 
     update_config(&mut init_config, api, store, update)?;
 
