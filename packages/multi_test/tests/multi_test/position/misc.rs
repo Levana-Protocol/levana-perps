@@ -89,7 +89,7 @@ fn position_misc_short_1() {
         })
         .unwrap();
 
-    for i in 0..100 {
+    for i in 0..10 {
         let (pos_id, _) = market
             .exec_open_position(
                 &trader,

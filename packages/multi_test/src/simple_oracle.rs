@@ -5,7 +5,7 @@
 use anyhow::{bail, Result};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    entry_point, to_json_binary, Deps, DepsMut, Env, Event, MessageInfo, QueryResponse, Response,
+    to_json_binary, Deps, DepsMut, Env, Event, MessageInfo, QueryResponse, Response,
 };
 use cosmwasm_std::{Addr, BlockInfo, Decimal256, Timestamp};
 use cw2::set_contract_version;
@@ -72,7 +72,6 @@ pub struct Price {
     pub volatile: bool,
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
@@ -101,7 +100,6 @@ pub fn instantiate(
     )
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     // all execution messages require the sender to be the owner
     let owner = OWNER.load(deps.storage)?;
@@ -140,7 +138,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     match msg {
         QueryMsg::Owner {} => {

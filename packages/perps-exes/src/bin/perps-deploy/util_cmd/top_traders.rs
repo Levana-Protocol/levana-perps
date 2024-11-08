@@ -1,10 +1,9 @@
-use std::cmp::Ordering;
 use std::path::PathBuf;
 
 use crate::cli::Opt;
 use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt, PositionRecord};
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use cosmos::CosmosNetwork;
 use itertools::Itertools;
 use perps_exes::{config::MainnetFactories, PerpsNetwork};
@@ -186,7 +185,14 @@ async fn active_traders_on_factory(
             csv_filename.display()
         )
     })?;
-    let former_threshold = Utc::now() - Duration::hours(24);
+
+    let start_date = (Utc::now() - chrono::Duration::days(1)).date_naive();
+    let start_date = start_date
+        .and_hms_opt(0, 0, 0)
+        .expect("Error adding hours/minutes/seconds")
+        .and_utc();
+    let end_date = start_date + chrono::Duration::days(1);
+
     let active_trader_count = csv_data
         .values()
         .filter_map(
@@ -196,10 +202,8 @@ async fn active_traders_on_factory(
                  owner,
                  ..
              }| match (opened_at, closed_at) {
-                (opened_at, _) if opened_at.cmp(&former_threshold) == Ordering::Greater => {
-                    Some(owner)
-                }
-                (_, Some(closed_at)) if closed_at.cmp(&former_threshold) == Ordering::Greater => {
+                (opened_at, _) if opened_at >= &start_date && opened_at < &end_date => Some(owner),
+                (_, Some(closed_at)) if closed_at >= &start_date && closed_at < &end_date => {
                     Some(owner)
                 }
                 (_, _) => None,

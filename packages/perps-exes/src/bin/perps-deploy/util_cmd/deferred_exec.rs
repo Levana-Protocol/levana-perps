@@ -181,7 +181,7 @@ async fn go(
     }
 
     while let Some(res) = set.join_next().await {
-        match res.map_or_else(|e| Err(e.into()), |x| x) {
+        match res.unwrap_or_else(|e| Err(e.into())) {
             Ok(()) => (),
             Err(e) => {
                 set.abort_all();

@@ -2,29 +2,29 @@
 //!
 //! Within the perps platform, we have a few different varieties of leverage:
 //!
-//! * Does the leverage value include direction? Directioned leverage uses
-//! negative values to represent shorts and positive to represent longs.
-//! Undirectioned is the absolute leverage amount. We use the term "signed"
-//! represent leverage types that include the direction.
+//! - Does the leverage value include direction? Directioned leverage
+//!   uses negative values to represent shorts and positive to represent longs.
+//!   Undirectioned is the absolute leverage amount. We use the term "signed"
+//!   represent leverage types that include the direction.
 //!
-//! * Notional or base: leverage is given in terms of exposure to the base
-//! asset. Within the protocol, for collateral-is-quote markets, the same
-//! applies, since base and notional are the same asset. However, for
-//! collateral-is-base, we have to convert the leverage in two ways: (1) flip
-//! the direction from long to short or short to long, and (2) apply the
-//! off-by-one factor to account for the exposure the trader experiences by
-//! using the base asset as collateral.
+//! - Notional or base: leverage is given in terms of exposure to the base
+//!   asset. Within the protocol, for collateral-is-quote markets, the same
+//!   applies, since base and notional are the same asset. However, for
+//!   collateral-is-base, we have to convert the leverage in two ways: (1) flip
+//!   the direction from long to short or short to long, and (2) apply the
+//!   off-by-one factor to account for the exposure the trader experiences by
+//!   using the base asset as collateral.
 //!
 //! We end up with three different data types:
 //!
 //! * [LeverageToBase] is the the absolute leverage (without direction) from
-//! the trader point of view in terms of exposure to the base asset.
+//!   the trader point of view in terms of exposure to the base asset.
 //!
 //! * [SignedLeverageToBase] is the trader perspective of leverage, but uses
-//! negative values to represent shorts.
+//!   negative values to represent shorts.
 //!
 //! * [SignedLeverageToNotional] is the protocol's perspective of leverage
-//! including the sign.
+//!   including the sign.
 //!
 //! It's not necessary to provide a `LeverageToNotional`, since within the
 //! protocol we always use signed values. The unsigned version is only for
@@ -134,11 +134,10 @@ impl SignedLeverageToBase {
     /// The formula for converting is `leverage_to_notional = 1 -
     /// leverage_to_base`. The motivation for that is:
     ///
-    /// 1. Going long on notional is equivalent to going short on collateral and
-    /// vice-versa, therefore we have a negative sign.
-    ///
-    /// 2. By holding the collateral asset, the trader already has exposure to
-    /// its price fluctuation, so we need to represent that by adding 1.
+    /// - Going long on notional is equivalent to going short on collateral and
+    ///   vice-versa, therefore we have a negative sign.
+    /// - By holding the collateral asset, the trader already has exposure to
+    ///   its price fluctuation, so we need to represent that by adding 1.
     pub fn into_notional(self, market_type: MarketType) -> Result<SignedLeverageToNotional> {
         Ok(SignedLeverageToNotional(match market_type {
             MarketType::CollateralIsQuote => self.0,
