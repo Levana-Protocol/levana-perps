@@ -409,6 +409,7 @@ pub(crate) struct LocalContractWrapper<
     query_msg: PhantomData<QueryMsg>,
 }
 
+#[allow(type_alias_bounds)]
 type SudoFn<SudoMsg>
 where
     SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
