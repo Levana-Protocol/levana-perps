@@ -20,6 +20,7 @@ use cosmwasm_std::{
     StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg, WasmSudo};
+use namespace::OWNER_ADDR;
 use perpswap::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
 use perpswap::compat::BackwardsCompatTakeProfit;
 use perpswap::contracts::copy_trading::{
@@ -2130,6 +2131,13 @@ impl PerpsMarket {
         self.set_time(TimeJump::Blocks(1))?;
 
         Ok(res)
+    }
+
+    pub fn reset_factory_owner(&mut self) {
+        let contract_addr = self.app().factory_addr.clone();
+        self.app()
+            .contract_storage_mut(&contract_addr)
+            .remove(OWNER_ADDR.as_bytes());
     }
 
     pub fn sudo_factory(&self, msg: &FactoryExecuteMsg) -> Result<AppResponse> {

@@ -55,7 +55,11 @@ fn test_factory_add_market() {
 
 #[test]
 fn test_factory_sudo_add_market() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // This is required to test the todo entrypoint
+    market.reset_factory_owner();
+
     let now = market.now();
     let key = FACTORY_MARKET_LAST_ADDED.as_bytes().to_vec();
     let result = market
