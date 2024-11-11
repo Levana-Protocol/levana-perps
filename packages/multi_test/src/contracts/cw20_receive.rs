@@ -20,8 +20,7 @@ pub struct MockCw20ReceiverContract {
 
 impl MockCw20ReceiverContract {
     pub fn new(app: Rc<RefCell<PerpsApp>>) -> Result<Self> {
-        let contract =
-            Box::new(LocalContractWrapper::new(instantiate, execute, query).with_sudo(sudo));
+        let contract = Box::new(LocalContractWrapper::new(instantiate, execute, query));
 
         let code_id = app.borrow_mut().store_code(contract);
 
@@ -119,10 +118,6 @@ pub struct QueryMsg {}
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     Ok(QueryResponse::default())
-}
-
-pub fn sudo(_deps: DepsMut, _env: Env, _msg: ExecuteMsg) -> Result<Response> {
-    todo!()
 }
 
 #[test]
