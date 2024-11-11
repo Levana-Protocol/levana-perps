@@ -36,7 +36,7 @@ struct Worker {
     recv: CrankReceiver,
 }
 pub(crate) enum RunResult {
-    NormalRun(TxResponse),
+    NormalRun(Box<TxResponse>),
     OutOfGas,
     OsmosisEpoch(anyhow::Error),
     OsmosisCongested(anyhow::Error),
@@ -211,7 +211,7 @@ impl App {
         {
             Ok(txres) => {
                 track_tx_fees(self, crank_wallet.get_address(), &txres).await;
-                Ok(RunResult::NormalRun(txres.response))
+                Ok(RunResult::NormalRun(Box::new(txres.response)))
             }
             Err(e) => {
                 if self.is_osmosis_epoch() {

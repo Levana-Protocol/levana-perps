@@ -327,7 +327,7 @@ impl MarketContract {
                 Some(constant_builder) => {
                     tracing::info!("doesn not work");
                     let response = request
-                        .retry(constant_builder)
+                        .retry(*constant_builder)
                         .notify(|err, dur| {
                             tracing::error!("Retrying after {dur:?}. Received error: {err}")
                         })
@@ -362,7 +362,7 @@ impl MarketContract {
             pending_close: _,
             closed: _,
         } = match constant_builder {
-            Some(retry) => request.retry(retry).await?,
+            Some(retry) => request.retry(*retry).await?,
             None => request().await?,
         };
         assert_eq!(tokens.len(), response.len());
@@ -396,7 +396,7 @@ impl MarketContract {
             } = match retry {
                 Some(retry) => {
                     request
-                        .retry(retry)
+                        .retry(*retry)
                         .notify(|err, dur| {
                             tracing::error!("Retrying after {dur:?}. Received error: {err}")
                         })

@@ -145,8 +145,8 @@ impl CosmosResponseExt for TxResponse {
             // Event is a non-exhaustive struct, so we must create it the "slow" way
             Event::new(raw.r#type).add_attributes(raw.attributes.into_iter().map(|attr| {
                 Attribute {
-                    key: String::from_utf8_lossy(&attr.key).into_owned(),
-                    value: String::from_utf8_lossy(&attr.value).into_owned(),
+                    key: attr.key,
+                    value: attr.value,
                 }
             }))
         }))

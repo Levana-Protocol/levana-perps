@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn main_inner() -> anyhow::Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     let Cmd { opt, subcommand } = Cmd::parse();
     opt.init_logger()?;
 
