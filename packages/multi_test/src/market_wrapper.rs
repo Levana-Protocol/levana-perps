@@ -2133,13 +2133,6 @@ impl PerpsMarket {
         Ok(res)
     }
 
-    pub fn reset_factory_owner(&mut self) {
-        let contract_addr = self.app().factory_addr.clone();
-        self.app()
-            .contract_storage_mut(&contract_addr)
-            .remove(OWNER_ADDR.as_bytes());
-    }
-
     pub fn sudo_factory(&self, msg: &FactoryExecuteMsg) -> Result<AppResponse> {
         let contract_addr = self.app().factory_addr.clone();
         let res = self.app().sudo(SudoMsg::Wasm(WasmSudo {

@@ -82,10 +82,12 @@ fn test_factory_sudo_fail_with_owner() {
 
 #[test]
 fn test_factory_sudo_add_market() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // This is required to test the sudo entrypoint
-    market.reset_factory_owner();
+    market
+        .exec_factory(&FactoryExecuteMsg::RemoveOwner {})
+        .unwrap();
 
     let now = market.now();
     let key = FACTORY_MARKET_LAST_ADDED.as_bytes().to_vec();

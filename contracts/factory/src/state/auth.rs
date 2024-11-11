@@ -58,3 +58,7 @@ pub(crate) fn set_wind_down(store: &mut dyn Storage, wind_down: &Addr) -> Result
         .save(store, wind_down)
         .map_err(|err| err.into())
 }
+
+pub(crate) fn remove_owner(store: &mut dyn Storage) {
+    OWNER_ADDR.remove(store)
+}

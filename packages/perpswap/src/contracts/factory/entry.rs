@@ -119,6 +119,8 @@ pub enum ExecuteMsg {
         /// Code ID to use for future copy trading contracts
         code_id: String,
     },
+    /// Remove the owner from factory
+    RemoveOwner {},
 }
 
 /// Response from [QueryMsg::Markets]
@@ -338,6 +340,7 @@ impl ExecuteMsg {
             ExecuteMsg::Shutdown { .. } => false,
             ExecuteMsg::AddCopyTrading { .. } => false,
             ExecuteMsg::SetCopyTradingCodeId { .. } => true,
+            ExecuteMsg::RemoveOwner {} => true,
         }
     }
 }

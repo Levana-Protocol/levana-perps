@@ -1,7 +1,7 @@
 use crate::state::{
     all_contracts::ALL_CONTRACTS,
     auth::{
-        get_admin_migration, get_dao, get_kill_switch, get_owner, get_wind_down,
+        get_admin_migration, get_dao, get_kill_switch, get_owner, get_wind_down, remove_owner,
         set_admin_migration, set_dao, set_kill_switch, set_owner, set_wind_down,
     },
     code_ids::get_code_ids,
@@ -279,6 +279,7 @@ fn execute_msg(
                     .add_attribute("referee", info.sender),
             );
         }
+        ExecuteMsg::RemoveOwner {} => remove_owner(ctx.storage),
     }
 
     Ok(ctx.response.into_response())
