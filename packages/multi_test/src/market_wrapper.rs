@@ -20,7 +20,6 @@ use cosmwasm_std::{
     StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg, WasmSudo};
-use namespace::OWNER_ADDR;
 use perpswap::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
 use perpswap::compat::BackwardsCompatTakeProfit;
 use perpswap::contracts::copy_trading::{
