@@ -250,7 +250,7 @@ impl Opt {
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
             countertrade,
-            run_copy_trade: self.enable_copy_trade
+            run_copy_trade: self.enable_copy_trade,
         };
 
         Ok(FullBotConfig {
@@ -358,7 +358,7 @@ impl Opt {
             countertrade: self
                 .countertrade
                 .map(|contract| CounterTradeBotConfig { contract }),
-            run_copy_trade: self.enable_copy_trade
+            run_copy_trade: self.enable_copy_trade,
         };
         Ok(FullBotConfig {
             config,

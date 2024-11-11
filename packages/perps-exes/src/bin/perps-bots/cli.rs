@@ -94,7 +94,6 @@ pub(crate) struct Opt {
     /// Enable copy trading bot
     #[clap(long, env = "LEVANA_BOTS_ENABLE_COPY_TRADE")]
     pub(crate) enable_copy_trade: bool,
-
 }
 
 #[allow(clippy::large_enum_variant)]
