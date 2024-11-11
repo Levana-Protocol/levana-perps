@@ -309,7 +309,6 @@ pub(crate) fn contract_position_token() -> Box<dyn Contract<Empty>> {
         position_token::contract::instantiate,
         position_token::contract::execute,
         position_token::contract::query,
-        position_token::contract::sudo,
     ))
 }
 
@@ -318,7 +317,6 @@ pub(crate) fn contract_liquidity_token() -> Box<dyn Contract<Empty>> {
         liquidity_token::contract::instantiate,
         liquidity_token::contract::execute,
         liquidity_token::contract::query,
-        liquidity_token::contract::sudo,
     ))
 }
 
@@ -327,7 +325,6 @@ pub(crate) fn contract_cw20() -> Box<dyn Contract<Empty>> {
         cw20::contract::instantiate,
         cw20::contract::execute,
         cw20::contract::query,
-        cw20::contract::sudo,
     ))
 }
 
@@ -337,7 +334,6 @@ pub(crate) fn contract_market() -> Box<dyn Contract<Empty>> {
             market::contract::instantiate,
             market::contract::execute,
             market::contract::query,
-            market::contract::sudo,
         )
         .with_reply(market::contract::reply),
     )
@@ -349,9 +345,9 @@ pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
             factory::contract::instantiate,
             factory::contract::execute,
             factory::contract::query,
-            factory::contract::sudo,
         )
-        .with_reply(factory::contract::reply),
+        .with_reply(factory::contract::reply)
+        .with_sudo(factory::contract::sudo),
     )
 }
 
@@ -360,7 +356,6 @@ pub(crate) fn contract_simple_oracle() -> Box<dyn Contract<Empty>> {
         simple_oracle::instantiate,
         simple_oracle::execute,
         simple_oracle::query,
-        simple_oracle::sudo,
     ))
 }
 
@@ -370,7 +365,6 @@ pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
             countertrade::instantiate,
             countertrade::execute,
             countertrade::query,
-            countertrade::sudo,
         )
         .with_reply(countertrade::reply),
     )
@@ -382,7 +376,6 @@ pub(crate) fn contract_copy_trading() -> Box<dyn Contract<Empty>> {
             copy_trading::instantiate,
             copy_trading::execute,
             copy_trading::query,
-            copy_trading::sudo,
         )
         .with_reply(copy_trading::reply),
     )
@@ -396,13 +389,11 @@ pub(crate) struct LocalContractWrapper<
     ExecuteMsg,
     Query,
     QueryMsg,
-    Sudo,
     SudoMsg,
 > where
     Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
     Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
     Query: Fn(Deps, Env, QueryMsg) -> Result<QueryResponse> + 'static,
-    Sudo: Fn(DepsMut, Env, SudoMsg) -> Result<Response> + 'static,
     InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
     ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
     QueryMsg: Serialize + DeserializeOwned + 'static,
@@ -411,17 +402,23 @@ pub(crate) struct LocalContractWrapper<
     instantiate: Instantiate,
     execute: Execute,
     query: Query,
-    sudo: Sudo,
+    sudo: Option<SudoFn<SudoMsg>>,
     reply: Option<ReplyFn>,
     instantiate_msg: PhantomData<InstantiateMsg>,
     execute_msg: PhantomData<ExecuteMsg>,
     query_msg: PhantomData<QueryMsg>,
-    sudo_msg: PhantomData<SudoMsg>,
 }
 
+type SudoFn<SudoMsg>
+where
+    SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
+= fn(DepsMut, Env, SudoMsg) -> Result<Response>;
 type ReplyFn = fn(DepsMut, Env, Reply) -> Result<Response>;
 
-impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, Sudo, SudoMsg>
+#[derive(Serialize, serde::Deserialize, Debug)]
+enum NoSudoMsg {}
+
+impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg>
     LocalContractWrapper<
         Instantiate,
         InstantiateMsg,
@@ -429,33 +426,41 @@ impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, Sudo, Su
         ExecuteMsg,
         Query,
         QueryMsg,
-        Sudo,
-        SudoMsg,
+        NoSudoMsg,
     >
 where
     Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
     Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
     Query: Fn(Deps, Env, QueryMsg) -> Result<QueryResponse> + 'static,
-    Sudo: Fn(DepsMut, Env, SudoMsg) -> Result<Response> + 'static,
+    InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
+    ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
+    QueryMsg: Serialize + DeserializeOwned + 'static,
+{
+    pub fn new(instantiate: Instantiate, execute: Execute, query: Query) -> Self {
+        Self {
+            instantiate,
+            execute,
+            query,
+            sudo: None,
+            reply: None,
+            instantiate_msg: PhantomData,
+            execute_msg: PhantomData,
+            query_msg: PhantomData,
+        }
+    }
+}
+
+impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
+    LocalContractWrapper<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
+where
+    Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
+    Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
+    Query: Fn(Deps, Env, QueryMsg) -> Result<QueryResponse> + 'static,
     InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
     ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
     QueryMsg: Serialize + DeserializeOwned + 'static,
     SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
 {
-    pub fn new(instantiate: Instantiate, execute: Execute, query: Query, sudo: Sudo) -> Self {
-        Self {
-            instantiate,
-            execute,
-            query,
-            sudo,
-            reply: None,
-            instantiate_msg: PhantomData,
-            execute_msg: PhantomData,
-            query_msg: PhantomData,
-            sudo_msg: PhantomData,
-        }
-    }
-
     pub(crate) fn with_reply(
         self,
         reply_fn: fn(DepsMut, Env, Reply) -> Result<Response<Empty>>,
@@ -469,12 +474,38 @@ where
             instantiate_msg: self.instantiate_msg,
             execute_msg: self.execute_msg,
             query_msg: self.query_msg,
-            sudo_msg: self.sudo_msg,
+        }
+    }
+
+    pub(crate) fn with_sudo<NewSudoMsg>(
+        self,
+        sudo_fn: fn(DepsMut, Env, NewSudoMsg) -> Result<Response<Empty>>,
+    ) -> LocalContractWrapper<
+        Instantiate,
+        InstantiateMsg,
+        Execute,
+        ExecuteMsg,
+        Query,
+        QueryMsg,
+        NewSudoMsg,
+    >
+    where
+        NewSudoMsg: Serialize + DeserializeOwned + Debug + 'static,
+    {
+        LocalContractWrapper {
+            instantiate: self.instantiate,
+            execute: self.execute,
+            query: self.query,
+            sudo: Some(sudo_fn),
+            reply: self.reply,
+            instantiate_msg: self.instantiate_msg,
+            execute_msg: self.execute_msg,
+            query_msg: self.query_msg,
         }
     }
 }
 
-impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, Sudo, SudoMsg>
+impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
     Contract<Empty, Empty>
     for LocalContractWrapper<
         Instantiate,
@@ -483,14 +514,12 @@ impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, Sudo, Su
         ExecuteMsg,
         Query,
         QueryMsg,
-        Sudo,
         SudoMsg,
     >
 where
     Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
     Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
     Query: Fn(Deps, Env, QueryMsg) -> Result<QueryResponse> + 'static,
-    Sudo: Fn(DepsMut, Env, SudoMsg) -> Result<Response> + 'static,
     InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
     ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
     QueryMsg: Serialize + DeserializeOwned + 'static,
@@ -525,7 +554,10 @@ where
 
     fn sudo(&self, deps: DepsMut<Empty>, env: Env, msg: Vec<u8>) -> Result<Response<Empty>> {
         let msg: SudoMsg = from_json(msg)?;
-        (self.sudo)(deps, env, msg)
+        match self.sudo {
+            Some(sudo) => (sudo)(deps, env, msg),
+            None => bail!("sudo not implemented for contract"),
+        }
     }
 
     // this returns an error if the contract doesn't implement reply
