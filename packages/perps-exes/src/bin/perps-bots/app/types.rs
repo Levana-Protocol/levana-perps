@@ -270,9 +270,13 @@ impl Opt {
                 .with_max_gas_price(inner.higher_very_high_max_gas_price),
         };
 
-        let factory_contract = cosmos.make_contract(factory.factory);
-        let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
-        let copy_trading = RwLock::new(copy_trading);
+        let copy_trading = if config.run_copy_trade {
+            let factory_contract = cosmos.make_contract(factory.factory);
+            let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
+            RwLock::new(copy_trading)
+        } else {
+            RwLock::new(None)
+        };
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
