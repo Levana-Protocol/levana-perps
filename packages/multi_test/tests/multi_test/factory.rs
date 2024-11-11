@@ -118,6 +118,12 @@ fn test_factory_sudo_add_market() {
             },
         })
         .unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    market
+        .sudo_factory(&FactoryExecuteMsg::RegisterReferrer {
+            addr: Addr::unchecked(trader).into(),
+        })
+        .unwrap_err();
 
     let result = market.query_factory_raw(Binary::new(key)).unwrap().unwrap();
     let new_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
