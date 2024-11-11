@@ -120,7 +120,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     Ok(QueryResponse::default())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn sudo(_deps: DepsMut, _env: Env, _msg: ExecuteMsg) -> Result<Response> {
     todo!()
 }
