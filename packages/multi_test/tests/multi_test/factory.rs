@@ -57,7 +57,7 @@ fn test_factory_add_market() {
 fn test_factory_sudo_add_market() {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    // This is required to test the todo entrypoint
+    // This is required to test the sudo entrypoint
     market.reset_factory_owner();
 
     let now = market.now();
