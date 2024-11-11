@@ -177,11 +177,8 @@ fn execute_msg(
         ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams { name, description },
         } => {
-            let leader = if let Some(info) = info {
-                info.sender
-            } else {
-                anyhow::bail!("Message Info should be provided");
-            };
+            let info = info.context("Message info should be provided")?;
+            let leader = info.sender;
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COPY_TRADING.save(
                 ctx.storage,
@@ -265,18 +262,11 @@ fn execute_msg(
             impacts,
             effect,
         } => {
-            if let Some(info) = info {
-                shutdown(&mut ctx, &info, markets, impacts, effect)?
-            } else {
-                anyhow::bail!("Message info should be provided")
-            }
+            let info = info.context("Message info should be provided")?;
+            shutdown(&mut ctx, &info, markets, impacts, effect)?
         }
         ExecuteMsg::RegisterReferrer { addr } => {
-            let info = if let Some(info) = info {
-                info
-            } else {
-                anyhow::bail!("Message info should be provided");
-            };
+            let info = info.context("Message info should be provided")?;
             let referrer = addr.validate(state.api)?;
             anyhow::ensure!(
                 info.sender != referrer,
