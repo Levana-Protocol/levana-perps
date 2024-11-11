@@ -100,6 +100,10 @@ pub fn instantiate(
     )
 }
 
+pub fn sudo(_deps: DepsMut, _env: Env, _msg: ExecuteMsg) -> Result<Response> {
+    todo!()
+}
+
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     // all execution messages require the sender to be the owner
     let owner = OWNER.load(deps.storage)?;

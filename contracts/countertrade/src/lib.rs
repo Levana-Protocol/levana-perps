@@ -22,6 +22,11 @@ pub use reply::reply;
 const CONTRACT_NAME: &str = "levana.finance:countertrade";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(_deps: DepsMut, _env: Env, _msg: ExecuteMsg) -> Result<Response> {
+    todo!()
+}
+
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,

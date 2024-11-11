@@ -28,6 +28,11 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(_deps: DepsMut, _env: Env, _msg: ExecuteMsg) -> Result<Response> {
+    todo!()
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
