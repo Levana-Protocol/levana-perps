@@ -70,12 +70,10 @@ async fn go(
     };
     let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
-    let owner = factory.query_owner().await?;
-    let owner = if let Some(owner) = owner {
-        owner
-    } else {
-        anyhow::bail!("The factory owner is not provided");
-    };
+    let owner = factory
+        .query_owner()
+        .await?
+        .context("The factory owner is not provided")?;
     let mut updates = vec![];
 
     for MarketInfo {
