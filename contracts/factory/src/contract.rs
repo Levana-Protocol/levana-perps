@@ -177,7 +177,7 @@ fn execute_msg(
         ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams { name, description },
         } => {
-            let info = info.expect("Impossible! this can only be triggered by execute entpoint");
+            let info = info.context("Cannot call this method via sudo")?;
             let leader = info.sender;
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COPY_TRADING.save(
@@ -262,11 +262,11 @@ fn execute_msg(
             impacts,
             effect,
         } => {
-            let info = info.expect("Impossible! this can only be triggered by execute entpoint");
+            let info = info.context("Cannot call this method via sudo")?;
             shutdown(&mut ctx, &info, markets, impacts, effect)?
         }
         ExecuteMsg::RegisterReferrer { addr } => {
-            let info = info.expect("Impossible! this can only be triggered by execute entpoint");
+            let info = info.context("Cannot call this method via sudo")?;
             let referrer = addr.validate(state.api)?;
             anyhow::ensure!(
                 info.sender != referrer,
