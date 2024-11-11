@@ -111,7 +111,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn sudo(deps: DepsMut, env: Env, msg: ExecuteMsg) -> Result<Response> {
-    if get_owner(deps.storage)?.is_some() {
+    if !msg.requires_owner() || get_owner(deps.storage)?.is_some() {
         perp_bail!(
             ErrorId::Auth,
             ErrorDomain::Default,
