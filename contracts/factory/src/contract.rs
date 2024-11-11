@@ -97,7 +97,7 @@ pub fn instantiate(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
-    if msg.requires_owner() && Some(info.sender.clone()) != get_owner(deps.storage) {
+    if msg.requires_owner() && Some(info.sender.clone()) != get_owner(deps.storage)? {
         perp_bail!(
             ErrorId::Auth,
             ErrorDomain::Default,
@@ -111,7 +111,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn sudo(deps: DepsMut, env: Env, msg: ExecuteMsg) -> Result<Response> {
-    if get_owner(deps.storage).is_some() {
+    if get_owner(deps.storage)?.is_some() {
         perp_bail!(
             ErrorId::Auth,
             ErrorDomain::Default,
@@ -477,7 +477,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         }
 
         QueryMsg::FactoryOwner {} => FactoryOwnerResp {
-            owner: get_owner(store),
+            owner: get_owner(store)?,
             admin_migration: get_admin_migration(store)?,
             dao: get_dao(store)?,
             kill_switch: get_kill_switch(store)?,
