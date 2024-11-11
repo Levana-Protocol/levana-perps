@@ -5,7 +5,7 @@ mod handler;
 
 use anyhow::{Context as AnyhowContext, Result};
 use context::*;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use futures::{channel::mpsc::unbounded, future, pin_mut, StreamExt, TryStreamExt};
 use multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use std::{cell::RefCell, net::SocketAddr, rc::Rc, sync::Arc};

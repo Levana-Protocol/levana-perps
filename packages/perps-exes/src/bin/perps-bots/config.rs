@@ -102,6 +102,8 @@ pub(crate) struct BotConfig {
     /// How long to delay after price bot completes before running again
     pub(crate) price_bot_delay: Option<tokio::time::Duration>,
     pub(crate) log_requests: bool,
+    /// Should we run the copy trade bot?
+    pub(crate) run_copy_trade: bool,
 }
 
 pub(crate) struct NeedsPriceUpdateParams {
@@ -248,6 +250,7 @@ impl Opt {
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
             countertrade,
+            run_copy_trade: self.enable_copy_trade,
         };
 
         Ok(FullBotConfig {
@@ -355,6 +358,7 @@ impl Opt {
             countertrade: self
                 .countertrade
                 .map(|contract| CounterTradeBotConfig { contract }),
+            run_copy_trade: self.enable_copy_trade,
         };
         Ok(FullBotConfig {
             config,

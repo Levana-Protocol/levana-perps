@@ -9,12 +9,12 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 perpswap = { package = "levana_perpswap_cosmos", path = "../perpswap" }
-serde = "1.0.199"
-serde_json = "1.0.93"
+serde = "1.0.214"
+serde_json = "1.0.132"
 cosmwasm-std = { workspace = true, features = ["abort"] }
 cosmwasm-schema = { workspace = true }
-anyhow = { version = "1.0.82", features = ["backtrace"] }
-cw-multi-test = "2.0.1"
+anyhow = { version = "1.0.93", features = ["backtrace"] }
+cw-multi-test = "2.2.0"
 market = {package = "levana_perpswap_cosmos_market", path = "../../contracts/market" }
 factory = {package = "levana_perpswap_cosmos_factory", path = "../../contracts/factory" }
 position_token = {package = "levana_perpswap_cosmos_position_token", path = "../../contracts/position_token" }
@@ -23,11 +23,11 @@ cw20 = {package = "levana_perpswap_cosmos_cw20", path = "../../contracts/cw20" }
 countertrade = { package = "levana_perpswap_cosmos_countertrade", path = "../../contracts/countertrade" }
 copy_trading = { package = "levana_perpswap_copy_trading", path = "../../contracts/copy_trading"}
 rand = "0.8.5"
-once_cell = "1.16.0"
-arbitrary = { version = "1.2.0", optional = true, default-features = false, features = ["derive"] }
-cosmos-sdk-proto = { version = "0.21.1", features = ["cosmwasm"] }
+once_cell = "1.20.2"
+arbitrary = { version = "1.4.1", optional = true, default-features = false, features = ["derive"] }
+cosmos-sdk-proto = { version = "0.26.0", features = ["cosmwasm"] }
 cw2 = "2.0.0"
-proptest = "1.1.0"
+proptest = "1.5.0"
 dotenv = "0.15.0"
 cw-storage-plus = { version = "2.0.0", default-features = false }
 
