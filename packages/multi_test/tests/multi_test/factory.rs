@@ -54,6 +54,33 @@ fn test_factory_add_market() {
 }
 
 #[test]
+fn test_factory_sudo_fail_with_owner() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market.set_time(TimeJump::Hours(10)).unwrap();
+    market
+        .sudo_factory(&FactoryExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                market_id: MarketId::new(
+                    "BTC",
+                    "USD",
+                    perpswap::storage::MarketType::CollateralIsQuote,
+                ),
+                token: market.token.clone().into(),
+                config: None,
+                spot_price: perpswap::contracts::market::spot_price::SpotPriceConfigInit::Manual {
+                    admin: Addr::unchecked(TEST_CONFIG.protocol_owner.clone()).into(),
+                },
+                initial_borrow_fee_rate: "0.01".parse().unwrap(),
+                initial_price: Some(InitialPrice {
+                    price: "1".parse().unwrap(),
+                    price_usd: "1".parse().unwrap(),
+                }),
+            },
+        })
+        .unwrap_err();
+}
+
+#[test]
 fn test_factory_sudo_add_market() {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
