@@ -20,7 +20,8 @@ pub struct MockCw20ReceiverContract {
 
 impl MockCw20ReceiverContract {
     pub fn new(app: Rc<RefCell<PerpsApp>>) -> Result<Self> {
-        let contract = Box::new(LocalContractWrapper::new(instantiate, execute, query, sudo));
+        let contract =
+            Box::new(LocalContractWrapper::new(instantiate, execute, query).with_sudo(sudo));
 
         let code_id = app.borrow_mut().store_code(contract);
 
