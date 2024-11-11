@@ -407,7 +407,6 @@ pub(crate) struct LocalContractWrapper<
     instantiate_msg: PhantomData<InstantiateMsg>,
     execute_msg: PhantomData<ExecuteMsg>,
     query_msg: PhantomData<QueryMsg>,
-    sudo_msg: PhantomData<SudoMsg>,
 }
 
 type SudoFn<SudoMsg>
@@ -415,6 +414,41 @@ where
     SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
 = fn(DepsMut, Env, SudoMsg) -> Result<Response>;
 type ReplyFn = fn(DepsMut, Env, Reply) -> Result<Response>;
+
+#[derive(Serialize, serde::Deserialize, Debug)]
+enum NoSudoMsg {}
+
+impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg>
+    LocalContractWrapper<
+        Instantiate,
+        InstantiateMsg,
+        Execute,
+        ExecuteMsg,
+        Query,
+        QueryMsg,
+        NoSudoMsg,
+    >
+where
+    Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
+    Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
+    Query: Fn(Deps, Env, QueryMsg) -> Result<QueryResponse> + 'static,
+    InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
+    ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
+    QueryMsg: Serialize + DeserializeOwned + 'static,
+{
+    pub fn new(instantiate: Instantiate, execute: Execute, query: Query) -> Self {
+        Self {
+            instantiate,
+            execute,
+            query,
+            sudo: None,
+            reply: None,
+            instantiate_msg: PhantomData,
+            execute_msg: PhantomData,
+            query_msg: PhantomData,
+        }
+    }
+}
 
 impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
     LocalContractWrapper<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
@@ -427,20 +461,6 @@ where
     QueryMsg: Serialize + DeserializeOwned + 'static,
     SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
 {
-    pub fn new(instantiate: Instantiate, execute: Execute, query: Query) -> Self {
-        Self {
-            instantiate,
-            execute,
-            query,
-            sudo: None,
-            reply: None,
-            instantiate_msg: PhantomData,
-            execute_msg: PhantomData,
-            query_msg: PhantomData,
-            sudo_msg: PhantomData,
-        }
-    }
-
     pub(crate) fn with_reply(
         self,
         reply_fn: fn(DepsMut, Env, Reply) -> Result<Response<Empty>>,
@@ -454,14 +474,24 @@ where
             instantiate_msg: self.instantiate_msg,
             execute_msg: self.execute_msg,
             query_msg: self.query_msg,
-            sudo_msg: self.sudo_msg,
         }
     }
 
-    pub(crate) fn with_sudo(
+    pub(crate) fn with_sudo<NewSudoMsg>(
         self,
-        sudo_fn: fn(DepsMut, Env, SudoMsg) -> Result<Response<Empty>>,
-    ) -> Self {
+        sudo_fn: fn(DepsMut, Env, NewSudoMsg) -> Result<Response<Empty>>,
+    ) -> LocalContractWrapper<
+        Instantiate,
+        InstantiateMsg,
+        Execute,
+        ExecuteMsg,
+        Query,
+        QueryMsg,
+        NewSudoMsg,
+    >
+    where
+        NewSudoMsg: Serialize + DeserializeOwned + Debug + 'static,
+    {
         LocalContractWrapper {
             instantiate: self.instantiate,
             execute: self.execute,
@@ -471,7 +501,6 @@ where
             instantiate_msg: self.instantiate_msg,
             execute_msg: self.execute_msg,
             query_msg: self.query_msg,
-            sudo_msg: self.sudo_msg,
         }
     }
 }
