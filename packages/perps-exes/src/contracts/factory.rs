@@ -108,9 +108,16 @@ impl Factory {
         Ok(res)
     }
 
-    pub async fn query_owner(&self) -> Option<Address> {
-        let FactoryOwnerResp { owner, .. } = self.0.query(QueryMsg::FactoryOwner {}).await.ok()?;
-        owner.map(|addr| addr.into_string().parse().ok())?
+    pub async fn query_owner(&self) -> Result<Option<Address>> {
+        let FactoryOwnerResp { owner, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
+        owner
+            .map(|owner| {
+                owner
+                    .into_string()
+                    .parse()
+                    .with_context(|| format!("Invalid factory owner found for factory {}", self.0))
+            })
+            .transpose()
     }
 
     pub async fn query_migration_admin(&self) -> Result<Address> {

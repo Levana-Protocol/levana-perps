@@ -105,7 +105,7 @@ async fn go(
 
     if !factory_msgs.is_empty() {
         tracing::info!("Update factory message");
-        let owner = factory.query_owner().await;
+        let owner = factory.query_owner().await?;
         let owner = if let Some(owner) = owner {
             owner
         } else {

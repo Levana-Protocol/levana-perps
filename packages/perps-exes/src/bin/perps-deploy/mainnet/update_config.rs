@@ -69,7 +69,7 @@ async fn go(
         None => factory.get_markets().await?,
     };
 
-    let owner = factory.query_owner().await;
+    let owner = factory.query_owner().await?;
     tracing::info!("CW3 contract: {:?}", owner);
 
     let msgs = markets
