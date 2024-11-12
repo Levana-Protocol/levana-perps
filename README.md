@@ -10,8 +10,7 @@ It's also an updated dev environment, with multichain support and a native SDK i
     - [Slides describing the platform](https://docs.levana.exchange/slides/) (primarily intended for audit)
     - [API tutorial in TypeScript](https://docs.levana.exchange/api-tutorial-ts/introduction)
 - References docs
-    - [`msg` crate](https://apidocs.levana.exchange/msg/doc/levana_perpswap_cosmos_msg/)
-    - [`shared` crate](https://apidocs.levana.exchange/shared/doc/levana_perpswap_cosmos_shared/)
+    - [levana_perpswap_cosmos](https://apidocs.levana.exchange/levana_perpswap_cosmos/)
 - Web interfaces
     - [Develop frontend](https://levana-web-app-develop.vercel.app/)
     - [Staging frontend](https://levana-web-app-staging.vercel.app/)
