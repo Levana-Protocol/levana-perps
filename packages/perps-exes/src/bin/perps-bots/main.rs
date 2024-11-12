@@ -20,7 +20,7 @@ fn main() -> Result<()> {
 }
 
 fn main_inner() -> Result<()> {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let opt = cli::Opt::parse();
 

@@ -98,7 +98,7 @@ async fn go(
             let markets = match retry_policy.as_ref() {
                 Some(retry_builder) => {
                     markets
-                        .retry(retry_builder)
+                        .retry(*retry_builder)
                         .notify(|err, dur| {
                             tracing::error!(
                                 "Retrying after {dur:?}, Received error during market fetch: {err}"
@@ -108,7 +108,7 @@ async fn go(
                 }
                 None => {
                     markets
-                        .retry(&ConstantBuilder::default())
+                        .retry(ConstantBuilder::default())
                         .notify(|err, dur| {
                             tracing::error!(
                             "Retrying dd after {dur:?}, Received error during market fetch: {err}"

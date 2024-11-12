@@ -30,9 +30,9 @@ members = [
 [workspace.dependencies]
 cosmwasm-std = { version = "2.1.4" }
 cosmwasm-schema = { version = "2.1.4" }
-cw-multi-test = "2.1.1"
+cw-multi-test = "2.2.0"
 pyth-sdk-cw = { git = "https://github.com/lvn-hasky-dragon/pyth-crosschain.git", rev = "0d45c60ee97bfa20a81de1d5cd523f9d16f2c282"}
-cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "133778b62a40dea46daa72cfd849739a0c82c016", features = ["config"] }
+cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "3eee1074dcab928f83ce69b7969e1a2f2efa59e0", features = ["config"] }
 
 [profile.release]
 opt-level = 'z'
