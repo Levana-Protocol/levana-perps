@@ -2,18 +2,20 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
-use msg::contracts::market::spot_price::{PythConfigInit, SpotPriceConfigInit, StrideConfigInit};
-use msg::prelude::*;
-use msg::{
+use perps_exes::config::{ConfigTestnet, ConfigUpdateAndBorrowFee, MarketConfigUpdates};
+use perps_exes::contracts::{Factory, MarketInfo};
+use perps_exes::prelude::MarketContract;
+use perpswap::contracts::market::spot_price::{
+    PythConfigInit, SpotPriceConfigInit, StrideConfigInit,
+};
+use perpswap::prelude::*;
+use perpswap::{
     contracts::{
         cw20::Cw20Coin,
         market::{config::ConfigUpdate, entry::NewMarketParams},
     },
     token::TokenInit,
 };
-use perps_exes::config::{ConfigTestnet, ConfigUpdateAndBorrowFee, MarketConfigUpdates};
-use perps_exes::contracts::{Factory, MarketInfo};
-use perps_exes::prelude::MarketContract;
 
 use crate::app::{App, PriceSourceConfig};
 use crate::{
@@ -230,7 +232,7 @@ pub(crate) async fn instantiate(
             wallet,
             format!("Levana Perps Factory{label_suffix}"),
             vec![],
-            msg::contracts::factory::entry::InstantiateMsg {
+            perpswap::contracts::factory::entry::InstantiateMsg {
                 market_code_id: market_code_id.get_code_id().to_string(),
                 position_token_code_id: position_token_code_id.get_code_id().to_string(),
                 liquidity_token_code_id: liquidity_token_code_id.get_code_id().to_string(),
@@ -240,6 +242,7 @@ pub(crate) async fn instantiate(
                 kill_switch: wallet.get_address_string().into(),
                 wind_down: wallet.get_address_string().into(),
                 label_suffix: Some(label_suffix),
+                copy_trading_code_id: None,
             },
             ContractAdmin::Sender,
         )
@@ -308,7 +311,7 @@ pub(crate) async fn instantiate(
                 if feeds.iter().chain(feeds_usd.iter()).any(|f| {
                     matches!(
                         f.data,
-                        msg::contracts::market::spot_price::SpotPriceFeedDataInit::Pyth { .. }
+                        perpswap::contracts::market::spot_price::SpotPriceFeedDataInit::Pyth { .. }
                     )
                 }) {
                     tracing::info!("not doing initial crank for {} because it contains pyth feeds which may need a publish first", market.market_id);
@@ -319,7 +322,7 @@ pub(crate) async fn instantiate(
                         .execute(
                             wallet,
                             vec![],
-                            msg::contracts::market::entry::ExecuteMsg::Crank {
+                            perpswap::contracts::market::entry::ExecuteMsg::Crank {
                                 execs: None,
                                 rewards: None,
                             },

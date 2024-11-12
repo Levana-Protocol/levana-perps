@@ -51,9 +51,8 @@ impl ExchangeId {
     /// to the cryptocurrency page of the CMC and try finding the
     /// markets. Then based on the CEX or DEX filter, you can find the
     /// exchange type.
-
-    /// Another way to determine if through the coingecko page. Eg:
-    /// https://www.coingecko.com/en/exchanges/okx
+    /// Another way to determine if through the coingecko page.
+    /// For example: [OKX on CoinGecko](https://www.coingecko.com/en/exchanges/okx)
     ///
     /// Unfortunately, CMC doesn't provide an API for this currently.
     pub(crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {
@@ -79,7 +78,8 @@ impl ExchangeId {
             | 9588 | 922 | 925 | 137 | 1037 | 7893 | 605 | 9798 | 9867 | 633 | 5750 | 7680
             | 9957 | 723 | 1414 | 7699 | 9786 | 9933 | 9662 | 1100 | 9920 | 10109 | 10103
             | 6637 | 10153 | 1222 | 3631 | 10361 | 629 | 10599 | 10702 | 10770 | 10846 | 10771
-            | 10866 => Ok(ExchangeKind::Cex),
+            | 10866 | 10922 | 10963 | 10946 | 10962 | 10970 | 11016 | 8304 | 10992 | 11087
+            | 11124 | 11135 | 11136 | 21 => Ok(ExchangeKind::Cex),
             1707 | 1454 | 1187 | 1530 | 1567 | 1344 | 1714 | 9244 | 1165 | 1293 | 1327 | 1395
             | 1447 | 1547 | 1551 | 1614 | 1657 | 1665 | 6255 | 6444 | 6706 | 6757 | 8915 | 9245
             | 1342 | 1426 | 1612 | 8161 | 1069 | 246 | 267 | 1062 | 1063 | 1070 | 1141 | 1206
@@ -97,9 +97,8 @@ impl ExchangeId {
             | 1699 | 5327 | 6420 | 6753 | 7392 | 503 | 7086 | 8913 | 9243 | 249 | 310 | 856
             | 983 | 1232 | 1281 | 1370 | 1378 | 1407 | 1413 | 1457 | 1480 | 1487 | 1489 | 1514
             | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 | 9882 | 9883 | 1577
-            | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 | 1675 | 10403 => {
-                Ok(ExchangeKind::Dex)
-            }
+            | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 | 1675 | 10403 | 11090
+            | 11216 => Ok(ExchangeKind::Dex),
             other => Err(anyhow!("Exchange type not known for id {}", other)),
         }
     }
@@ -205,6 +204,8 @@ pub(crate) enum Coin {
     WstEth,
     Maga,
     Datom,
+    AmAtom,
+    AllBtc,
 }
 
 impl FromStr for Coin {
@@ -256,6 +257,8 @@ impl FromStr for Coin {
             "wstETH" => Ok(Coin::WstEth),
             "MAGA" => Ok(Coin::Maga),
             "dATOM" => Ok(Coin::Datom),
+            "amATOM" => Ok(Coin::AmAtom),
+            "allBTC" => Ok(Coin::AllBtc),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -317,6 +320,8 @@ impl Coin {
             Coin::WstEth => ETH_CMC_ID, // Since we are speculating on ETH
             Coin::Maga => 27872,
             Coin::Datom => ATOM_CMC_ID, // Since we are speculating on ATOM
+            Coin::AmAtom => ATOM_CMC_ID, // Since we are speculating on ATOM
+            Coin::AllBtc => BTC_CMC_ID, // Since we are speculating on BTC
         }
     }
 
@@ -366,6 +371,8 @@ impl Coin {
             Coin::WstEth => WrappedCoin(Coin::Eth),
             Coin::Maga => WrappedCoin(Coin::Maga),
             Coin::Datom => WrappedCoin(Coin::Atom),
+            Coin::AmAtom => WrappedCoin(Coin::Atom),
+            Coin::AllBtc => WrappedCoin(Coin::Btc),
         }
     }
 }

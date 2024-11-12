@@ -4,14 +4,14 @@ use cosmos::{
     HasContract, HasCosmos, Wallet,
 };
 use cosmwasm_std::Decimal256;
-use msg::contracts::{
+use perpswap::contracts::{
     cw20::Cw20Coin,
     faucet::entry::{
         ExecuteMsg, GetTokenResponse, IsAdminResponse, NextTradingIndexResponse, OwnerMsg,
         QueryMsg, TapAmountResponse,
     },
 };
-use shared::storage::UnsignedDecimal;
+use perpswap::storage::UnsignedDecimal;
 
 #[derive(Clone)]
 pub(crate) struct Faucet(Contract);
@@ -74,7 +74,7 @@ impl Faucet {
             "stATOM" => "1000",
             "USDC" => "20000",
             "USDT" => "20000",
-            "BTC" | "wBTC" => "1",
+            "BTC" | "wBTC" | "allBTC" => "1",
             "OSMO" => "2000",
             "stOSMO" => "2000",
             "SEI" => "2000",

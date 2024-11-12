@@ -5,8 +5,8 @@ use crate::{
     arbitrary::helpers::max_gains_strategy, config::DEFAULT_MARKET, market_wrapper::PerpsMarket,
     PerpsApp,
 };
-use msg::contracts::market::entry::SlippageAssert;
-use msg::prelude::*;
+use perpswap::contracts::market::entry::SlippageAssert;
+use perpswap::prelude::*;
 use proptest::prelude::*;
 use std::ops::RangeInclusive;
 use std::rc::Rc;

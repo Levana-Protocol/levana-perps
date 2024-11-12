@@ -4,8 +4,10 @@ use anyhow::{anyhow, Result};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::position_token::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use msg::prelude::*;
+use perpswap::contracts::position_token::entry::{
+    ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
+};
+use perpswap::prelude::*;
 use semver::Version;
 
 // version info for migration info

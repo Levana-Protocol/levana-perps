@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{config::DEFAULT_MARKET, market_wrapper::PerpsMarket, PerpsApp};
-use msg::{
+use perpswap::{
     contracts::market::{
         entry::PriceForQuery,
         position::{LiquidationReason, PositionCloseReason},
@@ -13,7 +13,7 @@ fn status() {
     let market = PerpsMarket::new_custom(
         PerpsApp::new_cell().unwrap(),
         "WBTC_BTC".parse().unwrap(),
-        msg::token::TokenInit::Native {
+        perpswap::token::TokenInit::Native {
             denom: "BTC".to_owned(),
             decimal_places: 8,
         },

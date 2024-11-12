@@ -11,10 +11,10 @@ use cosmos::{
     proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, HasAddress, Wallet,
 };
 use cosmos::{HasAddressHrp, SeedPhrase};
-use msg::contracts::market::entry::StatusResp;
-use msg::contracts::market::position::ClosedPosition;
-use msg::prelude::*;
-use msg::{
+use perpswap::contracts::market::entry::StatusResp;
+use perpswap::contracts::market::position::ClosedPosition;
+use perpswap::prelude::*;
+use perpswap::{
     contracts::{
         factory::entry::MarketInfoResponse,
         faucet::entry::{ExecuteMsg as FaucetExecuteMsg, FaucetAsset},
@@ -64,7 +64,7 @@ impl PerpApp {
         let factory_contract = cosmos.make_contract(factory_contract_addr);
 
         let market_info: MarketInfoResponse = factory_contract
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+            .query(perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                 market_id: market_id.clone(),
             })
             .await?;
@@ -103,10 +103,9 @@ impl PerpApp {
         collateral: NonZero<Collateral>,
         direction: DirectionToBase,
         leverage: LeverageToBase,
-        max_gains: MaxGainsInQuote,
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit: PriceBaseInQuote,
     ) -> Result<TxResponse> {
         let _ = self
             .market
@@ -116,10 +115,9 @@ impl PerpApp {
                 collateral,
                 direction,
                 leverage,
-                max_gains,
                 slippage_assert,
                 stop_loss_override,
-                take_profit_override,
+                take_profit,
             )
             .await?;
         self.crank_single(None).await

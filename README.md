@@ -10,12 +10,8 @@ It's also an updated dev environment, with multichain support and a native SDK i
     - [Slides describing the platform](https://docs.levana.exchange/slides/) (primarily intended for audit)
     - [API tutorial in TypeScript](https://docs.levana.exchange/api-tutorial-ts/introduction)
 - References docs
-    - [`msg` crate](https://apidocs.levana.exchange/msg/doc/levana_perpswap_cosmos_msg/)
-    - [`shared` crate](https://apidocs.levana.exchange/shared/doc/levana_perpswap_cosmos_shared/)
-- Web interfaces
-    - [Develop frontend](https://levana-web-app-develop.vercel.app/)
-    - [Staging frontend](https://levana-web-app-staging.vercel.app/)
-    - [Public beta](https://beta.levana.exchange/)
+    - [levana_perpswap_cosmos](https://apidocs.levana.finance/levana_perpswap_cosmos/)
+- [Web interfaces](https://staff.levana.finance/perps-sites)
 
 # PREREQUISITES
 
@@ -60,13 +56,12 @@ It's also an updated dev environment, with multichain support and a native SDK i
 * Juno: https://docs.junonetwork.io/validators/joining-the-testnets#get-some-testnet-tokens
 * Osmosis: https://faucet.osmosis.zone/#/
 
-# MISC
-
-the [original repo](https://github.com/Levana-Protocol/levana-perpetual-swap-contracts) is deprecated, though a sortof middle-ground partial refactor of the old vAMM approach is in [this commit](https://github.com/Levana-Protocol/levana-perps-multichain/tree/2417dc2e0ba3030ab8ed3cd0f1fc6f2ddaf39843/contracts/cosmos)
-
 # Deploying
 
-Deploying is handled via the `perps-deploy` tool, located in the `packages/perps-deploy` directory. The [README.md](packages/perps-deploy/README.md) includes more details of how deployments work, this file covers the direct steps.
+Deploying is handled via the `perps-deploy` tool, located in the
+`packages/perps-deploy` directory. The [perps-deploy.md](./docs/perps-deploy.md) includes
+more details of how deployments work, this file covers the direct
+steps.
 
 When you deploy, you'll need to have the deployer seed phrase. This is available in a [Google Drive sheet](https://docs.google.com/spreadsheets/d/1ILEkU8wqtQGO_bqxsSVORflwtY-4kj20dmTe9uOh3-4/edit?usp=share_link). You'll also need to choose which contract family you want to deploy, e.g. `dragonci`, `dragondev`, `dragonqa`. Let's assume you'll be deploying `dragonci`.
 

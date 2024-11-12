@@ -143,6 +143,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
             );
 
             tracing::info!("Notional asset: {}", market_id.get_notional());
+            tracing::info!("DNF in USD: {}", dnf.dnf_in_usd);
 
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 

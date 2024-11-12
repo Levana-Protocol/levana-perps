@@ -1,6 +1,6 @@
 use cosmos::Address;
 use cosmwasm_std::Uint64;
-use shared::storage::{MarketId, PriceBaseInQuote};
+use perpswap::storage::{MarketId, PriceBaseInQuote};
 
 use crate::{
     endpoints::pnl::PositionInfo,

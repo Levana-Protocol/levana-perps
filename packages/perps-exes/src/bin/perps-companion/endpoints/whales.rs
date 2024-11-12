@@ -16,10 +16,10 @@ use cosmos::{Address, CosmosNetwork};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
 
-use msg::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{contracts::Factory, PerpsNetwork};
+use perpswap::contracts::market::liquidity::LiquidityStats;
+use perpswap::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
 use reqwest::Client;
-use shared::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
 use tokio::task::JoinSet;
 
 use crate::{app::App, types::ContractEnvironment};
@@ -229,7 +229,7 @@ async fn worker(
 
 /// Overall market status information
 ///
-/// Returned from [QueryMsg::Status]
+/// Returned from [perpswap::contracts::market::entry::QueryMsg::Status]
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 struct StatusRelaxed {

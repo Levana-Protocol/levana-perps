@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{query_as, query_scalar, PgPool};
 

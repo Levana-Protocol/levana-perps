@@ -1,6 +1,7 @@
 mod balance;
 mod block_lag;
 mod congested;
+mod copy_trade;
 mod countertrade;
 mod crank_run;
 pub(crate) mod factory;
@@ -45,6 +46,10 @@ impl AppBuilder {
         self.start_factory_task()?;
         self.track_stale()?;
         self.track_block_lag()?;
+
+        if self.app.config.run_copy_trade {
+            self.start_copytrading_bot()?;
+        }
 
         if self.app.config.run_optional_services {
             self.track_stats()?;

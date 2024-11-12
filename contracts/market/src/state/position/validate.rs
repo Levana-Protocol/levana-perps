@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use msg::contracts::market::entry::SlippageAssert;
+use perpswap::contracts::market::entry::SlippageAssert;
 
 impl State<'_> {
     pub(crate) fn position_validate_trader_leverage(
@@ -220,16 +220,6 @@ impl State<'_> {
                     slippage_assert.price,
                 ))
             }
-        }
-    }
-}
-
-struct Currently<T>(Option<T>);
-impl<T: Display> Display for Currently<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match &self.0 {
-            Some(x) => write!(f, " (currently {x})"),
-            None => Ok(()),
         }
     }
 }

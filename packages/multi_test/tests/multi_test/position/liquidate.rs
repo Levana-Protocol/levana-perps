@@ -5,10 +5,10 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated, time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::entry::StopLoss;
-use msg::contracts::market::position::PositionId;
-use msg::prelude::*;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::contracts::market::entry::StopLoss;
+use perpswap::contracts::market::position::PositionId;
+use perpswap::prelude::*;
 
 #[test]
 fn position_liquidate_delayed_crank() {

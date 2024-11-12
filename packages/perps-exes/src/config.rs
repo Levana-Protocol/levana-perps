@@ -9,7 +9,7 @@ use figment::{
     providers::{Env, Format, Toml},
     Figment,
 };
-use msg::{
+use perpswap::{
     contracts::market::{
         config::{defaults::ConfigDefaults, ConfigUpdate},
         entry::InitialPrice,
@@ -528,6 +528,8 @@ pub struct WatcherConfig {
     pub block_lag: TaskConfig,
     #[serde(default = "defaults::counter_trade_bot")]
     pub counter_trade_bot: TaskConfig,
+    #[serde(default = "defaults::copy_trade_bot")]
+    pub copy_trade_bot: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -661,6 +663,12 @@ impl Default for WatcherConfig {
             },
             counter_trade_bot: TaskConfig {
                 delay: Delay::Constant(60),
+                out_of_date: Some(180),
+                retries: None,
+                delay_between_retries: None,
+            },
+            copy_trade_bot: TaskConfig {
+                delay: Delay::Constant(20),
                 out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,

@@ -1,4 +1,4 @@
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 pub(crate) const ADMINS: Map<&Addr, ()> = Map::new("admins");
 

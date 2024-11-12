@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cosmwasm_std::{entry_point, to_json_binary, Addr, Storage};
 use cosmwasm_std::{Binary, Deps, Env};
-use msg::contracts::tracker::entry::{CodeIdResp, ContractResp, QueryMsg};
+use perpswap::contracts::tracker::entry::{CodeIdResp, ContractResp, QueryMsg};
 
 use crate::state::{CODE_BY_HASH, CODE_BY_ID, CONTRACT_BY_ADDR, CONTRACT_BY_FAMILY};
 

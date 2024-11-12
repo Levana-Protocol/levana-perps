@@ -2,18 +2,18 @@ use crate::state::{State, StateContext};
 use anyhow::{Context, Result};
 use cosmwasm_std::{Addr, Order, Storage};
 use cw_storage_plus::{Bound, Item, Map, PrefixBound};
-use msg::contracts::market::entry::{
+use perpswap::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::market::entry::{
     ExecutedLimitOrder, LimitOrderHistoryResp, LimitOrderResp, LimitOrderResult, LimitOrdersResp,
 };
-use msg::contracts::market::fees::events::TradeId;
-use msg::contracts::market::order::events::{
+use perpswap::contracts::market::fees::events::TradeId;
+use perpswap::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
-use msg::contracts::market::order::{LimitOrder, OrderId};
-use msg::contracts::market::position::events::PositionSaveReason;
-use msg::contracts::market::position::CollateralAndUsd;
-use msg::prelude::*;
-use shared::compat::BackwardsCompatTakeProfit;
+use perpswap::contracts::market::order::{LimitOrder, OrderId};
+use perpswap::contracts::market::position::events::PositionSaveReason;
+use perpswap::contracts::market::position::CollateralAndUsd;
+use perpswap::prelude::*;
 
 use super::fees::CapCrankFee;
 use super::position::{OpenPositionExec, OpenPositionParams};
@@ -134,9 +134,6 @@ impl State<'_> {
 
         let market_type = self.market_type(ctx.storage)?;
 
-        // this is kept in case we're executing an order that was already placed in the old system
-        // it shouldn't be needed for any new orders, which do this song and dance in deferred_exec creation
-        // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
         #[allow(deprecated)]
         let take_profit_trader = match (order.take_profit, order.max_gains) {
             (None, None) => {

@@ -7,10 +7,10 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::ConfigUpdate, entry::PositionsQueryFeeApproach, position::PositionId,
 };
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 // this is currently a known issue, working around it in the meantime
 // however, to make sure it doesn't get lost in the mix

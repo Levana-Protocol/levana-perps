@@ -7,7 +7,7 @@ use cosmwasm_std::{
     Uint128,
 };
 use cw_multi_test::Executor;
-use msg::prelude::*;
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{config::TEST_CONFIG, LocalContractWrapper, PerpsApp};
@@ -118,4 +118,29 @@ pub struct QueryMsg {}
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     Ok(QueryResponse::default())
+}
+
+#[test]
+fn test_allow_unknown_fields() {
+    #[cw_serde]
+    struct Expanded {
+        foo: String,
+        bar: String,
+    }
+    impl Default for Expanded {
+        fn default() -> Self {
+            Expanded {
+                foo: "hello".to_string(),
+                bar: "world".to_string(),
+            }
+        }
+    }
+    #[cw_serde]
+    struct Minimal {
+        foo: String,
+    }
+    let expanded_str = serde_json::to_string(&Expanded::default()).unwrap();
+    let expanded: Expanded = serde_json::from_str(&expanded_str).unwrap();
+    let minimal: Minimal = serde_json::from_str(&expanded_str).unwrap();
+    assert_eq!(expanded.foo, minimal.foo);
 }

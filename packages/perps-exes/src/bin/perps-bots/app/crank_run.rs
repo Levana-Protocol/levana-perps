@@ -20,8 +20,8 @@ use axum::async_trait;
 
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::{MarketContract, MarketId};
+use perpswap::prelude::MarketExecuteMsg;
 
 use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;
@@ -36,7 +36,7 @@ struct Worker {
     recv: CrankReceiver,
 }
 pub(crate) enum RunResult {
-    NormalRun(TxResponse),
+    NormalRun(Box<TxResponse>),
     OutOfGas,
     OsmosisEpoch(anyhow::Error),
     OsmosisCongested(anyhow::Error),
@@ -211,7 +211,7 @@ impl App {
         {
             Ok(txres) => {
                 track_tx_fees(self, crank_wallet.get_address(), &txres).await;
-                Ok(RunResult::NormalRun(txres.response))
+                Ok(RunResult::NormalRun(Box::new(txres.response)))
             }
             Err(e) => {
                 if self.is_osmosis_epoch() {

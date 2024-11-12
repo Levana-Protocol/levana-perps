@@ -2,11 +2,11 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use crate::cli::Opt;
 use cosmos::Address;
-use msg::{
+use perps_exes::{contracts::Factory, prelude::MarketContract, PerpsNetwork};
+use perpswap::{
     contracts::{cw20::entry::AllAccountsResponse, liquidity_token::LiquidityTokenKind},
     prelude::*,
 };
-use perps_exes::{contracts::Factory, prelude::MarketContract, PerpsNetwork};
 use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]
@@ -116,7 +116,7 @@ async fn handle_market(
                 .market
                 .query(MarketQueryMsg::LiquidityTokenProxy {
                     kind,
-                    msg: msg::contracts::liquidity_token::entry::QueryMsg::AllAccounts {
+                    msg: perpswap::contracts::liquidity_token::entry::QueryMsg::AllAccounts {
                         start_after: start_after.take(),
                         limit: None,
                     },

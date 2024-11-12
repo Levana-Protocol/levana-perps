@@ -18,7 +18,7 @@ use crate::prelude::*;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
-use msg::{
+use perpswap::{
     contracts::market::{
         deferred_execution::{DeferredExecId, DeferredExecItem},
         entry::{
@@ -31,10 +31,10 @@ use msg::{
     shutdown::ShutdownImpact,
 };
 
-use msg::contracts::market::entry::LimitOrderResp;
+use perpswap::contracts::market::entry::LimitOrderResp;
 
+use perpswap::price::Price;
 use semver::Version;
-use shared::price::Price;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:market";
@@ -93,6 +93,30 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response> {
+    let (mut state, ctx) = StateContext::new(deps, env)?;
+    #[cfg(feature = "sanity")]
+    state.sanity_check(ctx.storage);
+
+    match msg {
+        SudoMsg::ConfigUpdate { update } => {
+            update_config(&mut state.config, state.api, ctx.storage, *update)?;
+        }
+    }
+
+    #[cfg(feature = "sanity")]
+    crate::state::sanity::sanity_check_post_execute(
+        &state,
+        ctx.storage,
+        &state.env,
+        &state.querier,
+        &ctx.fund_transfers,
+    );
+
+    ctx.into_response(&state)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
@@ -141,13 +165,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             sender: _,
         } => anyhow::bail!("Cannot nest a Receive inside another Receive"),
 
-        // TODO: remove this once the deprecated fields are fully removed
-        #[allow(deprecated)]
         ExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
@@ -158,9 +179,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     slippage_assert,
                     leverage,
                     direction,
-                    max_gains,
+                    max_gains: None,
                     stop_loss_override,
-                    take_profit,
+                    take_profit: Some(take_profit),
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
@@ -285,13 +306,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
-        // TODO: remove this once the deprecated fields are fully removed
-        #[allow(deprecated)]
         ExecuteMsg::PlaceLimitOrder {
             trigger_price,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
             take_profit,
         } => {
@@ -302,9 +320,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     trigger_price,
                     leverage,
                     direction,
-                    max_gains,
+                    max_gains: None,
                     stop_loss_override,
-                    take_profit,
+                    take_profit: Some(take_profit),
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),

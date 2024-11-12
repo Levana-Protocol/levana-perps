@@ -15,10 +15,6 @@ use std::collections::BTreeMap;
 use chrono::{TimeZone, Utc};
 use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty};
-use msg::contracts::market::{
-    entry::NewMarketParams,
-    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
-};
 use perps_exes::{
     config::{
         load_toml, save_toml, ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig,
@@ -27,6 +23,10 @@ use perps_exes::{
     contracts::Factory,
     prelude::*,
     PerpsNetwork,
+};
+use perpswap::contracts::market::{
+    entry::NewMarketParams,
+    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
 };
 
 use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path};
@@ -417,7 +417,7 @@ async fn instantiate_factory(
             wallet,
             factory_label.clone(),
             vec![],
-            msg::contracts::factory::entry::InstantiateMsg {
+            perpswap::contracts::factory::entry::InstantiateMsg {
                 market_code_id: market.to_string(),
                 position_token_code_id: position.to_string(),
                 liquidity_token_code_id: liquidity.to_string(),
@@ -427,6 +427,7 @@ async fn instantiate_factory(
                 kill_switch: kill_switch.unwrap_or(owner).get_address_string().into(),
                 wind_down: wind_down.unwrap_or(owner).get_address_string().into(),
                 label_suffix,
+                copy_trading_code_id: None,
             },
             ContractAdmin::Addr(migration_admin),
         )
@@ -466,10 +467,10 @@ struct AddMarketOpts {
     factory: String,
     /// New market ID to add
     #[clap(long, required = true)]
-    market_id: Vec<MarketId>,
+    market: Vec<MarketId>,
 }
 
-async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
+async fn add_market(opt: Opt, AddMarketOpts { factory, market }: AddMarketOpts) -> Result<()> {
     let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
     let factories = MainnetFactories::load()?;
@@ -485,9 +486,12 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     let network = factory.network;
     let factory = app.cosmos.make_contract(factory.address);
     let factory = Factory::from_contract(factory);
-    let owner = factory.query_owner().await?;
+    let owner = factory
+        .query_owner()
+        .await?
+        .context("The factory owner is not provided")?;
 
-    for market_id in market_id {
+    for market_id in market {
         let ConfigUpdateAndBorrowFee {
             config: mut market_config_update,
             initial_borrow_fee_rate,
@@ -522,7 +526,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
         let spot_price = get_spot_price_config(&oracle, &market_id)?;
         validate_spot_price_config(&app.cosmos, &spot_price, &market_id).await?;
 
-        let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+        let msg = perpswap::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: NewMarketParams {
                 spot_price,
                 market_id,

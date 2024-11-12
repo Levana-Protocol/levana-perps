@@ -3,7 +3,7 @@ use crate::{extensions::TokenExt, time::TimeJump};
 use super::data::*;
 use anyhow::Result;
 use cosmwasm_std::testing::MockApi;
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 impl LpDepositWithdraw {
     pub fn run(&self) -> Result<()> {

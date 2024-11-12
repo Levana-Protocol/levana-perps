@@ -5,16 +5,16 @@ use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Order;
 use cw_storage_plus::Map;
-use msg::contracts::liquidity_token::LiquidityTokenKind;
-use msg::contracts::market::config::MaxLiquidity;
-use msg::contracts::market::entry::{LiquidityCooldown, LpInfoResp, UnstakingStatus};
-use msg::contracts::market::liquidity::events::{
+use perpswap::contracts::liquidity_token::LiquidityTokenKind;
+use perpswap::contracts::market::config::MaxLiquidity;
+use perpswap::contracts::market::entry::{LiquidityCooldown, LpInfoResp, UnstakingStatus};
+use perpswap::contracts::market::liquidity::events::{
     DeltaNeutralityRatioEvent, DepositEvent, LockEvent, UnlockEvent, WithdrawEvent,
 };
-use msg::contracts::market::liquidity::events::{LiquidityPoolSizeEvent, LockUpdateEvent};
-use msg::contracts::market::liquidity::LiquidityStats;
+use perpswap::contracts::market::liquidity::events::{LiquidityPoolSizeEvent, LockUpdateEvent};
+use perpswap::contracts::market::liquidity::LiquidityStats;
+use perpswap::prelude::*;
 use serde::{Deserialize, Serialize};
-use shared::prelude::*;
 pub(crate) use stats::*;
 use std::cmp::Ordering;
 

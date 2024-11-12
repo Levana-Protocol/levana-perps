@@ -1,10 +1,8 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
-#[cfg(feature = "sei")]
-use cosmwasm_std::QuerierWrapper;
 use cosmwasm_std::{Binary, Order};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::{
         OraclePriceFeedPythResp, OraclePriceFeedSeiResp, OraclePriceFeedSimpleResp,
         OraclePriceFeedStrideResp, PriceForQuery,
@@ -12,8 +10,6 @@ use msg::contracts::market::{
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
-#[cfg(feature = "sei")]
-use sei_cosmwasm::{ExchangeRatesResponse, SeiQuerier};
 use serde::{Deserialize, Serialize};
 
 /// Stores spot price history.
@@ -494,9 +490,6 @@ impl State<'_> {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
                 let mut simple = BTreeMap::new();
-                #[cfg(feature = "sei")]
-                let mut sei = BTreeMap::new();
-                #[cfg(not(feature = "sei"))]
                 let sei = BTreeMap::new();
 
                 let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
@@ -560,41 +553,7 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Sei { denom } => {
-                            #[cfg(feature = "sei")]
-                            {
-                                if let Entry::Vacant(entry) = sei.entry(denom.clone()) {
-                                    let querier = QuerierWrapper::new(&*self.querier);
-                                    let querier = SeiQuerier::new(&querier);
-                                    let res: ExchangeRatesResponse =
-                                        querier.query_exchange_rates()?;
-                                    let pair = res
-                                        .denom_oracle_exchange_rate_pairs
-                                        .iter()
-                                        .find(|x| x.denom == *denom)
-                                        .with_context(|| format!("no such denom {denom}"))?;
-
-                                    let price: Decimal256 =
-                                        pair.oracle_exchange_rate.exchange_rate.into();
-                                    let price = Number::try_from(price)?;
-                                    let price = NumberGtZero::try_from(price)
-                                        .context("price must be > 0")?;
-
-                                    let publish_time = Timestamp::from_millis(
-                                        pair.oracle_exchange_rate.last_update_timestamp,
-                                    );
-
-                                    entry.insert(OraclePriceFeedSeiResp {
-                                        price,
-                                        publish_time,
-                                        // Sei feeds default to being volatile unless otherwise overridden
-                                        volatile: feed.volatile.unwrap_or(true),
-                                    });
-                                }
-                            }
-                            #[cfg(not(feature = "sei"))]
-                            {
-                                bail!("SEI price feed for {denom} is only available on sei network")
-                            }
+                            bail!("SEI price feed for {denom} is only available on sei network")
                         }
 
                         SpotPriceFeedData::Stride {

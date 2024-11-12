@@ -1,14 +1,8 @@
+use std::collections::HashSet;
+
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-        spot_price::{SpotPriceConfig, SpotPriceFeedData},
-    },
-    prelude::MarketExecuteMsg,
-};
 use perps_exes::{
     config::{
         ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories,
@@ -16,6 +10,15 @@ use perps_exes::{
     },
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
+};
+use perpswap::{
+    contracts::market::{
+        config::{Config, ConfigUpdate},
+        entry::ExecuteOwnerMsg,
+        spot_price::{SpotPriceConfig, SpotPriceFeedData},
+    },
+    prelude::MarketExecuteMsg,
+    storage::MarketId,
 };
 
 use crate::{
@@ -28,6 +31,9 @@ pub(super) struct SyncConfigOpts {
     /// The factory contract address or identifier
     #[clap(long)]
     factory: String,
+    /// Markets to sync, if empty syncs all
+    #[clap(long = "market")]
+    market_ids: Vec<MarketId>,
 }
 impl SyncConfigOpts {
     pub(super) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
@@ -35,7 +41,13 @@ impl SyncConfigOpts {
     }
 }
 
-async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) -> Result<()> {
+async fn go(
+    opt: crate::cli::Opt,
+    SyncConfigOpts {
+        factory,
+        market_ids,
+    }: SyncConfigOpts,
+) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let network = factory.network;
@@ -47,9 +59,21 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
     let markets = factory.get_markets().await?;
+    let markets = if market_ids.is_empty() {
+        markets
+    } else {
+        let market = market_ids.into_iter().collect::<HashSet<_>>();
+        markets
+            .into_iter()
+            .filter(|x| market.contains(&x.market_id))
+            .collect()
+    };
     let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
-    let owner = factory.query_owner().await?;
+    let owner = factory
+        .query_owner()
+        .await?
+        .context("The factory owner is not provided")?;
     let mut updates = vec![];
 
     for MarketInfo {
@@ -74,7 +98,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .get(&network)
             .with_context(|| format!("No crank fee config found for network {network}"))?;
         let default_config = Config::new(
-            msg::contracts::market::spot_price::SpotPriceConfig::Manual {
+            perpswap::contracts::market::spot_price::SpotPriceConfig::Manual {
                 admin: Addr::unchecked("ignored"),
             },
         );

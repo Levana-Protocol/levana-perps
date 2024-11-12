@@ -1,4 +1,4 @@
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     entry::PositionsQueryFeeApproach,
     position::{PositionId, PositionsResp},
 };
@@ -57,7 +57,7 @@ impl<'a> State<'a> {
             return Ok((info, true));
         }
 
-        let msg::contracts::factory::entry::MarketInfoResponse {
+        let perpswap::contracts::factory::entry::MarketInfoResponse {
             market_addr,
             position_token: _,
             liquidity_token_lp: _,
@@ -66,7 +66,7 @@ impl<'a> State<'a> {
             .querier
             .query_wasm_smart(
                 &self.config.factory,
-                &msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                &perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                     market_id: market_id.clone(),
                 },
             )
@@ -77,11 +77,11 @@ impl<'a> State<'a> {
                 )
             })?;
 
-        let status: msg::contracts::market::entry::StatusResp = self
+        let status: perpswap::contracts::market::entry::StatusResp = self
             .querier
             .query_wasm_smart(
                 &market_addr,
-                &msg::contracts::market::entry::QueryMsg::Status { price: None },
+                &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
             )
             .with_context(|| format!("Unable to load market status from contract {market_addr}"))?;
 
@@ -107,6 +107,7 @@ impl<'a> State<'a> {
         Ok(market)
     }
 }
+
 impl Totals {
     /// Convert an amount of shares into collateral.
     pub(crate) fn shares_to_collateral(
@@ -114,13 +115,12 @@ impl Totals {
         shares: LpToken,
         pos: &PositionsInfo,
     ) -> Result<Collateral> {
-        let collateral = self.collateral.checked_add(pos.active_collateral()?)?;
-        Ok(Collateral::from_decimal256(
-            shares
-                .into_decimal256()
-                .checked_mul(collateral.into_decimal256())?
-                .checked_div(self.shares.into_decimal256())?,
-        ))
+        let total_collateral = self.collateral.checked_add(pos.active_collateral()?)?;
+        let one_share_value = total_collateral
+            .into_decimal256()
+            .checked_div(self.shares.into_decimal256())?;
+        let share_collateral = shares.into_decimal256().checked_mul(one_share_value)?;
+        Ok(Collateral::from_decimal256(share_collateral))
     }
 
     /// Returns the newly minted share amount
@@ -182,7 +182,7 @@ impl PositionsInfo {
         let Resp { tokens } = state.querier.query_wasm_smart(
             &market.addr,
             &MarketQueryMsg::NftProxy {
-                nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
+                nft_msg: perpswap::contracts::position_token::entry::QueryMsg::Tokens {
                     owner: state.my_addr.as_ref().into(),
                     start_after: None,
                     limit: None,
@@ -226,5 +226,64 @@ impl PositionsInfo {
             PositionsInfo::NoPositions => Ok(Collateral::zero()),
             PositionsInfo::OnePosition { pos } => Ok(pos.active_collateral.raw()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use perpswap::number::{Collateral, UnsignedDecimal};
+
+    use crate::{PositionsInfo, Totals};
+
+    #[test]
+    fn regression_perp_4062() {
+        let totals = Totals {
+            collateral: "0.000000000000005108".parse().unwrap(),
+            shares: "0.000000000000005108".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert_ne!(my_collateral, Collateral::zero());
+        assert!(my_collateral.approx_eq(totals.collateral));
+
+        let totals = Totals {
+            collateral: "9999999999999999".parse().unwrap(),
+            shares: "0.000000000000005108".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
+
+        let totals = Totals {
+            collateral: "0.000000000000005108".parse().unwrap(),
+            shares: "9999999999999999".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
+
+        let totals = Totals {
+            collateral: "999999999999999999".parse().unwrap(),
+            shares: "999999999999999999".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
     }
 }

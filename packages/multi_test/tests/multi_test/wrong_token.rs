@@ -1,6 +1,6 @@
 use cosmwasm_std::{testing::MockApi, to_json_binary};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{contracts::liquidity_token::LiquidityTokenKind, prelude::*, token::Token};
+use perpswap::{contracts::liquidity_token::LiquidityTokenKind, prelude::*, token::Token};
 
 #[test]
 fn directly_call_receive() {

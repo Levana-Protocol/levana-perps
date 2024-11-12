@@ -2,6 +2,7 @@
 pub(crate) mod all_contracts;
 pub(crate) mod auth;
 pub(crate) mod code_ids;
+pub(crate) mod copy_trading;
 pub(crate) mod label;
 pub(crate) mod liquidity_token;
 pub(crate) mod market;
@@ -11,7 +12,7 @@ pub(crate) mod reply;
 pub(crate) mod shutdown;
 
 use cosmwasm_std::{Addr, Api, Deps, DepsMut, Env, Storage};
-use shared::prelude::*;
+use perpswap::prelude::*;
 
 pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,

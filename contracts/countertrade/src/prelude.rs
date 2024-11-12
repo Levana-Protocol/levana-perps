@@ -5,11 +5,11 @@ pub(crate) use cosmwasm_std::{
     Empty, Env, Event, MessageInfo, Order, QuerierWrapper, Reply, Response, Storage, Uint128,
 };
 pub(crate) use cw_storage_plus::{Bound, Item, Map};
-pub(crate) use msg::contracts::countertrade::*;
-pub(crate) use msg::contracts::market::entry::{
+pub(crate) use perpswap::contracts::countertrade::*;
+pub(crate) use perpswap::contracts::market::entry::{
     ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg,
 };
-pub(crate) use shared::{
+pub(crate) use perpswap::{
     attr_map,
     storage::{Collateral, LpToken, MarketId, NonZero, Notional, Signed, UnsignedDecimal},
 };

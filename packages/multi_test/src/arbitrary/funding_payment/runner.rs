@@ -5,8 +5,8 @@ use crate::market_wrapper::PerpsMarket;
 use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_multi_test::AppResponse;
-use msg::contracts::market::position::PositionId;
-use msg::prelude::*;
+use perpswap::contracts::market::position::PositionId;
+use perpswap::prelude::*;
 
 #[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub enum FundingPaymentExpect {

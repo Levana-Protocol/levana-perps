@@ -3,8 +3,6 @@ name: Test
 on:
   push:
     branches: [main]
-    tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request:
   workflow_dispatch:
 
@@ -25,20 +23,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: just@1.25.2
+          tool: just@1.25.2,nextest@0.9.82
       - uses: dorny/paths-filter@v3
         id: contracts
         with:
           filters: |
             contracts:
               - 'contracts/**'
-              - 'packages/msg/**'
-              - 'packages/shared/**'
+              - 'packages/perpswap/**'
               - 'packages/multi_test/**'
               - 'packages/fuzz/**'
               - '.ci/**'
-      - name: Check commit
-        run: just check-commits
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -47,7 +42,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.81.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -95,53 +90,3 @@ jobs:
       - name: Migrate contracts (osmoci)
         if: github.ref == 'refs/heads/main'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just migrate-osmoci || echo "Ignoring failed migration"
-      - name: Configure AWS Credentials
-        if: github.ref == 'refs/heads/main'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
-      - name: Build and Deploy documentation
-        if: github.ref == 'refs/heads/main'
-        run: |
-          just build-docs
-          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --size-only --acl public-read --delete
-
-  macos-binary:
-    runs-on: macos-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: de-vri-es/setup-git-credentials@v2
-        with:
-          credentials: "https://levana-bot:${{secrets.GH_BOT_PAT}}@github.com"
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just@1.25.0
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.75.0
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            .
-      - name: Compile
-        run: just cargo-compile
-      - name: Run tests
-        run: just cargo-test-check
-      - name: Clippy
-        run: just cargo-clippy-check
-      - name: Rustfmt
-        run: just cargo-fmt-check
-      - name: Release builds
-        run: |
-          just cargo-release
-          cp target/release/perps-qa target/release/perps-qa-apple-darwin
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: target/release/perps-qa-apple-darwin
-          generate_release_notes: true

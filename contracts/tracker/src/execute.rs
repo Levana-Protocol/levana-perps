@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use cosmwasm_std::entry_point;
+use cosmwasm_std::{entry_point, Event};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
-use msg::contracts::tracker::entry::ExecuteMsg;
-use msg::contracts::tracker::events::{InstantiateEvent, MigrateEvent, NewCodeIdEvent};
+use perpswap::contracts::tracker::entry::ExecuteMsg;
+use perpswap::contracts::tracker::events::{InstantiateEvent, MigrateEvent, NewCodeIdEvent};
 
 use crate::state::{
     CodeIdInfo, ContractInfo, ADMINS, CODE_BY_HASH, CODE_BY_ID, CONTRACT_BY_ADDR,
@@ -44,14 +44,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 gitrev,
             };
             CODE_BY_ID.save(deps.storage, code_id, &info)?;
-            Response::new().add_event(
-                NewCodeIdEvent {
-                    contract_type: info.contract_type,
-                    code_id,
-                    hash: info.hash,
-                }
-                .into(),
-            )
+            let event: Event = NewCodeIdEvent {
+                contract_type: info.contract_type,
+                code_id,
+                hash: info.hash,
+            }
+            .into();
+            Response::new().add_event(event)
         }
         ExecuteMsg::Instantiate {
             code_id,
@@ -85,18 +84,17 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 migrate_count: 0,
             };
             CONTRACT_BY_ADDR.save(deps.storage, &address, &info)?;
+            let event: Event = InstantiateEvent {
+                contract_type: code_id_info.contract_type,
+                code_id,
+                hash: code_id_info.hash,
+                address: address.into_string(),
+                family: info.family,
+                sequence: new_sequence,
+            }
+            .into();
 
-            Response::new().add_event(
-                InstantiateEvent {
-                    contract_type: code_id_info.contract_type,
-                    code_id,
-                    hash: code_id_info.hash,
-                    address: address.into_string(),
-                    family: info.family,
-                    sequence: new_sequence,
-                }
-                .into(),
-            )
+            Response::new().add_event(event)
         }
         ExecuteMsg::Migrate {
             new_code_id,
@@ -124,20 +122,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             contract_info.migrate_count += 1;
             CONTRACT_BY_ADDR.save(deps.storage, &address, &contract_info)?;
 
-            Response::new().add_event(
-                MigrateEvent {
-                    contract_type: old_code_info.contract_type,
-                    old_code_id,
-                    new_code_id,
-                    old_hash: old_code_info.hash,
-                    new_hash: new_code_info.hash,
-                    address: address.into_string(),
-                    family: contract_info.family,
-                    sequence: contract_info.sequence,
-                    new_migrate_count: contract_info.migrate_count,
-                }
-                .into(),
-            )
+            let event: Event = MigrateEvent {
+                contract_type: old_code_info.contract_type,
+                old_code_id,
+                new_code_id,
+                old_hash: old_code_info.hash,
+                new_hash: new_code_info.hash,
+                address: address.into_string(),
+                family: contract_info.family,
+                sequence: contract_info.sequence,
+                new_migrate_count: contract_info.migrate_count,
+            }
+            .into();
+            Response::new().add_event(event)
         }
         ExecuteMsg::AddAdmin { address } => {
             let address = deps.api.addr_validate(&address)?;

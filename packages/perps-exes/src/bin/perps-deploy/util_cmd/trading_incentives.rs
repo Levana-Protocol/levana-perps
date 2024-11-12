@@ -9,8 +9,8 @@ use cosmos::{Address, AddressHrp};
 use cosmwasm_std::Decimal256;
 use perps_exes::config::{MainnetFactories, MainnetFactory};
 use perps_exes::PerpsNetwork;
+use perpswap::storage::{LvnToken, UnsignedDecimal, Usd};
 use reqwest::Url;
-use shared::storage::{LvnToken, UnsignedDecimal, Usd};
 
 #[derive(clap::Parser)]
 pub(super) struct DistributionsCsvOpt {

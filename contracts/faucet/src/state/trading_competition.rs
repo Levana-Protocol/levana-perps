@@ -1,5 +1,5 @@
 use crate::state::*;
-use msg::contracts::faucet::entry::FaucetAsset;
+use perpswap::contracts::faucet::entry::FaucetAsset;
 
 use super::tokens::TOKEN_INFO;
 
@@ -9,6 +9,7 @@ const TAPPED_ONCE: Map<(&Addr, &Addr), ()> = Map::new(namespace::TC_TAPPED_ONCE)
 pub(crate) enum AlreadyTappedTradingCompetition {
     NotTradingCompetition,
     AlreadyTapped(Addr),
+    #[allow(dead_code)]
     DidNotTap(Addr),
 }
 

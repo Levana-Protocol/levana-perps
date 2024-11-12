@@ -1,6 +1,6 @@
 use axum_extra::routing::TypedPath;
+use perpswap::storage::MarketId;
 use serde::Deserialize;
-use shared::storage::MarketId;
 
 #[derive(TypedPath)]
 #[typed_path("/")]

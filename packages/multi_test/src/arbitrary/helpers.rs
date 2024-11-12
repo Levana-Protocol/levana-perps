@@ -1,7 +1,7 @@
-use msg::contracts::market::config::Config;
-use msg::prelude::*;
-use msg::token::Token;
 use once_cell::sync::Lazy;
+use perpswap::contracts::market::config::Config;
+use perpswap::prelude::*;
+use perpswap::token::Token;
 use proptest::prelude::*;
 use std::ops::{Div, Mul, Sub};
 use std::ops::{Range, RangeInclusive};

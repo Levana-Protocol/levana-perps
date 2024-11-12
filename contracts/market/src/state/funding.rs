@@ -5,11 +5,11 @@ use crate::prelude::*;
 use crate::state::data_series::DataSeries;
 use anyhow::Context;
 use cosmwasm_std::{Decimal256, OverflowError};
-use msg::contracts::market::fees::events::{
+use perpswap::contracts::market::fees::events::{
     BorrowFeeChangeEvent, FeeType, FundingPaymentEvent, FundingRateChangeEvent,
     InsufficientMarginEvent, TradeId,
 };
-use msg::contracts::market::position::{
+use perpswap::contracts::market::position::{
     ClosePositionInstructions, LiquidationReason, MaybeClosedPosition, Position,
     PositionCloseReason,
 };

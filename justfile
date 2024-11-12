@@ -20,7 +20,7 @@ cargo-compile:
 
 # Market tests
 market-test collateral-type token-kind:
-	env MARKET_COLLATERAL_TYPE={{collateral-type}} MARKET_TOKEN_KIND={{token-kind}} cargo test --workspace --locked
+	env MARKET_COLLATERAL_TYPE={{collateral-type}} MARKET_TOKEN_KIND={{token-kind}} cargo nextest run --workspace --locked
 
 # cargo tests check
 cargo-test-check:
@@ -67,17 +67,11 @@ cargo-full-check:
 build-contracts:
 	./.ci/contracts.sh
 
-build-contracts-sei:
-	env SEI="true" ./.ci/contracts.sh
-
 # Build contracts with Cosmos Docker tooling for arm64
 # only for development purposes, not deploying mainnet contracts
 # as per the docker tool's internal rules, these builds will have the architecture extension in the name
 build-contracts-arm64:
 	env OPTIMIZER_ARM64="true" ./.ci/contracts.sh
-
-build-contracts-sei-arm64:
-	env SEI="true" OPTIMIZER_ARM64="true" ./.ci/contracts.sh
 
 # Build contracts with native tooling
 # only for development purposes, not deploying mainnet contracts
@@ -85,9 +79,6 @@ build-contracts-sei-arm64:
 # deployed with our tooling easily
 build-contracts-native:
 	./.ci/native-contract-build.sh
-
-build-contracts-native-sei:
-	env SEI="true" ./.ci/native-contract-build.sh
 
 # Deploy contracts to LocalOsmosis
 local-deploy:
@@ -112,8 +103,8 @@ contracts-test-wasmd:
 # Cache docker images by saving it under wasm
 cache-docker-images:
 	mkdir -p wasm/images
-	-docker load -i ./wasm/images/workspace_0.15.1.tar
-	-[ -f wasm/images/workspace_0.15.1.tar ] || docker pull cosmwasm/workspace-optimizer:0.15.1 && docker save cosmwasm/workspace-optimizer:0.15.1 > wasm/images/workspace_0.15.1.tar
+	-docker load -i ./wasm/images/workspace_0.16.1.tar
+	-[ -f wasm/images/workspace_0.15.1.tar ] || docker pull cosmwasm/optimizer:0.16.1 && docker save cosmwasm/optimizer:0.16.1 > wasm/images/workspace_0.16.1.tar
 
 # Typescript check for CI which needs deps installed
 typescript-check:
@@ -122,7 +113,7 @@ typescript-check:
 
 # Typescript schema
 typescript-schema:
-	cd packages/msg && cargo run --example generate-schema
+	cd packages/perpswap && cargo run --example generate-schema
 	cd ts-schema && yarn && yarn build
 
 # Generate the schema and copy to a webapp directory located at ../webapp
@@ -172,31 +163,16 @@ deploy-osmosis-ci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet instantiate --family osmoci
 
-# Deploy to Sei ci
-deploy-sei-ci:
-	cargo run --bin perps-deploy testnet store-code --network sei-testnet
-	cargo run --bin perps-deploy testnet instantiate --family seici
-
-# Deploy to Sei tesntet
-deploy-sei-testnet:
-	cargo run --bin perps-deploy testnet store-code --network sei-testnet
-
 # Migrate osmoci
 migrate-osmoci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet migrate --family osmoci
 
-# Migrate seici
-migrate-seici:
-	cargo run --bin perps-deploy testnet store-code --network sei-testnet
-	cargo run --bin perps-deploy testnet migrate --family seici
-
 # Build documentations
 build-docs:
 	mkdir -p ./.output/temp/schema/cosmos
-	cargo doc --no-deps --package levana_perpswap_cosmos_msg --target-dir=./.output/temp/api/cosmos/msg
-	cargo doc --no-deps --package levana_perpswap_cosmos_shared --target-dir=./.output/temp/api/cosmos/shared
-	echo "<html><body><h1>perpetual swaps</h1></body></html>" > ./.output/temp/index.html
+	cargo doc --no-deps --package levana_perpswap_cosmos --target-dir=./.output/temp/
+	echo "<html><body><h1>404 page not found</h1></body></html>" > ./.output/temp/doc/404.html
 
 # Coverage with specific collateral and market token kind
 coverage-test collateral-type token-kind:
@@ -269,12 +245,6 @@ create-nft-mint-relayer-channel path-name juno-port stargaze-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{stargaze-port}} --order unordered --version nft-mint-001 --debug --override
 create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override
-
-# Check commits
-check-commits:
-	git fetch origin main --depth=1
-	git log --pretty=format:"%ae" $(git branch --show-current)...origin/main > email
-	awk -f ./.ci/commit-check.awk email
 
 # Build perps-market-params binary in release mode
 cargo-market-params-release:

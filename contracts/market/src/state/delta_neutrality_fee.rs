@@ -2,7 +2,7 @@ use super::{State, StateContext};
 use crate::prelude::*;
 use cosmwasm_std::{Decimal256, Storage};
 use cw_storage_plus::Item;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::Config,
     delta_neutrality_fee::{DeltaNeutralityFeeEvent, DeltaNeutralityFeeReason},
     fees::events::{FeeType, InsufficientMarginEvent},
@@ -370,7 +370,6 @@ mod test {
 
     proptest! {
         #[test]
-        #[cfg_attr(not(feature = "proptest"), ignore)]
         fn delta_neutrality_fee_amount(
             cap in 0.0f32..1.0,
             sensitivity in 1.0f32..10.0,

@@ -20,8 +20,7 @@ crate-type = ["cdylib", "rlib"]
 library = []
 
 [dependencies]
-msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
-shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
+perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
 cosmwasm-std = { workspace = true, features = ["abort"] }
 cw2 = "2.0.0"
 cw-storage-plus = "2.0.0"
@@ -34,4 +33,4 @@ cw-utils = "2.0.0"
 serde-json-wasm = "0.5"
 
 [dev-dependencies]
-cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true }

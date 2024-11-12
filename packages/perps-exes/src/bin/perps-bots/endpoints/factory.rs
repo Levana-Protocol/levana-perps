@@ -4,7 +4,7 @@ use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress};
 use perps_exes::PerpsNetwork;
-use shared::storage::MarketId;
+use perpswap::storage::MarketId;
 
 use crate::{
     app::factory::{FactoryInfo, FrontendInfoTestnet},

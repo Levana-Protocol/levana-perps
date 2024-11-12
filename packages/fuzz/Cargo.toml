@@ -6,11 +6,11 @@ edition = "2021"
 
 [dependencies]
 multi_test = {package = "levana_perpswap_multi_test", path = "../multi_test", features = ["arbitrary"] }
-msg = {package = "levana_perpswap_cosmos_msg", path = "../msg", features = ["arbitrary"] }
+perpswap = {package = "levana_perpswap_cosmos", path = "../perpswap", features = ["arbitrary"] }
 libfuzzer-sys = "0.4"
 cosmwasm-std = { workspace = true, features = ["abort"] }
-anyhow = "1.0.82"
-arbitrary = { version = "1.2.0", features = ["derive"] }
+anyhow = "1.0.93"
+arbitrary = { version = "1.4.1", features = ["derive"] }
 
 [package.metadata]
 cargo-fuzz = true

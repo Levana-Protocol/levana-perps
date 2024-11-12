@@ -1,7 +1,7 @@
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt, PerpsApp,
 };
-use msg::{contracts::market::liquidity::events::DeltaNeutralityRatioEvent, prelude::*};
+use perpswap::{contracts::market::liquidity::events::DeltaNeutralityRatioEvent, prelude::*};
 
 #[test]
 fn delta_neutrality_ratio_event() {

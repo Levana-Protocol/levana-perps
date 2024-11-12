@@ -22,8 +22,8 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
-use msg::prelude::*;
-use msg::token::Token;
+use perpswap::prelude::*;
+use perpswap::token::Token;
 use rand::rngs::ThreadRng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
@@ -75,6 +75,7 @@ pub(crate) enum PerpsContract {
     Cw20,
     SimpleOracle,
     Countertrade,
+    CopyTrading,
 }
 
 impl PerpsApp {
@@ -93,11 +94,12 @@ impl PerpsApp {
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
         let simple_oracle_code_id = app.store_code(contract_simple_oracle());
         let countertrade_code_id = app.store_code(contract_countertrade());
+        let copy_trading_code_id = app.store_code(contract_copy_trading());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &msg::contracts::factory::entry::InstantiateMsg {
+            &perpswap::contracts::factory::entry::InstantiateMsg {
                 market_code_id: market_code_id.to_string(),
                 position_token_code_id: position_token_code_id.to_string(),
                 liquidity_token_code_id: liquidity_token_code_id.to_string(),
@@ -107,6 +109,7 @@ impl PerpsApp {
                 kill_switch: TEST_CONFIG.kill_switch.clone().into(),
                 wind_down: TEST_CONFIG.wind_down.clone().into(),
                 label_suffix: Some(" - MULTITEST".to_owned()),
+                copy_trading_code_id: Some(copy_trading_code_id.to_string()),
             },
             &[],
             "factory",
@@ -137,10 +140,10 @@ impl PerpsApp {
         let countertrade_addr = app.instantiate_contract(
             countertrade_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &msg::contracts::countertrade::InstantiateMsg {
+            &perpswap::contracts::countertrade::InstantiateMsg {
                 factory: factory_addr.as_ref().into(),
                 admin: TEST_CONFIG.protocol_owner.clone().into(),
-                config: msg::contracts::countertrade::ConfigUpdate::default(),
+                config: perpswap::contracts::countertrade::ConfigUpdate::default(),
             },
             &[],
             "countertrade",
@@ -156,6 +159,7 @@ impl PerpsApp {
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
                 (PerpsContract::SimpleOracle, simple_oracle_code_id),
                 (PerpsContract::Countertrade, countertrade_code_id),
+                (PerpsContract::CopyTrading, copy_trading_code_id),
             ]
             .into(),
             app,
@@ -267,12 +271,12 @@ impl PerpsApp {
         match self.cw20_addrs.entry(symbol.clone()) {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
-                let msg = msg::contracts::cw20::entry::InstantiateMsg {
+                let msg = perpswap::contracts::cw20::entry::InstantiateMsg {
                     name: symbol.clone(),
                     symbol,
                     decimals: TEST_CONFIG.cw20_decimals,
                     initial_balances: Vec::new(),
-                    minter: msg::contracts::cw20::entry::InstantiateMinter {
+                    minter: perpswap::contracts::cw20::entry::InstantiateMinter {
                         minter: TEST_CONFIG.protocol_owner.clone().into(),
                         cap: None,
                     },
@@ -342,7 +346,8 @@ pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
             factory::contract::execute,
             factory::contract::query,
         )
-        .with_reply(factory::contract::reply),
+        .with_reply(factory::contract::reply)
+        .with_sudo(factory::contract::sudo),
     )
 }
 
@@ -365,6 +370,17 @@ pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
     )
 }
 
+pub(crate) fn contract_copy_trading() -> Box<dyn Contract<Empty>> {
+    Box::new(
+        LocalContractWrapper::new(
+            copy_trading::instantiate,
+            copy_trading::execute,
+            copy_trading::query,
+        )
+        .with_reply(copy_trading::reply),
+    )
+}
+
 // struct to satisfy the `Contract` trait
 pub(crate) struct LocalContractWrapper<
     Instantiate,
@@ -373,6 +389,7 @@ pub(crate) struct LocalContractWrapper<
     ExecuteMsg,
     Query,
     QueryMsg,
+    SudoMsg,
 > where
     Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
     Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
@@ -380,20 +397,38 @@ pub(crate) struct LocalContractWrapper<
     InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
     ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
     QueryMsg: Serialize + DeserializeOwned + 'static,
+    SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
 {
     instantiate: Instantiate,
     execute: Execute,
     query: Query,
+    sudo: Option<SudoFn<SudoMsg>>,
     reply: Option<ReplyFn>,
     instantiate_msg: PhantomData<InstantiateMsg>,
     execute_msg: PhantomData<ExecuteMsg>,
     query_msg: PhantomData<QueryMsg>,
 }
 
+#[allow(type_alias_bounds)]
+type SudoFn<SudoMsg>
+where
+    SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
+= fn(DepsMut, Env, SudoMsg) -> Result<Response>;
 type ReplyFn = fn(DepsMut, Env, Reply) -> Result<Response>;
 
+#[derive(Serialize, serde::Deserialize, Debug)]
+enum NoSudoMsg {}
+
 impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg>
-    LocalContractWrapper<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg>
+    LocalContractWrapper<
+        Instantiate,
+        InstantiateMsg,
+        Execute,
+        ExecuteMsg,
+        Query,
+        QueryMsg,
+        NoSudoMsg,
+    >
 where
     Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
     Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
@@ -407,13 +442,26 @@ where
             instantiate,
             execute,
             query,
+            sudo: None,
             reply: None,
             instantiate_msg: PhantomData,
             execute_msg: PhantomData,
             query_msg: PhantomData,
         }
     }
+}
 
+impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
+    LocalContractWrapper<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
+where
+    Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
+    Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
+    Query: Fn(Deps, Env, QueryMsg) -> Result<QueryResponse> + 'static,
+    InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
+    ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
+    QueryMsg: Serialize + DeserializeOwned + 'static,
+    SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
+{
     pub(crate) fn with_reply(
         self,
         reply_fn: fn(DepsMut, Env, Reply) -> Result<Response<Empty>>,
@@ -422,7 +470,35 @@ where
             instantiate: self.instantiate,
             execute: self.execute,
             query: self.query,
+            sudo: self.sudo,
             reply: Some(reply_fn),
+            instantiate_msg: self.instantiate_msg,
+            execute_msg: self.execute_msg,
+            query_msg: self.query_msg,
+        }
+    }
+
+    pub(crate) fn with_sudo<NewSudoMsg>(
+        self,
+        sudo_fn: fn(DepsMut, Env, NewSudoMsg) -> Result<Response<Empty>>,
+    ) -> LocalContractWrapper<
+        Instantiate,
+        InstantiateMsg,
+        Execute,
+        ExecuteMsg,
+        Query,
+        QueryMsg,
+        NewSudoMsg,
+    >
+    where
+        NewSudoMsg: Serialize + DeserializeOwned + Debug + 'static,
+    {
+        LocalContractWrapper {
+            instantiate: self.instantiate,
+            execute: self.execute,
+            query: self.query,
+            sudo: Some(sudo_fn),
+            reply: self.reply,
             instantiate_msg: self.instantiate_msg,
             execute_msg: self.execute_msg,
             query_msg: self.query_msg,
@@ -430,8 +506,17 @@ where
     }
 }
 
-impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg> Contract<Empty, Empty>
-    for LocalContractWrapper<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg>
+impl<Instantiate, InstantiateMsg, Execute, ExecuteMsg, Query, QueryMsg, SudoMsg>
+    Contract<Empty, Empty>
+    for LocalContractWrapper<
+        Instantiate,
+        InstantiateMsg,
+        Execute,
+        ExecuteMsg,
+        Query,
+        QueryMsg,
+        SudoMsg,
+    >
 where
     Instantiate: Fn(DepsMut, Env, MessageInfo, InstantiateMsg) -> Result<Response> + 'static,
     Execute: Fn(DepsMut, Env, MessageInfo, ExecuteMsg) -> Result<Response> + 'static,
@@ -439,6 +524,7 @@ where
     InstantiateMsg: Serialize + DeserializeOwned + Debug + 'static,
     ExecuteMsg: Serialize + DeserializeOwned + Debug + 'static,
     QueryMsg: Serialize + DeserializeOwned + 'static,
+    SudoMsg: Serialize + DeserializeOwned + Debug + 'static,
 {
     fn execute(
         &self,
@@ -467,8 +553,12 @@ where
         (self.query)(deps, env, msg)
     }
 
-    fn sudo(&self, _deps: DepsMut<Empty>, _env: Env, _msg: Vec<u8>) -> Result<Response<Empty>> {
-        bail!("sudo not implemented for contract")
+    fn sudo(&self, deps: DepsMut<Empty>, env: Env, msg: Vec<u8>) -> Result<Response<Empty>> {
+        let msg: SudoMsg = from_json(msg)?;
+        match self.sudo {
+            Some(sudo) => (sudo)(deps, env, msg),
+            None => bail!("sudo not implemented for contract"),
+        }
     }
 
     // this returns an error if the contract doesn't implement reply

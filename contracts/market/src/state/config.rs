@@ -1,7 +1,7 @@
 use crate::state::*;
 use anyhow::ensure;
 use cw_storage_plus::Item;
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     config::{Config, ConfigUpdate},
     spot_price::{
         PythConfig, SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeed, SpotPriceFeedData,
@@ -24,10 +24,7 @@ pub(crate) fn config_init(
 ) -> Result<()> {
     let mut init_config = Config::new(convert_spot_price_init(api, spot_price)?);
 
-    let update = match config {
-        None => ConfigUpdate::default(),
-        Some(update) => update,
-    };
+    let update = config.unwrap_or_default();
 
     update_config(&mut init_config, api, store, update)?;
 

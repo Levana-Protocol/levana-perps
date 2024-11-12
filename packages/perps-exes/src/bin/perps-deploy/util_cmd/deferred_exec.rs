@@ -7,14 +7,14 @@ use std::{
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos, HasCosmos};
-use msg::contracts::market::deferred_execution::{
-    DeferredExecId, DeferredExecStatus, GetDeferredExecResp,
-};
 use parking_lot::Mutex;
 use perps_exes::{
     config::MainnetFactories,
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, MarketId},
+};
+use perpswap::contracts::market::deferred_execution::{
+    DeferredExecId, DeferredExecStatus, GetDeferredExecResp,
 };
 use tokio::task::JoinSet;
 
@@ -181,7 +181,7 @@ async fn go(
     }
 
     while let Some(res) = set.join_next().await {
-        match res.map_or_else(|e| Err(e.into()), |x| x) {
+        match res.unwrap_or_else(|e| Err(e.into())) {
             Ok(()) => (),
             Err(e) => {
                 set.abort_all();

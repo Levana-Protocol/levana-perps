@@ -1,6 +1,6 @@
 use cosmwasm_std::testing::MockApi;
-use msg::prelude::*;
 use once_cell::sync::Lazy;
+use perpswap::prelude::*;
 use std::env;
 use std::string::ToString;
 

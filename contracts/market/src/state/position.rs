@@ -2,11 +2,11 @@ pub(crate) mod liquifund;
 
 use cosmwasm_std::Order;
 mod open;
-use msg::contracts::market::{
+pub(crate) use open::*;
+use perpswap::contracts::market::{
     entry::{ClosedPositionCursor, ClosedPositionsResp, PositionsQueryFeeApproach},
     position::events::{PositionSaveEvent, PositionSaveReason},
 };
-pub(crate) use open::*;
 pub(crate) mod close;
 mod cw721;
 pub(crate) mod take_profit;
@@ -16,7 +16,9 @@ mod validate;
 use crate::constants::DEFAULT_CLOSED_POSITION_HISTORY_LIMIT;
 use crate::prelude::*;
 use cw_storage_plus::PrefixBound;
-use msg::contracts::market::position::{ClosedPosition, LiquidationReason, PositionOrPendingClose};
+use perpswap::contracts::market::position::{
+    ClosedPosition, LiquidationReason, PositionOrPendingClose,
+};
 
 pub(super) const OPEN_POSITIONS: Map<PositionId, Position> = Map::new(namespace::OPEN_POSITIONS);
 pub(super) const LAST_POSITION_ID: Item<PositionId> = Item::new(namespace::LAST_POSITION_ID);
@@ -61,10 +63,6 @@ pub(super) const NEXT_LIQUIFUNDING: Map<(Timestamp, PositionId), ()> =
 
 /// Gets a full position by id
 pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Position> {
-    #[derive(serde::Serialize)]
-    struct Data {
-        position: PositionId,
-    }
     OPEN_POSITIONS
         .may_load(store, id)
         .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
@@ -173,10 +171,10 @@ impl State<'_> {
         let (min, max) = match (cursor, order) {
             (None, _) => (None, None),
             (Some(cursor), OrderInMessage::Ascending) => {
-                (Some(Bound::inclusive((cursor.time, cursor.position))), None)
+                (Some(Bound::exclusive((cursor.time, cursor.position))), None)
             }
             (Some(cursor), OrderInMessage::Descending) => {
-                (None, Some(Bound::inclusive((cursor.time, cursor.position))))
+                (None, Some(Bound::exclusive((cursor.time, cursor.position))))
             }
         };
 
@@ -194,6 +192,7 @@ impl State<'_> {
                 }
                 Some(res) => {
                     let (key, pos) = res?;
+                    positions.push(pos);
                     // continuations only exist when we reach a limit and break early
                     if positions.len() == limit {
                         // slight optimization, to avoid needless pagination
@@ -206,7 +205,6 @@ impl State<'_> {
                             break None;
                         }
                     }
-                    positions.push(pos);
                 }
             }
         };

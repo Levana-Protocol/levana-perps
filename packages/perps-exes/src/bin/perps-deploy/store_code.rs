@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use cosmos::{Cosmos, CosmosNetwork, HasAddressHrp, Wallet};
-use msg::contracts::tracker::entry::CodeIdResp;
 use perps_exes::{config::parse_deployment, PerpsNetwork};
+use perpswap::contracts::tracker::entry::CodeIdResp;
 
 use crate::{cli::Opt, tracker::Tracker, util::get_hash_for_path};
 

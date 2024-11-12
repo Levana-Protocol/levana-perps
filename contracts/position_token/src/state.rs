@@ -3,8 +3,8 @@ mod market;
 
 use cosmwasm_std::{Addr, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 use cw_storage_plus::Item;
-use shared::namespace;
-use shared::prelude::*;
+use perpswap::namespace;
+use perpswap::prelude::*;
 
 /// The factory address
 const FACTORY_ADDR: Item<Addr> = Item::new(namespace::FACTORY_ADDR);

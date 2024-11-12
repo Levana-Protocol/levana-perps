@@ -1,9 +1,9 @@
 use anyhow::Result;
-use cosmwasm_std::entry_point;
+use cosmwasm_std::{entry_point, Event};
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::tracker::entry::{InstantiateMsg, MigrateMsg};
-use msg::contracts::tracker::events::NewTracker;
+use perpswap::contracts::tracker::entry::{InstantiateMsg, MigrateMsg};
+use perpswap::contracts::tracker::events::NewTracker;
 
 use crate::state::ADMINS;
 
@@ -22,12 +22,11 @@ pub fn instantiate(
 
     ADMINS.save(deps.storage, &info.sender, &())?;
 
-    Ok(Response::new().add_event(
-        NewTracker {
-            admin: info.sender.into_string(),
-        }
-        .into(),
-    ))
+    let event: Event = NewTracker {
+        admin: info.sender.into_string(),
+    }
+    .into();
+    Ok(Response::new().add_event(event))
 }
 
 #[entry_point]

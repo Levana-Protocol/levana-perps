@@ -8,9 +8,9 @@ use crate::cli::Cmd;
 use anyhow::Result;
 use clap::Parser;
 use cosmos::Coin;
-use msg::contracts::market::entry::StatusResp;
-use msg::contracts::market::{entry::SlippageAssert, liquidity::LiquidityStats};
 use perps_exes::prelude::*;
+use perpswap::contracts::market::entry::StatusResp;
+use perpswap::contracts::market::{entry::SlippageAssert, liquidity::LiquidityStats};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -101,7 +101,7 @@ async fn main_inner() -> Result<()> {
         cli::Subcommand::OpenPosition {
             collateral,
             leverage,
-            max_gains,
+            take_profit,
             current_price,
             max_slippage,
             short,
@@ -111,15 +111,8 @@ async fn main_inner() -> Result<()> {
             } else {
                 DirectionToBase::Long
             };
-            // Convert from percentage to ratio representation.
-            let max_gain = match max_gains {
-                MaxGainsInQuote::Finite(x) => MaxGainsInQuote::Finite(
-                    NonZero::new(x.raw() / Decimal256::from_str("100").unwrap()).unwrap(),
-                ),
-                MaxGainsInQuote::PosInfinity => MaxGainsInQuote::PosInfinity,
-            };
             tracing::debug!("Collateral: {collateral}");
-            tracing::debug!("Max gains: {:?}", max_gain);
+            tracing::debug!("Take Profit: {:?}", take_profit);
             tracing::debug!("Leverage: {:?}", leverage);
             tracing::debug!("Direction: {:?}", direction);
 
@@ -143,10 +136,9 @@ async fn main_inner() -> Result<()> {
                     collateral,
                     direction,
                     leverage,
-                    max_gain,
                     slippage_assert,
                     None,
-                    None,
+                    take_profit,
                 )
                 .await?;
             println!("Transaction hash: {}", tx.txhash);

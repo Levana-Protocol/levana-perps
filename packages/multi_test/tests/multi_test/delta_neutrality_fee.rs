@@ -2,8 +2,8 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt,
     return_unless_market_collateral_quote, time::TimeJump, PerpsApp,
 };
-use msg::contracts::market::config::ConfigUpdate;
-use msg::prelude::*;
+use perpswap::contracts::market::config::ConfigUpdate;
+use perpswap::prelude::*;
 
 #[test]
 fn delta_neutrality_fee_cap() {

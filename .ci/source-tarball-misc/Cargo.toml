@@ -5,8 +5,7 @@ members = [
     "contracts/liquidity_token",
     "contracts/market",
     "contracts/position_token",
-    "packages/msg",
-    "packages/shared",
+    "packages/perpswap",
 ]
 
 [profile.release]

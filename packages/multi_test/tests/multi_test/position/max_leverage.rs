@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 #[test]
 fn max_leverage_long() {

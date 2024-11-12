@@ -1,3 +1,4 @@
+mod copy_trading;
 mod counterleverage;
 mod countertrade;
 mod crank_fee;
@@ -10,6 +11,7 @@ mod edge;
 mod edge_liquidation;
 mod edge_update;
 mod events;
+mod factory;
 mod fees;
 mod funding;
 mod history;

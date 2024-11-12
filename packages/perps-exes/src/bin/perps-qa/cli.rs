@@ -1,6 +1,6 @@
 use cosmos::{Address, SeedPhrase};
-use msg::{contracts::market::position::PositionId, prelude::*};
 use perps_exes::{build_version, PerpsNetwork, UpdatePositionCollateralImpact};
+use perpswap::{contracts::market::position::PositionId, prelude::*};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 #[derive(clap::Parser)]
@@ -36,9 +36,9 @@ pub(crate) enum Subcommand {
         /// Leverage
         #[clap(long, allow_hyphen_values = true)]
         leverage: LeverageToBase,
-        /// Max gains percentage
+        /// Take profit price
         #[clap(long, allow_hyphen_values = true)]
-        max_gains: MaxGainsInQuote,
+        take_profit: PriceBaseInQuote,
         /// Current USD Price
         #[clap(long)]
         current_price: Option<PriceBaseInQuote>,

@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use cosmwasm_std::{SubMsg, WasmMsg};
-use msg::contracts::market::{
+use perpswap::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
     position::{PositionId, PositionQueryResponse},
 };
-use shared::{
+use perpswap::{
     number::Number,
     price::{Price, TakeProfitTrader},
     storage::{
@@ -35,13 +35,13 @@ pub(crate) fn get_work_for(
             &MarketQueryMsg::GetDeferredExec { id },
         )? {
             GetDeferredExecResp::Found { item } => match item.status {
-                msg::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
-                    return Ok(HasWorkResp::NoWork {})
+                perpswap::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
+                    return Ok(HasWorkResp::NoWork {});
                 }
-                msg::contracts::market::deferred_execution::DeferredExecStatus::Success {
+                perpswap::contracts::market::deferred_execution::DeferredExecStatus::Success {
                     ..
                 }
-                | msg::contracts::market::deferred_execution::DeferredExecStatus::Failure {
+                | perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
                     ..
                 } => {
                     return Ok(HasWorkResp::Work {
@@ -75,7 +75,7 @@ pub(crate) fn get_work_for(
                 cursor
             }),
             limit: Some(1),
-            order: Some(shared::storage::OrderInMessage::Ascending),
+            order: Some(perpswap::storage::OrderInMessage::Ascending),
         },
     )?;
     assert!(positions.len() <= 1);
@@ -182,13 +182,17 @@ pub(crate) fn get_work_for(
                             take_profit_factor,
                             stop_loss_factor,
                             Some(*pos.clone()),
+                            market,
+                            state,
                         )?;
                         match result {
                             Some(work) => return Ok(HasWorkResp::Work { desc: work }),
                             None => return Ok(HasWorkResp::NoWork {}),
                         }
                     }
-                    None => return Ok(HasWorkResp::NoWork {}),
+                    None => {
+                        return Ok(HasWorkResp::NoWork {});
+                    }
                 }
             }
         }
@@ -199,7 +203,15 @@ pub(crate) fn get_work_for(
         return Ok(HasWorkResp::NoWork {});
     }
 
-    desired_action(state, &status, &price, pos.as_deref(), available_collateral).map(|x| match x {
+    desired_action(
+        state,
+        &status,
+        &price,
+        pos.as_deref(),
+        available_collateral,
+        market,
+    )
+    .map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
     })
@@ -211,6 +223,7 @@ fn desired_action(
     price: &PricePoint,
     pos: Option<&PositionQueryResponse>,
     available_collateral: NonZero<Collateral>,
+    market_info: &MarketInfo,
 ) -> Result<Option<WorkDescription>> {
     let one_sided_market = if status.long_funding.is_zero() || status.short_funding.is_zero() {
         assert!(status.long_funding.is_zero());
@@ -296,6 +309,8 @@ fn desired_action(
                                 take_profit_factor,
                                 stop_loss_factor,
                                 None,
+                                market_info,
+                                state,
                             )
                         }
 
@@ -341,6 +356,8 @@ fn desired_action(
                                 take_profit_factor,
                                 stop_loss_factor,
                                 Some(pos.clone()),
+                                market_info,
+                                state,
                             )
                         }
                         None => Ok(None),
@@ -372,6 +389,8 @@ fn desired_action(
                             take_profit_factor,
                             stop_loss_factor,
                             None,
+                            market_info,
+                            state,
                         )
                     }
                     None => Ok(None),
@@ -458,6 +477,14 @@ fn smart_search(
     } else {
         (short_notional, long_notional)
     };
+
+    // Takes care of PERP-4149
+    // In case both popular and unpopular sides are 0, we need to close any CT position, or do
+    // nothing
+    if unpopular_notional == Notional::zero() && popular_notional == Notional::zero() {
+        return Ok(Notional::zero());
+    }
+
     // Ratio refers to what percentage of the market is unpopular.
     // The absolute maximum we can ever achieve is 0.5, meaning a
     // perfectly balanced market.
@@ -465,6 +492,7 @@ fn smart_search(
     // The lowest ratio we'll potentially want is the starting ratio.
     // The fact that we're in this function means we know we want to
     // increase the unpopular side positions.
+
     let mut high_ratio = Decimal256::from_ratio(1u8, 2u8);
     let mut low_ratio = unpopular_notional.into_decimal256().checked_div(
         popular_notional
@@ -482,7 +510,6 @@ fn smart_search(
                 .checked_mul(popular_notional.into_decimal256())?
                 .checked_div(Decimal256::one().checked_sub(target_ratio)?)?,
         );
-        let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
 
         assert!(popular_notional >= desired_unpopular);
         let new_funding_rate = derive_popular_funding_rate_annual(
@@ -496,7 +523,10 @@ fn smart_search(
             .checked_sub(target_funding)?
             .abs_unsigned();
         let epsilon = Decimal256::from_str("0.00001").unwrap();
-        if difference < epsilon {
+        if desired_unpopular < unpopular_notional {
+            break Ok(Notional::zero());
+        } else if difference < epsilon {
+            let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
             break Ok(delta_unpopular);
         } else if iteration >= allowed_iterations {
             break Err(anyhow!("Iteration limit reached without converging"));
@@ -511,7 +541,7 @@ fn smart_search(
 fn derive_popular_funding_rate_annual(
     popular_notional: Notional,
     unpopular_notional: Notional,
-    config: &msg::contracts::market::config::Config,
+    config: &perpswap::contracts::market::config::Config,
 ) -> Result<Decimal256> {
     let rf_per_annual_cap = config.funding_rate_max_annualized;
     let instant_net_open_interest = popular_notional
@@ -572,8 +602,14 @@ fn derive_popular_funding_rate_annual(
             std::cmp::Ordering::Equal => (Number::ZERO, Number::ZERO),
         }
     };
-    assert!(unpopular.is_negative());
-    assert!(popular.is_strictly_positive());
+
+    if instant_open_long.is_zero() || instant_open_short.is_zero() {
+        assert!(unpopular.is_zero());
+        assert!(popular.is_zero());
+    } else {
+        assert!(unpopular.is_negative());
+        assert!(popular.is_strictly_positive());
+    }
     Ok(popular.abs_unsigned())
 }
 
@@ -587,6 +623,8 @@ fn compute_delta_notional(
     take_profit_factor: Decimal256,
     stop_loss_factor: Decimal256,
     countertrade_position: Option<PositionQueryResponse>,
+    market_info: &MarketInfo,
+    state: &State,
 ) -> Result<Option<WorkDescription>> {
     let entry_price = price.price_notional;
     let hundred = Number::from_str("100").context("Unable to convert 100 to Number")?;
@@ -655,6 +693,9 @@ fn compute_delta_notional(
         countertrade_position.clone(),
         status.market_type,
         min_deposit_collateral,
+        market_info,
+        price,
+        state,
     )?;
 
     let work = match capital {
@@ -683,17 +724,29 @@ fn compute_delta_notional(
                 }
             }
             Capital::AddCollateral { collateral, pos_id } => {
+                // Make sure we're providing more collateral than the crank fee.
+                // As an arbitrary metric, we make sure we always have at least 5x the crank fee,
+                // otherwise we'll just bleed funds into fees.
+                let crank_fee_collateral = estimate_crank_fee_from_status(status, price)?
+                    .checked_mul_dec(Decimal256::from_ratio(5u8, 1u8))?;
+                if crank_fee_collateral >= collateral {
+                    return Ok(None);
+                }
                 WorkDescription::UpdatePositionAddCollateralImpactSize {
                     pos_id,
                     amount: NonZero::new(collateral).context("add_collateral is zero")?,
                 }
             }
-            Capital::RemoveCollateral { collateral, pos_id } => {
-                WorkDescription::UpdatePositionRemoveCollateralImpactSize {
-                    pos_id,
-                    amount: NonZero::new(collateral).context("remove_collateral is zero")?,
-                }
-            }
+            Capital::RemoveCollateral {
+                collateral,
+                pos_id,
+                crank_fee,
+            } => WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+                pos_id,
+                amount: NonZero::new(collateral).context("remove_collateral is zero")?,
+                crank_fee,
+            },
+            Capital::Close { pos_id } => WorkDescription::ClosePosition { pos_id },
         },
         None => return Ok(None),
     };
@@ -712,10 +765,15 @@ enum Capital {
     RemoveCollateral {
         collateral: Collateral,
         pos_id: PositionId,
+        crank_fee: Collateral,
+    },
+    Close {
+        pos_id: PositionId,
     },
 }
 
 /// Returns the deposit collateral and leverage value to be used for this position.
+#[allow(clippy::too_many_arguments)]
 fn optimize_capital_efficiency(
     available_collateral: NonZero<Collateral>,
     position_notional_size_in_collateral: Signed<Collateral>,
@@ -723,6 +781,9 @@ fn optimize_capital_efficiency(
     countertrade_position: Option<PositionQueryResponse>,
     market_type: MarketType,
     min_deposit_collateral: Collateral,
+    market_info: &MarketInfo,
+    price: &PricePoint,
+    state: &State,
 ) -> Result<Option<Capital>> {
     let result = match countertrade_position {
         Some(countertrade_position) => {
@@ -753,11 +814,14 @@ fn optimize_capital_efficiency(
             } else if diff.is_zero() {
                 None
             } else {
+                // We should reduce collateral
+                let estimated_crank_fee = estimate_crank_fee(state, market_info, price)?;
                 let collateral = diff.abs_unsigned();
-                let countertrade_final_deposit_collateral = countertrade_position
-                    .deposit_collateral
+                let countertrade_final_active_collateral = countertrade_position
+                    .active_collateral
+                    .into_signed()
                     .checked_sub(collateral.into_signed())?;
-                let max_deduct = if countertrade_final_deposit_collateral
+                let max_deduct = if countertrade_final_active_collateral
                     >= min_deposit_collateral.into_signed()
                 {
                     collateral
@@ -767,10 +831,22 @@ fn optimize_capital_efficiency(
                         .checked_sub(min_deposit_collateral.into_signed())?;
                     result.abs_unsigned()
                 };
-                Some(Capital::RemoveCollateral {
-                    collateral: max_deduct,
-                    pos_id: countertrade_position.id,
-                })
+                if estimated_crank_fee > max_deduct {
+                    // If crank_fee is more than the amount it's going
+                    // to be reduce, it's not worth performing this
+                    // action
+                    None
+                } else if max_deduct >= countertrade_position.active_collateral.raw() {
+                    Some(Capital::Close {
+                        pos_id: countertrade_position.id,
+                    })
+                } else {
+                    Some(Capital::RemoveCollateral {
+                        collateral: max_deduct,
+                        pos_id: countertrade_position.id,
+                        crank_fee: estimated_crank_fee,
+                    })
+                }
             }
         }
         None => {
@@ -848,9 +924,8 @@ pub(crate) fn execute(
                     slippage_assert: None,
                     leverage,
                     direction,
-                    max_gains: None,
                     stop_loss_override,
-                    take_profit: Some(take_profit),
+                    take_profit,
                 },
             )?;
             totals.collateral = totals.collateral.checked_sub(collateral.raw())?;
@@ -923,6 +998,7 @@ pub(crate) fn execute(
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
             res = res.add_event(event);
+
             let msg = market.token.into_market_execute_msg(
                 &market.addr,
                 amount.raw(),
@@ -936,30 +1012,62 @@ pub(crate) fn execute(
 
             res = add_market_msg(storage, res, msg)?;
         }
-        WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => {
+        WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+            pos_id,
+            amount,
+            crank_fee,
+        } => {
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
+                .add_attribute("crank-fee", crank_fee.to_string())
                 .add_attribute("amount", amount.to_string());
             res = res.add_event(event);
+
             let amount = market.token.round_down_to_precision(amount.raw())?;
-            let msg = cosmwasm_std::WasmMsg::Execute {
-                contract_addr: market.addr.into_string(),
-                msg: to_json_binary(
-                    &MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
-                        id: pos_id,
-                        amount: NonZero::new(amount).context("amount is zero")?,
-                        slippage_assert: None,
-                    },
-                )?,
-                funds: vec![],
+            let amount = NonZero::new(amount).context("Remove amount is zero")?;
+
+            let market_msg = MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                id: pos_id,
+                amount,
+                slippage_assert: None,
             };
+            let msg = market
+                .token
+                .into_market_execute_msg(&market.addr, crank_fee, market_msg)?;
 
-            totals.collateral = totals.collateral.checked_add(amount)?;
+            totals.collateral = totals.collateral.checked_add(amount.raw())?;
+            totals.collateral = totals.collateral.checked_sub(crank_fee)?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
-
             res = add_market_msg(storage, res, msg)?;
         }
     }
 
     Ok(res)
+}
+
+fn estimate_crank_fee(
+    state: &State,
+    market: &MarketInfo,
+    price: &PricePoint,
+) -> Result<Collateral> {
+    // Loginc taken from from deferred_execution part of the code.
+    let status: perpswap::contracts::market::entry::StatusResp = state
+        .querier
+        .query_wasm_smart(
+            &market.addr,
+            &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
+        )
+        .with_context(|| format!("Unable to load market status from contract {}", market.addr))?;
+    estimate_crank_fee_from_status(&status, price)
+}
+
+fn estimate_crank_fee_from_status(status: &StatusResp, price: &PricePoint) -> Result<Collateral> {
+    let crank_fee_surcharge = status.config.crank_fee_surcharge;
+    let crank_fee_charged = status.config.crank_fee_charged;
+    let estimated_queue_size = 5u32;
+    let fees =
+        crank_fee_surcharge.checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
+    let fees = fees.checked_add(crank_fee_charged)?;
+    let fees = price.usd_to_collateral(fees);
+    Ok(fees)
 }

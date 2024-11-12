@@ -5,6 +5,7 @@ mod list_contracts;
 mod lp_history;
 mod token_balances;
 mod top_traders;
+mod trading_fees;
 mod trading_incentives;
 mod tvl_report;
 
@@ -17,14 +18,6 @@ use std::{
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress, TxBuilder};
-use msg::contracts::market::{
-    entry::{PositionAction, PositionActionKind, TradeHistorySummary},
-    position::{
-        ClosedPosition, LiquidationReason, PositionCloseReason, PositionId, PositionQueryResponse,
-        PositionsResp,
-    },
-    spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
-};
 use perps_exes::{
     config::{ChainConfig, MainnetFactories},
     contracts::Factory,
@@ -32,11 +25,19 @@ use perps_exes::{
     pyth::get_oracle_update_msg,
     PerpsNetwork,
 };
-use reqwest::Url;
-use serde_json::json;
-use shared::storage::{
+use perpswap::contracts::market::{
+    entry::{PositionAction, PositionActionKind, TradeHistorySummary},
+    position::{
+        ClosedPosition, LiquidationReason, PositionCloseReason, PositionId, PositionQueryResponse,
+        PositionsResp,
+    },
+    spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
+};
+use perpswap::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
+use reqwest::Url;
+use serde_json::json;
 use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]
@@ -98,6 +99,11 @@ enum Sub {
         #[clap(flatten)]
         inner: top_traders::TopTradersOpt,
     },
+    /// Publish the number of active traders in 24 hours
+    TradingFees {
+        #[clap(flatten)]
+        inner: trading_fees::TradingFeesOpt,
+    },
     /// Export a CSV with trading and rekt incentives
     TradingIncentivesCsv {
         #[clap(flatten)]
@@ -128,6 +134,7 @@ impl UtilOpt {
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
             Sub::TopTraders { inner } => inner.go(opt).await,
+            Sub::TradingFees { inner } => inner.go(opt).await,
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
             Sub::GovDistribute { inner } => inner.go(opt).await,
             Sub::CounterTrade { inner } => inner.go(opt).await,

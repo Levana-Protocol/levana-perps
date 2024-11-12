@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmwasm_std::{Attribute, Event};
 use cw_multi_test::AppResponse;
-use msg::prelude::*;
+use perpswap::prelude::*;
 
 // for both multi-test's AppResponse and the real low-level TxResponse
 // in both cases we want to be able to do things like `resp.event_first("open-position")`
@@ -145,8 +145,8 @@ impl CosmosResponseExt for TxResponse {
             // Event is a non-exhaustive struct, so we must create it the "slow" way
             Event::new(raw.r#type).add_attributes(raw.attributes.into_iter().map(|attr| {
                 Attribute {
-                    key: String::from_utf8_lossy(&attr.key).into_owned(),
-                    value: String::from_utf8_lossy(&attr.value).into_owned(),
+                    key: attr.key,
+                    value: attr.value,
                 }
             }))
         }))

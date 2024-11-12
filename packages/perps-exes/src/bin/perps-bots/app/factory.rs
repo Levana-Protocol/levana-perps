@@ -4,9 +4,10 @@ use std::sync::Arc;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
-use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
-use msg::prelude::*;
-use msg::{
+use perpswap::contracts::factory::entry::CopyTradingInfoRaw;
+use perpswap::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
+use perpswap::prelude::*;
+use perpswap::{
     contracts::{
         factory::entry::MarketInfoResponse,
         tracker::entry::{CodeIdResp, ContractResp},
@@ -19,13 +20,32 @@ use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
+use super::copy_trade::{get_copy_trading_addresses, query_copy_trading_last_updated};
 use super::{App, AppBuilder};
 
+#[derive(Clone)]
 pub(crate) struct FactoryInfo {
     pub(crate) factory: Address,
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
     pub(crate) markets: Vec<Market>,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct CopyTrading {
+    pub(crate) addresses: Vec<Address>,
+    pub(crate) start_after: CopyTradingInfoRaw,
+    #[serde(skip)]
+    pub(crate) last_updated: Timestamp,
+}
+
+impl CopyTrading {
+    pub(crate) fn merge(&mut self, new: CopyTrading) {
+        self.addresses.extend(new.addresses);
+        self.last_updated = new.last_updated;
+        self.start_after = new.start_after;
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -98,8 +118,37 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
         }
     };
     let output = WatchedTaskOutput::new(message);
+    let factory = info.factory;
     app.set_factory_info(info).await;
+    if app.config.run_copy_trade {
+        optimized_copy_trading_update(&app.cosmos, app, factory).await?;
+    }
     Ok(output)
+}
+
+async fn optimized_copy_trading_update(cosmos: &Cosmos, app: &App, factory: Address) -> Result<()> {
+    let factory_contract = cosmos.make_contract(factory);
+    let copy_trading = app.get_copy_trading().await;
+    if let Some(ref copy_trading) = copy_trading {
+        let last_updated = query_copy_trading_last_updated(&factory_contract).await?;
+        if copy_trading.last_updated == last_updated {
+            // No new contracts have been added
+            return Ok(());
+        }
+    }
+    let start_after = copy_trading.clone().map(|item| item.start_after.clone());
+    let remaining_copy_trading = get_copy_trading_addresses(&factory_contract, start_after).await?;
+    if let Some(remaining_copy_trading) = remaining_copy_trading {
+        let final_copy_trading = match copy_trading {
+            Some(mut copy_trading) => {
+                copy_trading.merge(remaining_copy_trading);
+                copy_trading
+            }
+            None => remaining_copy_trading,
+        };
+        app.set_copy_trading(final_copy_trading).await;
+    }
+    Ok(())
 }
 
 pub(crate) async fn get_factory_info_mainnet(
@@ -182,11 +231,13 @@ pub(crate) async fn get_contract(
 ) -> Result<(Address, Option<String>)> {
     let tracker = cosmos.make_contract(tracker);
     let (addr, code_id) = match tracker
-        .query(msg::contracts::tracker::entry::QueryMsg::ContractByFamily {
-            contract_type: contract_type.to_owned(),
-            family: family.to_owned(),
-            sequence: None,
-        })
+        .query(
+            perpswap::contracts::tracker::entry::QueryMsg::ContractByFamily {
+                contract_type: contract_type.to_owned(),
+                family: family.to_owned(),
+                sequence: None,
+            },
+        )
         .await
         .with_context(|| {
             format!("Calling ContractByFamily with {contract_type} and {family} against {tracker}",)
@@ -201,7 +252,7 @@ pub(crate) async fn get_contract(
         } => (address.parse()?, current_code_id),
     };
     let gitrev = match tracker
-        .query(msg::contracts::tracker::entry::QueryMsg::CodeById { code_id })
+        .query(perpswap::contracts::tracker::entry::QueryMsg::CodeById { code_id })
         .await?
     {
         CodeIdResp::Found { gitrev, .. } => gitrev,
@@ -221,7 +272,7 @@ async fn get_tokens_markets(
     for market in &markets {
         let denom = market.market_id.get_collateral().to_owned();
         let market_info: MarketInfoResponse = factory
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+            .query(perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
                 market_id: market.market_id.clone(),
             })
             .await?;
@@ -235,10 +286,10 @@ async fn get_tokens_markets(
             collateral: Token,
         }
         let StatusRespJustCollateral { collateral } = market
-            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
+            .query(perpswap::contracts::market::entry::QueryMsg::Status { price: None })
             .await?;
         match collateral {
-            msg::token::Token::Cw20 {
+            perpswap::token::Token::Cw20 {
                 addr,
                 decimal_places,
             } => tokens.push(Cw20 {
@@ -246,7 +297,7 @@ async fn get_tokens_markets(
                 denom,
                 decimals: decimal_places,
             }),
-            msg::token::Token::Native { .. } => (),
+            perpswap::token::Token::Native { .. } => (),
         }
     }
     Ok((tokens, markets))
@@ -256,7 +307,7 @@ async fn get_faucet_gas_amount(cosmos: &Cosmos, faucet: Address) -> Result<Optio
     let contract = cosmos.make_contract(faucet);
     Ok(
         match contract
-            .query(msg::contracts::faucet::entry::QueryMsg::GetGasAllowance {})
+            .query(perpswap::contracts::faucet::entry::QueryMsg::GetGasAllowance {})
             .await?
         {
             GasAllowanceResp::Disabled {} => None,
@@ -275,9 +326,11 @@ async fn get_faucet_collateral_amount(
     let contract = cosmos.make_contract(faucet);
     for name in ["ATOM", "ETH", "BTC", "USDC"] {
         match contract
-            .query(msg::contracts::faucet::entry::QueryMsg::TapAmountByName {
-                name: name.to_owned(),
-            })
+            .query(
+                perpswap::contracts::faucet::entry::QueryMsg::TapAmountByName {
+                    name: name.to_owned(),
+                },
+            )
             .await?
         {
             TapAmountResponse::CanTap { amount } => {
