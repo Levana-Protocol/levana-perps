@@ -939,38 +939,14 @@ dependencies = [
 
 [[package]]
 name = "cosmwasm-schema"
-version = "1.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b4cd28147a66eba73720b47636a58097a979ad8c8bfdb4ed437ebcbfe362576"
-dependencies = [
- "cosmwasm-schema-derive 1.5.7",
- "schemars",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "cosmwasm-schema"
 version = "2.0.2"
 source = "git+https://github.com/Levana-Protocol/cosmwasm.git?rev=6e1fbb12982d02f8ff3f1a291de60d423143c7f1#6e1fbb12982d02f8ff3f1a291de60d423143c7f1"
 dependencies = [
- "cosmwasm-schema-derive 2.0.2",
+ "cosmwasm-schema-derive",
  "schemars",
  "serde",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "cosmwasm-schema-derive"
-version = "1.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9acd45c63d41bc9b16bc6dc7f6bd604a8c2ad29ce96c8f3c96d7fc8ef384392e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -1172,7 +1148,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07dfee7f12f802431a856984a32bce1cb7da1e6c006b5409e3981035ce562dec"
 dependencies = [
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "schemars",
  "serde",
@@ -1185,7 +1161,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b04852cd38f044c0751259d5f78255d07590d136b8a86d4e09efdd7666bd6d27"
 dependencies = [
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "schemars",
@@ -1200,7 +1176,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a42212b6bf29bbdda693743697c621894723f35d3db0d5df930be22903d0e27c"
 dependencies = [
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-utils",
  "schemars",
@@ -2322,7 +2298,7 @@ name = "levana_perpswap_cosmos_cw20"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2340,7 +2316,7 @@ name = "levana_perpswap_cosmos_factory"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2358,7 +2334,7 @@ name = "levana_perpswap_cosmos_faucet"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2375,7 +2351,7 @@ name = "levana_perpswap_cosmos_liquidity_token"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2393,7 +2369,7 @@ name = "levana_perpswap_cosmos_market"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2415,7 +2391,7 @@ version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
  "arbitrary",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2437,7 +2413,7 @@ name = "levana_perpswap_cosmos_position_token"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2458,7 +2434,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "chrono",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2491,7 +2467,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "cosmos-sdk-proto",
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
@@ -2917,7 +2893,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "cosmos",
- "cosmwasm-schema 1.5.7",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "csv",
  "cw-multi-test",
@@ -2934,7 +2910,6 @@ dependencies = [
  "levana_perpswap_cosmos_msg",
  "levana_perpswap_cosmos_shared",
  "levana_perpswap_multi_test",
- "log",
  "mime",
  "once_cell",
  "parking_lot",
@@ -3198,7 +3173,7 @@ name = "pyth-sdk-cw"
 version = "1.2.1"
 source = "git+https://github.com/lvn-hasky-dragon/pyth-crosschain.git?rev=f6ede9803d07f63c8d146fb4ea3a8c1c1445fb57#f6ede9803d07f63c8d146fb4ea3a8c1c1445fb57"
 dependencies = [
- "cosmwasm-schema 2.0.2",
+ "cosmwasm-schema",
  "cosmwasm-std",
  "pyth-sdk",
  "thiserror",

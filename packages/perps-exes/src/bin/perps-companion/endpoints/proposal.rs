@@ -8,12 +8,12 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Json,
 };
-use headers::Host;
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
 use axum_extra::TypedHeader;
 use cosmos::{error::AddressError, Address, Contract};
 use cosmwasm_std::Uint64;
+use headers::Host;
 use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -22,10 +22,13 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::{
     app::App,
-    db::models::{ProposalInfoFromDb, ProposalInfoToDb}, types::{ChainId, ContractEnvironment},
+    db::models::{ProposalInfoFromDb, ProposalInfoToDb},
+    types::{ChainId, ContractEnvironment},
 };
 
-use super::{ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl};
+use super::{
+    ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl,
+};
 
 #[derive(askama::Template)]
 #[template(path = "proposal.html")]
@@ -52,7 +55,9 @@ pub(super) async fn proposal_url(
         .insert_proposal_detail(to_db)
         .await
         .map_err(|e| Error::Database { msg: e.to_string() })?;
-    let url = ProposalHtml { proposal_id: url_id };
+    let url = ProposalHtml {
+        proposal_id: url_id,
+    };
     Ok(Json(json!({ "url": url.to_uri().to_string() })))
 }
 
@@ -77,7 +82,8 @@ impl ProposalInfo {
             host: host.hostname().to_owned(),
             amplitude_key: environment.amplitude_key(),
             chain,
-            address: Address::from_str(&address).map_err(|source| { Error::InvalidAddress{source} })?,
+            address: Address::from_str(&address)
+                .map_err(|source| Error::InvalidAddress { source })?,
         })
     }
 }
@@ -130,7 +136,7 @@ impl GovContract {
                     msg: msg.clone(),
                     query_type,
                 };
-                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                tracing::log::error!("Attempt #{attempt}: {e}. {source:?}");
                 e
             });
             match res {
@@ -152,7 +158,9 @@ impl ProposalInfo {
         let ProposalInfo {
             proposal_id,
             chain,
-            address, .. } = &self;
+            address,
+            ..
+        } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
         let label = match cosmos.make_contract(*address).info().await {
             Ok(info) => Cow::Owned(info.label),
@@ -171,9 +179,7 @@ impl ProposalInfo {
 
         match res.proposals.pop() {
             Some(proposal) => proposal,
-            None => {
-                return Err(Error::ProposalNotFound)
-            }
+            None => return Err(Error::ProposalNotFound),
         };
 
         Ok(ProposalInfoToDb {
@@ -280,9 +286,7 @@ pub struct ProposalsResp {
 #[derive(QueryResponses)]
 pub(crate) enum QueryMsg {
     #[returns(ProposalsResp)]
-    ProposalsById {
-        ids: Vec<Uint64>,
-    },
+    ProposalsById { ids: Vec<Uint64> },
 }
 
 #[derive(Debug, Clone)]
@@ -308,9 +312,7 @@ pub(crate) enum Error {
     #[error("Page not found")]
     InvalidPage,
     #[error("Invalid address: {source}")]
-    InvalidAddress {
-        source: AddressError,
-    },
+    InvalidAddress { source: AddressError },
 }
 
 impl IntoResponse for Error {
@@ -323,7 +325,7 @@ impl IntoResponse for Error {
                 },
                 Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
-                    log::error!("Database serror: {msg}");
+                    tracing::error!("Database serror: {msg}");
                     http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
