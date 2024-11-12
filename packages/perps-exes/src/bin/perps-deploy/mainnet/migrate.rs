@@ -105,7 +105,10 @@ async fn go(
 
     if !factory_msgs.is_empty() {
         tracing::info!("Update factory message");
-        let owner = factory.query_owner().await?;
+        let owner = factory
+            .query_owner()
+            .await?
+            .context("The factory owner is not provided")?;
         tracing::info!("CW3 contract: {owner}");
         tracing::info!(
             "Message: {}",

@@ -54,6 +54,85 @@ fn test_factory_add_market() {
 }
 
 #[test]
+fn test_factory_sudo_fail_with_owner() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market.set_time(TimeJump::Hours(10)).unwrap();
+    market
+        .sudo_factory(&FactoryExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                market_id: MarketId::new(
+                    "BTC",
+                    "USD",
+                    perpswap::storage::MarketType::CollateralIsQuote,
+                ),
+                token: market.token.clone().into(),
+                config: None,
+                spot_price: perpswap::contracts::market::spot_price::SpotPriceConfigInit::Manual {
+                    admin: Addr::unchecked(TEST_CONFIG.protocol_owner.clone()).into(),
+                },
+                initial_borrow_fee_rate: "0.01".parse().unwrap(),
+                initial_price: Some(InitialPrice {
+                    price: "1".parse().unwrap(),
+                    price_usd: "1".parse().unwrap(),
+                }),
+            },
+        })
+        .unwrap_err();
+}
+
+#[test]
+fn test_factory_sudo_add_market() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // This is required to test the sudo entrypoint
+    market
+        .exec_factory(&FactoryExecuteMsg::RemoveOwner {})
+        .unwrap();
+
+    let now = market.now();
+    let key = FACTORY_MARKET_LAST_ADDED.as_bytes().to_vec();
+    let result = market
+        .query_factory_raw(Binary::new(key.clone()))
+        .unwrap()
+        .unwrap();
+    let old_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    assert!(now > old_time);
+
+    market.set_time(TimeJump::Hours(10)).unwrap();
+    market
+        .sudo_factory(&FactoryExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                market_id: MarketId::new(
+                    "BTC",
+                    "USD",
+                    perpswap::storage::MarketType::CollateralIsQuote,
+                ),
+                token: market.token.clone().into(),
+                config: None,
+                spot_price: perpswap::contracts::market::spot_price::SpotPriceConfigInit::Manual {
+                    admin: Addr::unchecked(TEST_CONFIG.protocol_owner.clone()).into(),
+                },
+                initial_borrow_fee_rate: "0.01".parse().unwrap(),
+                initial_price: Some(InitialPrice {
+                    price: "1".parse().unwrap(),
+                    price_usd: "1".parse().unwrap(),
+                }),
+            },
+        })
+        .unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    market
+        .sudo_factory(&FactoryExecuteMsg::RegisterReferrer {
+            addr: Addr::unchecked(trader).into(),
+        })
+        .unwrap_err();
+
+    let result = market.query_factory_raw(Binary::new(key)).unwrap().unwrap();
+    let new_time: Timestamp = cosmwasm_std::from_json(result.as_slice()).unwrap();
+    assert!(old_time < new_time)
+}
+
+#[test]
 fn factory_has_copy_trading_contract() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 

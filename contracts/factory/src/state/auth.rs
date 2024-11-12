@@ -13,8 +13,8 @@ const KILL_SWITCH_ADDR: Item<Addr> = Item::new(namespace::KILL_SWITCH_ADDR);
 /// Wind down address
 const WIND_DOWN_ADDR: Item<Addr> = Item::new(namespace::WIND_DOWN_ADDR);
 
-pub(crate) fn get_owner(store: &dyn Storage) -> Result<Addr> {
-    OWNER_ADDR.load(store).map_err(|err| err.into())
+pub(crate) fn get_owner(store: &dyn Storage) -> Result<Option<Addr>> {
+    OWNER_ADDR.may_load(store).map_err(|err| err.into())
 }
 
 pub(crate) fn get_dao(store: &dyn Storage) -> Result<Addr> {
@@ -57,4 +57,8 @@ pub(crate) fn set_wind_down(store: &mut dyn Storage, wind_down: &Addr) -> Result
     WIND_DOWN_ADDR
         .save(store, wind_down)
         .map_err(|err| err.into())
+}
+
+pub(crate) fn remove_owner(store: &mut dyn Storage) {
+    OWNER_ADDR.remove(store)
 }

@@ -19,7 +19,7 @@ use cosmwasm_std::{
     to_json_binary, to_json_vec, Addr, Binary, ContractResult, CosmosMsg, Empty, QueryRequest,
     StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
-use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
+use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg, WasmSudo};
 use perpswap::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
 use perpswap::compat::BackwardsCompatTakeProfit;
 use perpswap::contracts::copy_trading::{
@@ -2126,6 +2126,18 @@ impl PerpsMarket {
         let res = self
             .app()
             .execute_contract(sender.clone(), contract_addr, msg, &[])?;
+
+        self.set_time(TimeJump::Blocks(1))?;
+
+        Ok(res)
+    }
+
+    pub fn sudo_factory(&self, msg: &FactoryExecuteMsg) -> Result<AppResponse> {
+        let contract_addr = self.app().factory_addr.clone();
+        let res = self.app().sudo(SudoMsg::Wasm(WasmSudo {
+            contract_addr,
+            message: to_json_binary(&msg).unwrap(),
+        }))?;
 
         self.set_time(TimeJump::Blocks(1))?;
 

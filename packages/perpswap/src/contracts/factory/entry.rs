@@ -119,6 +119,8 @@ pub enum ExecuteMsg {
         /// Code ID to use for future copy trading contracts
         code_id: String,
     },
+    /// Remove the owner from factory
+    RemoveOwner {},
 }
 
 /// Response from [QueryMsg::Markets]
@@ -284,7 +286,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct FactoryOwnerResp {
     /// Owner of the factory
-    pub owner: Addr,
+    pub owner: Option<Addr>,
     /// Migration admin of the factory
     pub admin_migration: Addr,
     /// Wallet that receives DAO/protocol fees for all markets
@@ -338,6 +340,7 @@ impl ExecuteMsg {
             ExecuteMsg::Shutdown { .. } => false,
             ExecuteMsg::AddCopyTrading { .. } => false,
             ExecuteMsg::SetCopyTradingCodeId { .. } => true,
+            ExecuteMsg::RemoveOwner {} => true,
         }
     }
 }

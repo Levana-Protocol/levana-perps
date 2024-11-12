@@ -1,7 +1,7 @@
 use crate::state::{
     all_contracts::ALL_CONTRACTS,
     auth::{
-        get_admin_migration, get_dao, get_kill_switch, get_owner, get_wind_down,
+        get_admin_migration, get_dao, get_kill_switch, get_owner, get_wind_down, remove_owner,
         set_admin_migration, set_dao, set_kill_switch, set_owner, set_wind_down,
     },
     code_ids::get_code_ids,
@@ -97,7 +97,7 @@ pub fn instantiate(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
-    if msg.requires_owner() && info.sender != get_owner(deps.storage)? {
+    if msg.requires_owner() && Some(info.sender.clone()) != get_owner(deps.storage)? {
         perp_bail!(
             ErrorId::Auth,
             ErrorDomain::Default,
@@ -106,6 +106,28 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         )
     }
 
+    execute_msg(deps, env, Some(info), msg)
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: DepsMut, env: Env, msg: ExecuteMsg) -> Result<Response> {
+    if !msg.requires_owner() || get_owner(deps.storage)?.is_some() {
+        perp_bail!(
+            ErrorId::Auth,
+            ErrorDomain::Default,
+            "Sudo entrypoint is only available for the factory which does not have owner",
+        )
+    }
+
+    execute_msg(deps, env, None, msg)
+}
+
+fn execute_msg(
+    deps: DepsMut,
+    env: Env,
+    info: Option<MessageInfo>,
+    msg: ExecuteMsg,
+) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match msg {
@@ -155,6 +177,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams { name, description },
         } => {
+            let info = info.context("Cannot call this method via sudo")?;
             let leader = info.sender;
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COPY_TRADING.save(
@@ -238,8 +261,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             markets,
             impacts,
             effect,
-        } => shutdown(&mut ctx, &info, markets, impacts, effect)?,
+        } => {
+            let info = info.context("Cannot call this method via sudo")?;
+            shutdown(&mut ctx, &info, markets, impacts, effect)?
+        }
         ExecuteMsg::RegisterReferrer { addr } => {
+            let info = info.context("Cannot call this method via sudo")?;
             let referrer = addr.validate(state.api)?;
             anyhow::ensure!(
                 info.sender != referrer,
@@ -252,6 +279,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     .add_attribute("referee", info.sender),
             );
         }
+        ExecuteMsg::RemoveOwner {} => remove_owner(ctx.storage),
     }
 
     Ok(ctx.response.into_response())

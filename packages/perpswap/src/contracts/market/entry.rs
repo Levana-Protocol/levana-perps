@@ -98,6 +98,16 @@ pub struct SlippageAssert {
     pub tolerance: Number,
 }
 
+/// Sudo message for the market contract
+#[cw_serde]
+pub enum SudoMsg {
+    /// Update the config
+    ConfigUpdate {
+        /// New configuration parameters
+        update: Box<ConfigUpdate>,
+    },
+}
+
 /// Execute message for the market contract
 #[allow(clippy::large_enum_variant)]
 #[cw_serde]
@@ -1199,6 +1209,18 @@ impl QueryMsg {
                 pos_delta_neutrality_fee_margin: u.arbitrary()?,
             }),
 
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for SudoMsg {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        match u.int_in_range::<u8>(0..=0)? {
+            0 => Ok(SudoMsg::ConfigUpdate {
+                update: Box::<ConfigUpdate>::default(),
+            }),
             _ => unreachable!(),
         }
     }
