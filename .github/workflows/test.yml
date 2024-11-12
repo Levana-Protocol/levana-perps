@@ -90,15 +90,3 @@ jobs:
       - name: Migrate contracts (osmoci)
         if: github.ref == 'refs/heads/main'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just migrate-osmoci || echo "Ignoring failed migration"
-      - name: Build documentation
-        if: github.ref == 'refs/heads/main'
-        run: just build-docs
-      - name: Deploy documentation
-        if: github.ref == 'refs/heads/main'
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: a24f405dad2c41c98a0314f4bb6d5c6f
-          projectName: levana-api-docs
-          directory: .output/temp/doc
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
