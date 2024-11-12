@@ -10,7 +10,7 @@ It's also an updated dev environment, with multichain support and a native SDK i
     - [Slides describing the platform](https://docs.levana.exchange/slides/) (primarily intended for audit)
     - [API tutorial in TypeScript](https://docs.levana.exchange/api-tutorial-ts/introduction)
 - References docs
-    - [levana_perpswap_cosmos](https://apidocs.levana.exchange/levana_perpswap_cosmos/)
+    - [levana_perpswap_cosmos](https://apidocs.levana.finance/levana_perpswap_cosmos/)
 - [Web interfaces](https://staff.levana.finance/perps-sites)
 
 # PREREQUISITES
@@ -58,7 +58,10 @@ It's also an updated dev environment, with multichain support and a native SDK i
 
 # Deploying
 
-Deploying is handled via the `perps-deploy` tool, located in the `packages/perps-deploy` directory. The [README.md](packages/perps-deploy/README.md) includes more details of how deployments work, this file covers the direct steps.
+Deploying is handled via the `perps-deploy` tool, located in the
+`packages/perps-deploy` directory. The [perps-deploy.md](./docs/perps-deploy.md) includes
+more details of how deployments work, this file covers the direct
+steps.
 
 When you deploy, you'll need to have the deployer seed phrase. This is available in a [Google Drive sheet](https://docs.google.com/spreadsheets/d/1ILEkU8wqtQGO_bqxsSVORflwtY-4kj20dmTe9uOh3-4/edit?usp=share_link). You'll also need to choose which contract family you want to deploy, e.g. `dragonci`, `dragondev`, `dragonqa`. Let's assume you'll be deploying `dragonci`.
 
