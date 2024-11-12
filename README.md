@@ -11,10 +11,7 @@ It's also an updated dev environment, with multichain support and a native SDK i
     - [API tutorial in TypeScript](https://docs.levana.exchange/api-tutorial-ts/introduction)
 - References docs
     - [levana_perpswap_cosmos](https://apidocs.levana.exchange/levana_perpswap_cosmos/)
-- Web interfaces
-    - [Develop frontend](https://levana-web-app-develop.vercel.app/)
-    - [Staging frontend](https://levana-web-app-staging.vercel.app/)
-    - [Public beta](https://beta.levana.exchange/)
+- [Web interfaces](https://staff.levana.finance/perps-sites)
 
 # PREREQUISITES
 
@@ -58,10 +55,6 @@ It's also an updated dev environment, with multichain support and a native SDK i
 
 * Juno: https://docs.junonetwork.io/validators/joining-the-testnets#get-some-testnet-tokens
 * Osmosis: https://faucet.osmosis.zone/#/
-
-# MISC
-
-the [original repo](https://github.com/Levana-Protocol/levana-perpetual-swap-contracts) is deprecated, though a sortof middle-ground partial refactor of the old vAMM approach is in [this commit](https://github.com/Levana-Protocol/levana-perps-multichain/tree/2417dc2e0ba3030ab8ed3cd0f1fc6f2ddaf39843/contracts/cosmos)
 
 # Deploying
 
