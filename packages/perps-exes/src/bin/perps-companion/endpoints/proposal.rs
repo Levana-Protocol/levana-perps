@@ -33,14 +33,14 @@ use super::{
 #[derive(askama::Template)]
 #[template(path = "proposal.html")]
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
-struct ProposalInfo {
+pub(crate) struct ProposalInfo {
     proposal_id: Uint64,
     title: String,
     image_url: String,
     html_url: String,
     host: String,
     chain: ChainId,
-    amplitude_key: &'static str,
+    amplitude_key: String,
     address: Address,
 }
 
@@ -80,7 +80,7 @@ impl ProposalInfo {
             image_url: ProposalImage { proposal_id }.to_uri().to_string(),
             html_url: ProposalHtml { proposal_id }.to_uri().to_string(),
             host: host.hostname().to_owned(),
-            amplitude_key: environment.amplitude_key(),
+            amplitude_key: environment.amplitude_key().to_string(),
             chain,
             address: Address::from_str(&address)
                 .map_err(|source| Error::InvalidAddress { source })?,
