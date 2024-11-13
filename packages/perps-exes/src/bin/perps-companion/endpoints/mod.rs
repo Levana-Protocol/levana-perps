@@ -32,7 +32,10 @@ use tracing::Level;
 use crate::app::App;
 use crate::types::ChainId;
 
-use self::pnl::ErrorDescription;
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorDescription {
+    pub(crate) msg: String,
+}
 
 #[derive(TypedPath)]
 #[typed_path("/")]
@@ -174,6 +177,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(common::grpc_health)
         .typed_get(common::build_version)
         .typed_get(pnl::pnl_css)
+        .typed_get(proposal::proposal_css)
         .typed_get(common::error_css)
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)

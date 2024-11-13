@@ -33,7 +33,7 @@ use crate::{
     types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
-use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
+use super::{ErrorDescription, ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -390,11 +390,6 @@ pub(crate) enum QueryType {
     EntryPrice,
     ExitPrice,
     Positions,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ErrorDescription {
-    pub(crate) msg: String,
 }
 
 #[derive(thiserror::Error, Clone, Debug)]

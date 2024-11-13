@@ -27,7 +27,8 @@ use crate::{
 };
 
 use super::{
-    ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl,
+    ErrorDescription, ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg,
+    ProposalUrl,
 };
 
 #[derive(askama::Template)]
@@ -287,11 +288,6 @@ pub struct ProposalsResp {
 pub(crate) enum QueryMsg {
     #[returns(ProposalsResp)]
     ProposalsById { ids: Vec<Uint64> },
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ErrorDescription {
-    pub(crate) msg: String,
 }
 
 #[derive(thiserror::Error, Clone, Debug)]
