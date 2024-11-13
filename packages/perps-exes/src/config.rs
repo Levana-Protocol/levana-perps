@@ -883,14 +883,33 @@ pub struct MainnetFactory {
 
 impl MainnetFactories {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
+    const TOML_DATA: &'static str =
+        include_str!("../../../packages/perps-exes/assets/mainnet-factories.toml");
 
     pub fn load() -> Result<Self> {
-        load_toml(Self::PATH, "LEVANA_MAINNET_FACTORIES_", "mainnet factories")
+        load_toml_from_str(
+            Self::TOML_DATA,
+            "LEVANA_MAINNET_FACTORIES_",
+            "mainnet factories",
+        )
     }
 
     pub fn save(&self) -> Result<()> {
         save_toml(Self::PATH, self)
     }
+}
+
+pub fn load_toml_from_str<T>(toml_data: &str, env_prefix: &str, config_desc: &str) -> Result<T>
+where
+    T: serde::de::DeserializeOwned + std::fmt::Debug,
+{
+    let config = Figment::new()
+        .merge(Toml::string(toml_data))
+        .merge(Env::prefixed(env_prefix))
+        .extract()
+        .with_context(|| format!("Unable to load {config_desc}"))?;
+    tracing::debug!("Loaded {config_desc}: {config:#?}");
+    Ok(config)
 }
 
 pub fn load_toml<P, T>(path: P, env_prefix: &str, config_desc: &str) -> Result<T>
