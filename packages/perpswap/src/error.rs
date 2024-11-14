@@ -99,21 +99,6 @@ pub enum ErrorDomain {
     Faucet,
 }
 
-/// Ensure a condition is true, otherwise returns from the function with an error.
-#[macro_export]
-macro_rules! perp_ensure {
-    ($val:expr, $id:expr, $domain:expr, $($t:tt)*) => {{
-        if !$val {
-            return Err(anyhow::Error::new($crate::error::PerpError {
-                id: $id,
-                domain: $domain,
-                description: format!($($t)*),
-                data: None::<()>,
-            }));
-        }
-    }};
-}
-
 /// Return early with the given perp error
 #[macro_export]
 macro_rules! perp_bail {
