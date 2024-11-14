@@ -1,4 +1,5 @@
 //! Types to represent timestamps and durations.
+use crate::error::{ErrorDomain, ErrorId};
 use crate::prelude::*;
 use anyhow::Result;
 #[cfg(feature = "chrono")]
@@ -94,11 +95,23 @@ impl Timestamp {
     ///
     /// Will fail if the right hand side is greater than the left hand side.
     pub fn checked_sub(self, rhs: Self, desc: &str) -> Result<Duration> {
+        #[derive(serde::Serialize)]
+        struct Data {
+            lhs: Timestamp,
+            rhs: Timestamp,
+            desc: String,
+        }
         match self.0.checked_sub(rhs.0) {
             Some(x) => Ok(Duration(x)),
-            None => Err(anyhow!(
-                "Invalid timestamp substraction during Action {desc}. Values {} - {rhs}",
-                self.0
+            None => Err(perp_anyhow_data!(
+                ErrorId::TimestampSubtractUnderflow,
+                ErrorDomain::Default,
+                Data {
+                    lhs: self,
+                    rhs,
+                    desc: desc.to_owned()
+                },
+                "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
             )),
         }
     }

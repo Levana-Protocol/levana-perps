@@ -274,10 +274,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             match state.validate_tap_faucet_error(store, &addr, &assets)? {
                 Ok(()) => TapEligibleResponse::Eligible {},
                 Err(FaucetError::TooSoon { wait_secs }) => TapEligibleResponse::Ineligible {
-                    seconds: wait_secs.0,
+                    seconds: wait_secs,
                     message: format!(
                         "You can only tap the faucet again in {}",
-                        wait_secs
+                        PrettyTimeRemaining(wait_secs)
                     ),
                     reason: IneligibleReason::TooSoon,
                 },
