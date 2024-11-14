@@ -31,11 +31,18 @@ use super::{
     ProposalUrl,
 };
 
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+pub(crate) struct ProposalInfoRecord {
+    address: Address,
+    chain: ChainId,
+    proposal_id: Uint64,
+}
+
 #[derive(askama::Template)]
 #[template(path = "proposal.html")]
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
 pub(crate) struct ProposalInfo {
-    proposal_id: Uint64,
+    id: Uint64,
     title: String,
     image_url: String,
     html_url: String,
@@ -48,10 +55,10 @@ pub(crate) struct ProposalInfo {
 pub(super) async fn proposal_url(
     _: ProposalUrl,
     app: State<Arc<App>>,
-    Json(proposal_info): Json<ProposalInfo>,
+    Json(proposal_info_record): Json<ProposalInfoRecord>,
 ) -> Result<Json<Value>, Error> {
     let db = &app.db;
-    let to_db = proposal_info.get_info_to_db(&app).await?;
+    let to_db = proposal_info_record.get_info_to_db(&app).await?;
     let url_id = db
         .insert_proposal_detail(to_db)
         .await
@@ -75,8 +82,9 @@ impl ProposalInfo {
             .await
             .map_err(|e| Error::Database { msg: e.to_string() })?
             .ok_or(Error::InvalidPage)?;
+
         Ok(ProposalInfo {
-            proposal_id: proposal_id.into(),
+            id: proposal_id.into(),
             title: title,
             image_url: ProposalImage { proposal_id }.to_uri().to_string(),
             html_url: ProposalHtml { proposal_id }.to_uri().to_string(),
@@ -154,9 +162,9 @@ impl GovContract {
     }
 }
 
-impl ProposalInfo {
+impl ProposalInfoRecord {
     async fn get_info_to_db(self, app: &App) -> Result<ProposalInfoToDb, Error> {
-        let ProposalInfo {
+        let ProposalInfoRecord {
             proposal_id,
             chain,
             address,
@@ -178,20 +186,71 @@ impl ProposalInfo {
             )
             .await?;
 
-        match res.proposals.pop() {
-            Some(proposal) => proposal,
+        let proposal = match res.0.pop() {
+            Some(proposal) => proposal.proposal,
             None => return Err(Error::ProposalNotFound),
         };
 
         Ok(ProposalInfoToDb {
             environment: ContractEnvironment::from_market(*chain, &label),
             proposal_id: self.proposal_id,
-            title: self.title,
+            title: proposal.title,
             chain: self.chain,
             address: self.address,
         })
     }
+}
 
+fn wrap_text(text: String, max_length: usize, max_lines: usize) -> Vec<String> {
+    let words = text.split_ascii_whitespace();
+    let mut line = "".to_string();
+    let mut text_lines = vec![];
+
+    for word in words {
+        // If we would go over the width limit with the current word,
+        // and we have at least one word in the current line,
+        // we save this line and add a new one.
+        if line.len() > 0 && ((line.len() + word.len()) >= max_length) {
+            text_lines.push(line);
+            line = "".to_string();
+
+            if text_lines.len() >= max_lines {
+                break;
+            }
+        }
+
+        // If we're already over the width limit, we save this line and add a new one.
+        if line.len() >= max_length {
+            text_lines.push(line);
+            line = "".to_string();
+
+            if text_lines.len() >= max_lines {
+                break;
+            }
+        }
+
+        // If we're not over the limit, we add the current word to the line being built.
+        if line.len() < max_length {
+            // If we already have at least one word in the current line, we separate it with a space.
+            if line.len() > 0 {
+                line.push(' ');
+            }
+            line.push_str(word);
+        }
+    }
+
+    // If the last line we were building didn't reach the limit, then we have to save those leftovers as well.
+    if line.len() > 0 {
+        text_lines.push(line);
+    }
+
+    text_lines
+}
+
+static TITLE_MAX_WIDTH: usize = 30;
+static TITLE_MAX_LINES: usize = 6;
+
+impl ProposalInfo {
     fn html(self) -> Response {
         let mut res = Html(self.render().unwrap()).into_response();
         res.headers_mut().insert(
@@ -214,7 +273,11 @@ impl ProposalInfo {
 
     fn image_svg(self) -> Response {
         // Generate the raw SVG text by rendering the template
-        let svg = ProposalSvg { info: &self }.render().unwrap();
+        let svg = ProposalSvg {
+            title_lines: wrap_text(self.title.to_string(), TITLE_MAX_WIDTH, TITLE_MAX_LINES),
+        }
+        .render()
+        .unwrap();
 
         let mut res = svg.into_response();
         res.headers_mut().insert(
@@ -230,7 +293,11 @@ impl ProposalInfo {
 
     fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
-        let svg = ProposalSvg { info: self }.render().unwrap();
+        let svg = ProposalSvg {
+            title_lines: wrap_text(self.title.to_string(), TITLE_MAX_WIDTH, TITLE_MAX_LINES),
+        }
+        .render()
+        .unwrap();
 
         // Convert the SVG into a usvg tree using default settings
         let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
@@ -279,9 +346,7 @@ pub struct ProposalRecordQueryResponse {
 }
 
 #[cw_serde]
-pub struct ProposalsResp {
-    pub proposals: Vec<ProposalRecordQueryResponse>,
-}
+pub struct ProposalsResp(Vec<ProposalRecordQueryResponse>);
 
 #[cw_serde]
 #[derive(QueryResponses)]
@@ -341,6 +406,6 @@ impl IntoResponse for Error {
 
 #[derive(askama::Template)]
 #[template(path = "proposal.svg.xml")]
-struct ProposalSvg<'a> {
-    info: &'a ProposalInfo,
+struct ProposalSvg {
+    title_lines: Vec<String>,
 }
