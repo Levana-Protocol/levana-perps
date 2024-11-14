@@ -9,7 +9,7 @@ fn directly_call_receive() {
 
     let addr = mock_api.addr_make("notacw20");
     let fakesender = mock_api.addr_make("fakesender");
-    market
+    let err = market
         .exec(
             &addr,
             &MarketExecuteMsg::Receive {
@@ -22,6 +22,9 @@ fn directly_call_receive() {
             },
         )
         .unwrap_err();
+
+    let root_cause = err.root_cause().to_string();
+    assert!(root_cause.contains("native assets come through execute messages directly"))
 }
 
 #[test]
@@ -45,7 +48,7 @@ fn deposit_lp_token() {
         )
         .unwrap();
 
-    market
+    let err = market
         .exec_liquidity_token_send(
             LiquidityTokenKind::Lp,
             &lp,
@@ -56,6 +59,9 @@ fn deposit_lp_token() {
             },
         )
         .unwrap_err();
+
+    let root_cause = err.root_cause().to_string();
+    assert!(root_cause.contains("native assets come through execute messages"));
 
     // And confirm that a basic transfer works still, ruling out insufficient liquidity
     market
