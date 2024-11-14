@@ -1,9 +1,6 @@
 //! Types to represent timestamps and durations.
+use crate::error::{ErrorDomain, ErrorId};
 use crate::prelude::*;
-use crate::{
-    error::{ErrorDomain, ErrorId, PerpError},
-    perp_error,
-};
 use anyhow::Result;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
@@ -266,24 +263,18 @@ impl Div<Duration> for Duration {
 }
 
 impl FromStr for Timestamp {
-    type Err = PerpError;
+    type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let err = |msg: &str| -> PerpError {
-            perp_error!(
-                ErrorId::Conversion,
-                ErrorDomain::Default,
-                "error converting {} to Timestamp, {}",
-                s,
-                msg
-            )
-        };
-
+    fn from_str(s: &str) -> anyhow::Result<Self> {
         let (seconds, nanos) = s
             .split_once('.')
-            .ok_or_else(|| err("missing decimal point"))?;
-        let seconds = seconds.parse().map_err(|_| err("unable to parse second"))?;
-        let nanos = nanos.parse().map_err(|_| err("unable to parse nanos"))?;
+            .ok_or_else(|| anyhow!("Missing decimal point in {s}"))?;
+        let seconds = seconds
+            .parse()
+            .map_err(|_| anyhow!("unable to parse second in {s}"))?;
+        let nanos = nanos
+            .parse()
+            .map_err(|_| anyhow!("unable to parse nanos in {s}"))?;
 
         let timestamp = Timestamp::from_seconds(seconds) + Duration::from_nanos(nanos);
 
