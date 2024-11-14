@@ -8,6 +8,9 @@ use anyhow::Context;
 use cosmwasm_std::Event;
 use serde::de::DeserializeOwned;
 
+use crate::error::{ErrorDomain, ErrorId};
+use crate::perp_anyhow;
+
 /// Extension trait to add methods to native cosmwasm events
 pub trait CosmwasmEventExt {
     // these are the only two that require implementation
@@ -164,7 +167,12 @@ pub trait CosmwasmEventExt {
     fn map_attr_ok<B>(&self, key: &str, f: impl Fn(&str) -> B) -> anyhow::Result<B> {
         match self.try_map_attr(key, f) {
             Some(x) => Ok(x),
-            None => Err(anyhow!("no such key {key}",)),
+            None => Err(perp_anyhow!(
+                ErrorId::Any,
+                ErrorDomain::Default,
+                "no such key {}",
+                key
+            )),
         }
     }
 

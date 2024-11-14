@@ -99,6 +99,19 @@ pub enum ErrorDomain {
     Faucet,
 }
 
+/// Generate a [PerpError] and then wrap it up in an anyhow error
+#[macro_export]
+macro_rules! perp_anyhow {
+    ($id:expr, $domain:expr, $($t:tt)*) => {{
+        anyhow::Error::new($crate::error::PerpError {
+            id: $id,
+            domain: $domain,
+            description: format!($($t)*),
+            data: None::<()>,
+        })
+    }};
+}
+
 /// Ensure a condition is true, otherwise returns from the function with an error.
 #[macro_export]
 macro_rules! perp_ensure {

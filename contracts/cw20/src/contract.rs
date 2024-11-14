@@ -38,8 +38,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             let minter_addr = state.minter_addr(ctx.storage)?;
 
             if minter_addr != info.sender {
-                return Err(anyhow!(
-                    "Cannot Setmarket, sender is {}, minter is {minter_addr}",
+                return Err(perp_anyhow!(
+                    ErrorId::Auth,
+                    ErrorDomain::Cw20,
+                    "Cannot SetMarket, sender is {}, minter is {minter_addr}",
                     info.sender
                 ));
             }
