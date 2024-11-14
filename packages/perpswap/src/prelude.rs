@@ -8,7 +8,9 @@ pub use crate::contracts::market::entry::{
 };
 pub use crate::cosmwasm::*;
 pub use crate::direction::{DirectionToBase, DirectionToNotional};
-pub use crate::error::market::{CongestionReason, MarketError, TriggerPriceMustBe, TriggerType};
+pub use crate::error::market::{
+    CongestionReason, MarketError, PublishTime, TriggerPriceMustBe, TriggerType,
+};
 pub use crate::event::CosmwasmEventExt;
 pub use crate::leverage::*;
 pub use crate::market_type::{MarketId, MarketType};
