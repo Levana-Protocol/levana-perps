@@ -35,19 +35,17 @@ impl Display for MaxGainsInQuote {
 }
 
 impl FromStr for MaxGainsInQuote {
-    type Err = PerpError;
-    fn from_str(src: &str) -> Result<Self, PerpError> {
+    type Err = MarketError;
+    fn from_str(src: &str) -> Result<Self, MarketError> {
         match src {
             POS_INF_STR => Ok(MaxGainsInQuote::PosInfinity),
             _ => match src.parse() {
                 Ok(number) => Ok(MaxGainsInQuote::Finite(number)),
-                Err(err) => Err(perp_error!(
-                    ErrorId::Conversion,
-                    ErrorDomain::Default,
-                    "error converting {} to MaxGainsInQuote, {}",
-                    src,
-                    err
-                )),
+                Err(err) => Err(MarketError::StringConversionError {
+                    original_string: src.to_owned(),
+                    r#type: "MaxGainsInQuote".to_owned(),
+                    error: err.to_string(),
+                }),
             },
         }
     }
