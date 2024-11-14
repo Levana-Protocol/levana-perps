@@ -112,19 +112,6 @@ macro_rules! perp_anyhow {
     }};
 }
 
-/// Like [perp_anyhow] but accepts optional extra data
-#[macro_export]
-macro_rules! perp_anyhow_data {
-    ($id:expr, $domain:expr, $data:expr, $($t:tt)*) => {{
-        anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        })
-    }};
-}
-
 /// Ensure a condition is true, otherwise returns from the function with an error.
 #[macro_export]
 macro_rules! perp_ensure {

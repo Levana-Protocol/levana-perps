@@ -22,9 +22,11 @@ const DEFAULT_CW20_TAP_AMOUNT: &str = "1000";
 const DEFAULT_NATIVE_TAP_AMOUNT: &str = "10";
 const NATIVE_DECIMAL_PLACES: u32 = 6; // differs per denom?
 
-#[derive(serde::Serialize)]
+#[derive(thiserror::Error, serde::Serialize, Debug)]
 pub(crate) enum FaucetError {
-    TooSoon { wait_secs: Decimal256 },
+    #[error("You can tap the faucet again in {wait_secs}")]
+    TooSoon { wait_secs: PrettyTimeRemaining },
+    #[error("You cannot tap a trading competition faucet more than once")]
     AlreadyTapped { cw20: Addr },
 }
 
@@ -70,10 +72,10 @@ impl State<'_> {
                 if elapsed < tap_limit {
                     let time_remaining = tap_limit - elapsed;
 
-                    return Ok(Err(FaucetError::TooSoon {
-                        wait_secs: time_remaining.as_ms_decimal_lossy()
-                            / Decimal256::from_str("1000").unwrap(),
-                    }));
+                    let wait_secs = time_remaining.as_ms_decimal_lossy()
+                        / Decimal256::from_str("1000").unwrap();
+                    let wait_secs = PrettyTimeRemaining(wait_secs);
+                    return Ok(Err(FaucetError::TooSoon { wait_secs }));
                 }
             }
         }
@@ -91,20 +93,7 @@ impl State<'_> {
         // problem with storage, inner error indicates whether the wallet can
         // tap or not.
         self.validate_tap_faucet_error(store, recipient, assets)?
-            .map_err(|e| match e {
-                FaucetError::TooSoon { wait_secs } => perp_anyhow_data!(
-                    ErrorId::Exceeded,
-                    ErrorDomain::Faucet,
-                    e,
-                    "You can tap the faucet again in {}",
-                    PrettyTimeRemaining(wait_secs),
-                ),
-                FaucetError::AlreadyTapped { cw20: _ } => perp_anyhow!(
-                    ErrorId::Exceeded,
-                    ErrorDomain::Faucet,
-                    "You cannot tap a trading competition faucet more than once"
-                ),
-            })
+            .map_err(|e| anyhow!(e))
     }
 
     // only available in mutable for now, simplifies caching mechanism
@@ -286,6 +275,7 @@ impl State<'_> {
     }
 }
 
+#[derive(serde::Serialize, Debug)]
 pub(crate) struct PrettyTimeRemaining(pub(crate) Decimal256);
 
 impl Display for PrettyTimeRemaining {
