@@ -112,19 +112,6 @@ macro_rules! perp_bail {
     }};
 }
 
-/// Like [perp_bail] but takes extra optional data
-#[macro_export]
-macro_rules! perp_bail_data {
-    ($id:expr, $domain:expr, $data:expr,  $($t:tt)*) => {{
-        return Err(anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        }));
-    }};
-}
-
 impl<T: Serialize> fmt::Display for PerpError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
