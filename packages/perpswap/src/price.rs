@@ -534,19 +534,17 @@ impl Display for TakeProfitTrader {
 }
 
 impl FromStr for TakeProfitTrader {
-    type Err = PerpError;
-    fn from_str(src: &str) -> Result<Self, PerpError> {
+    type Err = MarketError;
+    fn from_str(src: &str) -> Result<Self, MarketError> {
         match src {
             POS_INF_STR => Ok(TakeProfitTrader::PosInfinity),
             _ => match src.parse() {
                 Ok(number) => Ok(TakeProfitTrader::Finite(number)),
-                Err(err) => Err(perp_error!(
-                    ErrorId::Conversion,
-                    ErrorDomain::Default,
-                    "error converting {} to TakeProfitPrice , {}",
-                    src,
-                    err
-                )),
+                Err(err) => Err(MarketError::StringConversionError {
+                    original_string: src.to_owned(),
+                    r#type: "TakeProfitTrader".to_owned(),
+                    error: err.to_string(),
+                }),
             },
         }
     }

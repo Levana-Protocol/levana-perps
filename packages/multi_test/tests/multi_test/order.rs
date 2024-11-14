@@ -501,16 +501,15 @@ fn poc_set_other_users_trigger_order_high() {
         )
         .unwrap();
     // @audit - Supplied the sender to be the attacker address. The attacker was able to execute a set trigger order for another user.
-    let err: PerpError = market
+    let error = market
         .exec_update_position_take_profit(
             &attacker,
             pos_id,
             TakeProfitTrader::Finite(take_profit_override.into_non_zero()),
         )
-        .unwrap_err()
-        .downcast()
-        .unwrap();
-    assert_eq!(err.id, ErrorId::Auth);
+        .unwrap_err();
+    let root_cause = error.root_cause().to_string();
+    assert!(root_cause.contains("position owner is"));
 }
 
 #[test]

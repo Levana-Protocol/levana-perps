@@ -1,5 +1,6 @@
 pub(crate) mod liquifund;
 
+use anyhow::ensure;
 use cosmwasm_std::Order;
 mod open;
 pub(crate) use open::*;
@@ -352,20 +353,10 @@ impl State<'_> {
         addr: &Addr,
     ) -> Result<()> {
         match get_position(store, pos_id) {
-            Err(_) => Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Market,
-                "position owner does not exist",
-            )),
+            Err(_) => Err(anyhow!("position owner does not exist",)),
             Ok(pos) => {
                 if pos.owner != *addr {
-                    Err(perp_anyhow!(
-                        ErrorId::Auth,
-                        ErrorDomain::Market,
-                        "position owner is {} not {}",
-                        pos.owner,
-                        addr
-                    ))
+                    Err(anyhow!("position owner is {} not {addr}", pos.owner,))
                 } else {
                     Ok(())
                 }
@@ -512,13 +503,12 @@ impl State<'_> {
             );
         }
 
-        perp_ensure!(
+        ensure!(
             pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
-            ErrorId::InsufficientMargin,
-            ErrorDomain::Market,
-            "Active collateral cannot be less than liquidation margin: {} vs {:?}",
-            pos.active_collateral,
-            pos.liquidation_margin
+            format!(
+                "Active collateral cannot be less than liquidation margin: {} vs {:?}",
+                pos.active_collateral, pos.liquidation_margin
+            )
         );
 
         pos.liquidation_price = pos.liquidation_price(

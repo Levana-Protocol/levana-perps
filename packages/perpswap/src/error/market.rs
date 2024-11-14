@@ -14,6 +14,8 @@
 //! Instead, in the short term, we use this module to provide well-typed
 //! `thiserror` error values that can be converted to `PerpError` values.
 
+use pyth_sdk_cw::UnixTimestamp;
+
 use crate::prelude::*;
 
 /// An error type for known market errors with potentially special error handling.
@@ -177,6 +179,54 @@ pub enum MarketError {
         /// balancing operations.
         allowed: Collateral,
     },
+    #[error("Missing spot price for timestamp {timestamp}.")]
+    MissingSpotPrice { timestamp: Timestamp },
+    #[error("Current price not available on contract {contract} ({feed_name}), Allowed tolerance (in seconds): {allowed_tolerance_in_seconds}. Publish time: {publish_time}, Current block time: {block_time}")]
+    PriceTooOld {
+        /// Contract address where price is fetched
+        contract: Addr,
+        /// Feed name
+        feed_name: String,
+        /// Allowed tolerance
+        allowed_tolerance_in_seconds: u32,
+        /// Last publish time of the price
+        publish_time: PublishTime,
+        /// Current block time
+        block_time: Timestamp,
+    },
+    #[error("Error while converting {original_string} to {r#type}: {error}.")]
+    StringConversionError {
+        /// The source of string that was attempted to be converted
+        original_string: String,
+        /// The type to which it was attempted to be converted into
+        r#type: String,
+        /// The error received after the conversion was attempted
+        error: String,
+    },
+}
+
+/// Publish time of the price
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub enum PublishTime {
+    /// Timestamp
+    Timestamp {
+        /// Updated time
+        at: Timestamp,
+    },
+    /// Unix unix type represnted as i64 internally. Used by Pyth feeds.
+    Unixtime {
+        /// Updated time
+        at: UnixTimestamp,
+    },
+}
+
+impl Display for PublishTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PublishTime::Timestamp { at } => write!(f, "{}", at),
+            PublishTime::Unixtime { at } => write!(f, "{}", at),
+        }
+    }
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -318,6 +368,9 @@ impl MarketError {
                 ErrorId::InsufficientLiquidityForUnlock
             }
             MarketError::Liquidity { .. } => ErrorId::Liquidity,
+            MarketError::MissingSpotPrice { .. } => ErrorId::PriceNotFound,
+            MarketError::PriceTooOld { .. } => ErrorId::PriceTooOld,
+            MarketError::StringConversionError { .. } => ErrorId::Conversion,
         }
     }
 }

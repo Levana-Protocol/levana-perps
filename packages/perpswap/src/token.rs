@@ -189,15 +189,7 @@ impl Token {
         let value: u128 = amount
             .into_number()
             .to_u128_with_precision(self.decimal_places().into())
-            .ok_or_else(|| {
-                perp_anyhow!(
-                    ErrorId::Conversion,
-                    ErrorDomain::Wallet,
-                    "{} unable to convert {} to u128!",
-                    self.name(),
-                    amount
-                )
-            })?;
+            .ok_or_else(|| anyhow!("{} unable to convert {amount} to u128!", self.name(),))?;
 
         if value > 0 {
             Ok(Some(value))
@@ -220,9 +212,7 @@ impl Token {
                         amount: amount.into(),
                     }))
             }
-            Self::Cw20 { .. } => Err(perp_anyhow!(
-                ErrorId::NativeFunds,
-                ErrorDomain::Wallet,
+            Self::Cw20 { .. } => Err(anyhow!(
                 "{} cannot be turned into a native coin",
                 self.name()
             )),
@@ -249,9 +239,7 @@ impl Token {
         submsg: &T,
     ) -> Result<Option<Cw20ExecuteMsg>> {
         match self {
-            Self::Native { .. } => Err(perp_anyhow!(
-                ErrorId::Cw20Funds,
-                ErrorDomain::Wallet,
+            Self::Native { .. } => Err(anyhow!(
                 "{} cannot be turned into a cw20 message",
                 self.name()
             )),
@@ -278,9 +266,7 @@ impl Token {
         amount: NonZero<Collateral>,
     ) -> Result<Option<Cw20ExecuteMsg>> {
         match self {
-            Self::Native { .. } => Err(perp_anyhow!(
-                ErrorId::Cw20Funds,
-                ErrorDomain::Wallet,
+            Self::Native { .. } => Err(anyhow!(
                 "{} cannot be turned into a cw20 message",
                 self.name()
             )),
@@ -314,15 +300,7 @@ impl Token {
             Self::Cw20 { addr, .. } => {
                 let msg = self
                     .into_cw20_execute_send_msg(contract_addr, amount, &execute_msg)
-                    .map_err(|err| {
-                        perp_anyhow!(
-                            ErrorId::Conversion,
-                            ErrorDomain::Wallet,
-                            "{} (exec inner msg: {:?})!",
-                            err.downcast_ref::<PerpError>().unwrap().description,
-                            execute_msg
-                        )
-                    })?;
+                    .map_err(|err| anyhow!("Error executing {execute_msg:?}, got: {err}"))?;
 
                 match msg {
                     Some(msg) => Ok(WasmMsg::Execute {
@@ -349,15 +327,7 @@ impl Token {
                         .context("Unable to convert amount into NumberGtZero")?;
                     let coin = self
                         .into_native_coin(amount)
-                        .map_err(|err| {
-                            perp_anyhow!(
-                                ErrorId::Conversion,
-                                ErrorDomain::Wallet,
-                                "{} (exec inner msg: {:?})!",
-                                err.downcast_ref::<PerpError>().unwrap().description,
-                                execute_msg
-                            )
-                        })?
+                        .map_err(|err| anyhow!("Error executing {execute_msg:?}, got: {err}"))?
                         .unwrap();
 
                     vec![coin]
@@ -386,10 +356,8 @@ impl Token {
             }
         }
 
-        Err(perp_anyhow!(
-            ErrorId::Conversion,
-            ErrorDomain::Wallet,
-            "Token Collateral must be as precise as the Token (is {}, only {} decimal places supported)", value, self.decimal_places()
+        Err(anyhow!(
+            "Token Collateral must be as precise as the Token (is {value}, only {} decimal places supported)", self.decimal_places()
         ))
     }
 }

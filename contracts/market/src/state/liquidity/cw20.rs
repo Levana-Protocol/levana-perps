@@ -480,11 +480,7 @@ impl State<'_> {
         });
 
         if spender == owner {
-            return Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
-                "cannot increase allowance to own account"
-            ));
+            return Err(anyhow!("cannot increase allowance to own account"));
         }
 
         let update_fn = |allow: Option<AllowanceResponse>| -> Result<_> {
@@ -519,11 +515,7 @@ impl State<'_> {
         });
 
         if spender == owner {
-            return Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
-                "cannot decrease allowance to own account"
-            ));
+            return Err(anyhow!("cannot decrease allowance to own account"));
         }
 
         let key = (&owner, &spender);
@@ -566,18 +558,14 @@ impl State<'_> {
             match current {
                 Some(mut a) => {
                     if a.expires.is_expired(&block) {
-                        Err(perp_anyhow!(ErrorId::Expired, ErrorDomain::Cw20, ""))
+                        Err(anyhow!("Allowance is expired"))
                     } else {
                         // deduct the allowance if enough
                         a.allowance = a.allowance.checked_sub(amount)?;
                         Ok(a)
                     }
                 }
-                None => Err(perp_anyhow!(
-                    ErrorId::Auth,
-                    ErrorDomain::Cw20,
-                    "no allowance"
-                )),
+                None => Err(anyhow!("no allowance")),
             }
         };
         allowances_map(kind).update(ctx.storage, (owner, spender), update_fn)?;
@@ -609,13 +597,8 @@ impl State<'_> {
         let new_balance = Signed::from(*m).checked_add(delta)?;
         *m = match new_balance.try_into_non_negative_value() {
             None => {
-                return Err(perp_anyhow!(
-                    ErrorId::Cw20Funds,
-                    ErrorDomain::LiquidityToken,
-                    "balance for {} cannot be less than zero (tried to add {} to {})",
-                    owner,
-                    delta,
-                    m
+                return Err(anyhow!(
+                    "balance for {owner} cannot be less than zero (tried to add {delta} to {m})",
                 ))
             }
             Some(new_balance) => new_balance,
