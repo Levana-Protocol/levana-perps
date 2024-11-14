@@ -379,10 +379,8 @@ fn liquidity_token_transfer() {
         )
         .unwrap_err();
     // confirm that we get the expected error
-    let err: PerpError = err.downcast().unwrap();
-    if err.id != ErrorId::Cw20Funds || err.domain != ErrorDomain::LiquidityToken {
-        panic!("wrong error type!");
-    }
+    let error_msg = err.root_cause().to_string();
+    assert!(error_msg.contains("cannot be less than zero"));
 }
 
 #[test]
