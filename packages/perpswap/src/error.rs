@@ -99,6 +99,19 @@ pub enum ErrorDomain {
     Faucet,
 }
 
+/// Generate a [PerpError] value with additional optional data
+#[macro_export]
+macro_rules! perp_error_data {
+    ($id:expr, $domain:expr, $data:expr, $($t:tt)*) => {{
+        $crate::error::PerpError {
+            id: $id,
+            domain: $domain,
+            description: format!($($t)*),
+            data: Some($data),
+        }
+    }};
+}
+
 /// Generate a [PerpError] and then wrap it up in an anyhow error
 #[macro_export]
 macro_rules! perp_anyhow {
