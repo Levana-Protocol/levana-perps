@@ -59,12 +59,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
     fn validate_owner(store: &dyn Storage, info: &MessageInfo) -> Result<()> {
         if !is_admin(store, &info.sender) {
-            perp_bail!(
-                ErrorId::Auth,
-                ErrorDomain::Faucet,
-                "{} is not owner",
-                info.sender
-            );
+            bail!("{} is not owner", info.sender);
         }
 
         Ok(())

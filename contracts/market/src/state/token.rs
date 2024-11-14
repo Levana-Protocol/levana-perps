@@ -64,10 +64,10 @@ impl State<'_> {
 
                 match token {
                     Token::Cw20 { .. } => {
-                        perp_bail!(ErrorId::Cw20Funds, ErrorDomain::Wallet, "{}", msg);
+                        bail!(msg);
                     }
                     Token::Native { .. } => {
-                        perp_bail!(ErrorId::NativeFunds, ErrorDomain::Wallet, "{}", msg);
+                        bail!(msg);
                     }
                 }
             }

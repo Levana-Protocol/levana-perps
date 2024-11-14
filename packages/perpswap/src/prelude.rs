@@ -11,6 +11,7 @@ pub use crate::direction::{DirectionToBase, DirectionToNotional};
 pub use crate::error::market::{
     CongestionReason, MarketError, PublishTime, TriggerPriceMustBe, TriggerType,
 };
+pub use crate::error::*;
 pub use crate::event::CosmwasmEventExt;
 pub use crate::leverage::*;
 pub use crate::market_type::{MarketId, MarketType};
@@ -24,7 +25,6 @@ pub use crate::{
     auth::*,
     storage::{external_map_has, load_external_item, load_external_map},
 };
-pub use crate::{error::*, perp_bail};
 
 pub use anyhow::{anyhow, bail, Context, Result};
 pub use cosmwasm_schema::cw_serde;

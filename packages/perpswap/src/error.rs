@@ -99,19 +99,6 @@ pub enum ErrorDomain {
     Faucet,
 }
 
-/// Return early with the given perp error
-#[macro_export]
-macro_rules! perp_bail {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        return Err(anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None::<()>,
-        }));
-    }};
-}
-
 impl<T: Serialize> fmt::Display for PerpError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

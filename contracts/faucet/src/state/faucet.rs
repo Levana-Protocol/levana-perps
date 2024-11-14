@@ -162,11 +162,7 @@ impl State<'_> {
         };
 
         if amount < Number::ZERO {
-            perp_bail!(
-                ErrorId::InvalidAmount,
-                ErrorDomain::Faucet,
-                "amount must be greater than zero!"
-            );
+            bail!("amount must be greater than zero!");
         }
 
         match &asset {

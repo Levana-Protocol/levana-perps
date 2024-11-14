@@ -129,11 +129,7 @@ impl State<'_> {
             QueryMsg::MarketingInfo {} => MarketingInfoResponse::default().query_result(),
 
             QueryMsg::Version {} => {
-                perp_bail!(
-                    ErrorId::InvalidLiquidityTokenMsg,
-                    ErrorDomain::LiquidityToken,
-                    "unreachable (version msg)"
-                );
+                bail!("unreachable (version msg)");
             }
         }
     }

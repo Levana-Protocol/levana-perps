@@ -25,32 +25,16 @@ impl InstantiateMsg {
     pub fn validate(&self) -> anyhow::Result<()> {
         // Check name, symbol, decimals
         if !self.has_valid_name() {
-            perp_bail!(
-                ErrorId::MsgValidation,
-                ErrorDomain::Cw20,
-                "Name is not in the expected format (3-50 UTF-8 bytes)"
-            );
+            bail!("Name is not in the expected format (3-50 UTF-8 bytes)");
         }
         if !self.has_valid_symbol() {
-            perp_bail!(
-                ErrorId::MsgValidation,
-                ErrorDomain::Cw20,
-                "Ticker symbol is not in expected format [a-zA-Z\\-]{{3,12}}"
-            );
+            bail!("Ticker symbol is not in expected format [a-zA-Z\\-]{{3,12}}");
         }
         if self.decimals > 18 {
-            perp_bail!(
-                ErrorId::MsgValidation,
-                ErrorDomain::Cw20,
-                "Decimals must not exceed 18"
-            );
+            bail!("Decimals must not exceed 18");
         }
         if !self.has_valid_balances() {
-            perp_bail!(
-                ErrorId::MsgValidation,
-                ErrorDomain::Cw20,
-                "duplicate account balances"
-            );
+            bail!("duplicate account balances");
         }
         Ok(())
     }

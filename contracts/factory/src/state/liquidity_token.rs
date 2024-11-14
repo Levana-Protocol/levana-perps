@@ -47,9 +47,7 @@ pub(crate) fn save_liquidity_token_addr(
         .may_load(store, market_id.clone())?
         .is_some()
     {
-        perp_bail!(
-            ErrorId::AddressAlreadyExists,
-            ErrorDomain::Factory,
+        bail!(
             "liquidity token address for market {} already exists",
             market_id
         );
