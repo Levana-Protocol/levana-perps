@@ -83,11 +83,8 @@ impl State<'_> {
         }
 
         if TAPPED_ONCE.has(ctx.storage, (&cw20, &recipient)) {
-            Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Faucet,
-                "failed auth, cw20 {cw20}, recipient: {:?}, reason: trading competition",
-                recipient,
+            Err(anyhow!(
+                "failed auth, cw20 {cw20}, recipient: {recipient}, reason: trading competition"
             ))
         } else {
             TAPPED_ONCE.save(ctx.storage, (&cw20, &recipient), &())?;

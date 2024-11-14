@@ -40,14 +40,8 @@ impl State<'_> {
         if market_address == recipient {
             Ok(())
         } else {
-            Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
-                "failed auth, market: {}, sender_addr: {}, recipient: {:?}, reason: trading competition",
-                market_address,
-                sender,
-                recipient,
-            ))
+            Err(anyhow!(
+                "failed auth, market: {market_address}, sender_addr: {sender}, recipient: {recipient}, reason: trading competition"))
         }
     }
 

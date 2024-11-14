@@ -175,14 +175,7 @@ impl State<'_> {
                 let token_info = self.cw20_token_info(ctx, &cw20_addr)?;
                 let cw20_amount = amount
                     .to_u128_with_precision(token_info.decimals.into())
-                    .ok_or_else(|| {
-                        perp_anyhow!(
-                            ErrorId::Conversion,
-                            ErrorDomain::Faucet,
-                            "unable to convert {} to u128!",
-                            amount
-                        )
-                    })?;
+                    .ok_or_else(|| anyhow!("unable to convert {amount} to u128!"))?;
 
                 ctx.response.add_execute_submessage_oneshot(
                     cw20_addr,
@@ -195,14 +188,7 @@ impl State<'_> {
             FaucetAsset::Native(denom) => {
                 let native_amount = amount
                     .to_u128_with_precision(NATIVE_DECIMAL_PLACES)
-                    .ok_or_else(|| {
-                        perp_anyhow!(
-                            ErrorId::Conversion,
-                            ErrorDomain::Faucet,
-                            "unable to convert {} to u128!",
-                            amount
-                        )
-                    })?;
+                    .ok_or_else(|| anyhow!("unable to convert {amount} to u128!"))?;
                 let coin = Coin {
                     denom: denom.clone(),
                     amount: native_amount.into(),
