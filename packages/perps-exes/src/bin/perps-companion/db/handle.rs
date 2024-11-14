@@ -6,7 +6,7 @@ use sqlx::{query_as, query_scalar, PgPool};
 use crate::types::*;
 
 use super::super::endpoints::pnl::PositionInfo;
-use super::models::{PositionInfoFromDb, PositionInfoToDb, ProposalInfoFromDb, ProposalInfoToDb };
+use super::models::{PositionInfoFromDb, PositionInfoToDb, ProposalInfoFromDb, ProposalInfoToDb};
 
 #[derive(Clone)]
 pub(crate) struct Db {
@@ -155,7 +155,10 @@ impl Db {
         Ok(url_id as u64)
     }
 
-    pub(crate) async fn get_proposal_detail(&self, url_id: u64) -> Result<Option<ProposalInfoFromDb>> {
+    pub(crate) async fn get_proposal_detail(
+        &self,
+        url_id: u64,
+    ) -> Result<Option<ProposalInfoFromDb>> {
         query_as!(
             ProposalInfoFromDb,
             r#"

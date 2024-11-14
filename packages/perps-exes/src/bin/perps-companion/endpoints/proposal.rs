@@ -85,7 +85,7 @@ impl ProposalInfo {
 
         Ok(ProposalInfo {
             id: proposal_id.into(),
-            title: title,
+            title,
             image_url: ProposalImage { proposal_id }.to_uri().to_string(),
             html_url: ProposalHtml { proposal_id }.to_uri().to_string(),
             host: host.hostname().to_owned(),
@@ -210,7 +210,7 @@ fn wrap_text(text: String, max_length: usize, max_lines: usize) -> Vec<String> {
         // If we would go over the width limit with the current word,
         // and we have at least one word in the current line,
         // we save this line and add a new one.
-        if line.len() > 0 && ((line.len() + word.len()) >= max_length) {
+        if !line.is_empty() && ((line.len() + word.len()) >= max_length) {
             text_lines.push(line);
             line = "".to_string();
 
@@ -232,7 +232,7 @@ fn wrap_text(text: String, max_length: usize, max_lines: usize) -> Vec<String> {
         // If we're not over the limit, we add the current word to the line being built.
         if line.len() < max_length {
             // If we already have at least one word in the current line, we separate it with a space.
-            if line.len() > 0 {
+            if !line.is_empty() {
                 line.push(' ');
             }
             line.push_str(word);
@@ -240,7 +240,7 @@ fn wrap_text(text: String, max_length: usize, max_lines: usize) -> Vec<String> {
     }
 
     // If the last line we were building didn't reach the limit, then we have to save those leftovers as well.
-    if line.len() > 0 {
+    if !line.is_empty() {
         text_lines.push(line);
     }
 
