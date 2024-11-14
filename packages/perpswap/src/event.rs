@@ -52,12 +52,13 @@ pub trait CosmwasmEventExt {
 
     /// Parse a timestamp attribute
     fn timestamp_attr(&self, key: &str) -> anyhow::Result<Timestamp> {
-        self.map_attr_result(key, Timestamp::from_str)
+        self.map_attr_result(key, |s| Timestamp::from_str(s).map_err(|x| x.into()))
     }
 
     /// Parse a timestamp attribute, if it exists
     fn try_timestamp_attr(&self, key: &str) -> anyhow::Result<Option<Timestamp>> {
-        self.try_map_attr(key, Timestamp::from_str).transpose()
+        self.try_map_attr(key, |s| Timestamp::from_str(s).map_err(|x| x.into()))
+            .transpose()
     }
 
     /// Parse an unsigned decimal attribute
