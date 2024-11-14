@@ -30,10 +30,6 @@ cargo-test-check:
 	# just market-test base cw20
 	just market-test quote cw20
 
-# cargo tests on a single combination
-cargo-test-check-single:
-	just market-test base native
-
 # cargo tests check
 cargo-test-check-local:
 	just market-test base native

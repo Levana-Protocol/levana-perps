@@ -194,15 +194,6 @@ pub enum MarketError {
         /// Current block time
         block_time: Timestamp,
     },
-    #[error("Error while converting {original_string} to {r#type}: {error}.")]
-    StringConversionError {
-        /// The source of string that was attempted to be converted
-        original_string: String,
-        /// The type to which it was attempted to be converted into
-        r#type: String,
-        /// The error received after the conversion was attempted
-        error: String,
-    },
 }
 
 /// Publish time of the price
@@ -370,7 +361,6 @@ impl MarketError {
             MarketError::Liquidity { .. } => ErrorId::Liquidity,
             MarketError::MissingSpotPrice { .. } => ErrorId::PriceNotFound,
             MarketError::PriceTooOld { .. } => ErrorId::PriceTooOld,
-            MarketError::StringConversionError { .. } => ErrorId::Conversion,
         }
     }
 }
