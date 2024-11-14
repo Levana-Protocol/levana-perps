@@ -227,15 +227,8 @@ impl State<'_> {
         store: &dyn Storage,
         timestamp: Timestamp,
     ) -> Result<PricePoint> {
-        self.spot_price_inner_opt(store, timestamp)?.ok_or_else(|| {
-            perp_error!(
-                ErrorId::PriceNotFound,
-                ErrorDomain::SpotPrice,
-                "there is no spot price for timestamp {}",
-                timestamp
-            )
-            .into()
-        })
+        self.spot_price_inner_opt(store, timestamp)?
+            .ok_or_else(|| MarketError::MissingSpotPrice { timestamp }.into())
     }
 
     fn spot_price_inner_opt(
@@ -522,16 +515,19 @@ impl State<'_> {
                                             (*age_tolerance_seconds).into(),
                                         )
                                         .ok_or_else(|| {
-                                            perp_error!(
-                                                ErrorId::PriceTooOld,
-                                                ErrorDomain::Pyth,
-                                                "Current price is not available. Price id: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
-                                                id,
-                                                current_block_time_seconds,
-                                                price_feed.get_price_unchecked().publish_time,
-                                                (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
-                                                age_tolerance_seconds
-                                            )
+                                            let publish_time =
+                                                price_feed.get_price_unchecked().publish_time;
+                                            let publish_time =
+                                                PublishTime::Unixtime { at: publish_time };
+                                            let block_time = self.env.block.time.into();
+                                            MarketError::PriceTooOld {
+                                                contract: pyth_config.contract_address.clone(),
+                                                allowed_tolerance_in_seconds:
+                                                    *age_tolerance_seconds,
+                                                publish_time,
+                                                block_time,
+                                                feed_name: "Pyth".to_owned(),
+                                            }
                                         })?
                                 } else {
                                     price_feed.get_price_unchecked()
@@ -599,16 +595,18 @@ impl State<'_> {
                                             .checked_sub(resp.update_time)
                                     {
                                         if time_diff > (*age_tolerance_seconds).into() {
-                                            perp_bail!(
-                                                ErrorId::PriceTooOld,
-                                                ErrorDomain::Stride,
-                                                "Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
-                                                denom,
-                                                current_block_time_seconds,
-                                                resp.update_time,
-                                                time_diff,
-                                                age_tolerance_seconds
-                                            )
+                                            let block_time = self.env.block.time.into();
+                                            let publish_time = PublishTime::Timestamp {
+                                                at: Timestamp::from_seconds(resp.update_time),
+                                            };
+                                            bail!(MarketError::PriceTooOld {
+                                                contract: stride_address.clone(),
+                                                allowed_tolerance_in_seconds:
+                                                    *age_tolerance_seconds,
+                                                publish_time,
+                                                block_time,
+                                                feed_name: "Stride".to_owned(),
+                                            })
                                         }
                                     }
                                 }
@@ -654,16 +652,15 @@ impl State<'_> {
                                     if time_diff
                                         > Duration::from_seconds((*age_tolerance_seconds).into())
                                     {
-                                        perp_bail!(
-                                            ErrorId::PriceTooOld,
-                                            ErrorDomain::SimpleOracle,
-                                            "Current price is not available on simple oracle. Price contract: {}, Current block time: {}, price publish time: {}, diff: {:?}, age_tolerance: {}",
-                                            contract,
-                                            current_block_time_seconds,
-                                            publish_time,
-                                            time_diff,
-                                            age_tolerance_seconds
-                                        )
+                                        bail!(MarketError::PriceTooOld {
+                                            contract: contract.clone(),
+                                            feed_name: "Simple".to_owned(),
+                                            allowed_tolerance_in_seconds: *age_tolerance_seconds,
+                                            publish_time: PublishTime::Timestamp {
+                                                at: publish_time
+                                            },
+                                            block_time: self.env.block.time.into(),
+                                        })
                                     }
                                 }
 

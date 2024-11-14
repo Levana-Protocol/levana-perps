@@ -90,7 +90,6 @@ pub enum ErrorId {
 #[allow(missing_docs)]
 pub enum ErrorDomain {
     Market,
-    SpotPrice,
     PositionToken,
     LiquidityToken,
     Cw20,
@@ -98,10 +97,6 @@ pub enum ErrorDomain {
     Factory,
     Default,
     Faucet,
-    Pyth,
-    Farming,
-    Stride,
-    SimpleOracle,
 }
 
 /// Generate a [PerpError] value
