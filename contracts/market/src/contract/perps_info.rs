@@ -56,9 +56,7 @@ impl State<'_> {
                 let source = self.get_token(store)?;
                 let funds = match source {
                     Token::Native { .. } => {
-                        return Err(perp_anyhow!(
-                            ErrorId::Cw20Funds,
-                            ErrorDomain::Market,
+                        return Err(anyhow!(
                             "native assets come through execute messages directly"
                         ));
                     }
@@ -67,9 +65,7 @@ impl State<'_> {
                         decimal_places,
                     } => {
                         if addr.as_str() != info.sender.as_str() {
-                            return Err(perp_anyhow!(
-                                ErrorId::Cw20Funds,
-                                ErrorDomain::Market,
+                            return Err(anyhow!(
                                 "Wrong CW20 address. Expected: {addr}. Receive: {sender}."
                             ));
                         }
@@ -145,11 +141,7 @@ impl State<'_> {
                         let n = Collateral::from_decimal256(n);
                         let amount = match NonZero::new(n) {
                             Some(n) => Ok(n),
-                            None => Err(perp_anyhow!(
-                                ErrorId::NativeFunds,
-                                ErrorDomain::Market,
-                                "no coin amount!"
-                            )),
+                            None => Err(anyhow!("no coin amount!")),
                         }?;
                         Ok(PerpsMessageInfo {
                             funds: CollateralSent {
@@ -161,11 +153,7 @@ impl State<'_> {
                     }
                     // We received native funds, but this contract is expecting
                     // a CW20.
-                    Token::Cw20 { .. } => Err(perp_anyhow!(
-                        ErrorId::NativeFunds,
-                        ErrorDomain::Market,
-                        "direct deposit cannot be done via cw20"
-                    )),
+                    Token::Cw20 { .. } => Err(anyhow!("direct deposit cannot be done via cw20")),
                 }
             }
         }
@@ -175,21 +163,15 @@ impl State<'_> {
 impl CollateralSent {
     /// Take the collateral amount, if present. Can only be called once.
     pub(crate) fn take(&mut self) -> Result<NonZero<Collateral>> {
-        self.amount.take().ok_or_else(|| {
-            perp_anyhow!(
-                ErrorId::MissingFunds,
-                ErrorDomain::Market,
-                "No funds sent for message that requires funds"
-            )
-        })
+        self.amount
+            .take()
+            .ok_or_else(|| anyhow!("No funds sent for message that requires funds"))
     }
 
     pub(crate) fn ensure_empty(mut self) -> Result<()> {
         match self.amount.take() {
             None => Ok(()),
-            Some(amount) => Err(perp_anyhow!(
-                ErrorId::UnnecessaryFunds,
-                ErrorDomain::Market,
+            Some(amount) => Err(anyhow!(
                 "Funds sent for message that requires none. Amount: {amount}"
             )),
         }
