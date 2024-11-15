@@ -4,7 +4,7 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
 use cw2::{get_contract_version, set_contract_version};
 use perpswap::contracts::cw20::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use perpswap::{attr_map, prelude::*};
+use perpswap::prelude::*;
 use semver::Version;
 
 // version info for migration info
@@ -257,12 +257,11 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response> {
         ))
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-        Ok(attr_map! {
-            "old_contract_name" => old_cw2.contract,
-            "old_contract_version" => old_cw2.version,
-            "new_contract_name" => CONTRACT_NAME,
-            "new_contract_version" => CONTRACT_VERSION,
-        })
+        let response = Response::new()
+            .add_attribute("old_contract_name", old_cw2.contract)
+            .add_attribute("old_contract_version", old_cw2.version)
+            .add_attribute("new_contract_name", CONTRACT_NAME)
+            .add_attribute("new_contract_version", CONTRACT_VERSION);
+        Ok(response)
     }
 }

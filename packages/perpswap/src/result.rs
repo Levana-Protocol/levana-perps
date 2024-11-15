@@ -12,28 +12,3 @@ impl<T: Serialize> QueryResultExt for T {
         to_json_binary(self).map_err(|err| err.into())
     }
 }
-
-/// Makes it easy to create a Response where all the values
-/// are attributes, like a HashMap.
-///
-/// example:
-///
-/// attr_map!{
-///     "color" => "orange",
-///     "amount" => 2
-/// }
-///
-/// is equivilent to
-/// Response::new()
-///     .add_attribute("color", "orange")
-///     .add_attribute("amount", 2)
-#[macro_export]
-macro_rules! attr_map {
-            ($($key:expr => $val:expr),* ,) => (
-                $crate::attr_map!($($key => $val),*)
-            );
-            ($($key:expr => $val:expr),*) => ({
-                ::cosmwasm_std::Response::new()
-                $( .add_attribute($key, $val) )*
-            });
-}
