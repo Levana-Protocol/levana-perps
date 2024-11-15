@@ -70,7 +70,7 @@ pub(super) async fn proposal_url(
 }
 
 impl ProposalInfo {
-    async fn load_from_database(app: &App, proposal_id: u64, host: &Host) -> Result<Self, Error> {
+    async fn load_from_database(app: &App, proposal_id: i64, host: &Host) -> Result<Self, Error> {
         let ProposalInfoFromDb {
             title,
             environment,
@@ -83,8 +83,9 @@ impl ProposalInfo {
             .map_err(|e| Error::Database { msg: e.to_string() })?
             .ok_or(Error::InvalidPage)?;
 
+        let id_u64 = u64::try_from(proposal_id).map_err(|_| Error::ProposalNotFound)?;
         Ok(ProposalInfo {
-            id: proposal_id.into(),
+            id: id_u64.into(),
             title,
             image_url: ProposalImage { proposal_id }.to_uri().to_string(),
             html_url: ProposalHtml { proposal_id }.to_uri().to_string(),

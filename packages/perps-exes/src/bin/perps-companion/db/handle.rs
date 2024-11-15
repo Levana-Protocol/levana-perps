@@ -135,8 +135,9 @@ impl Db {
             environment,
             address,
         }: ProposalInfoToDb,
-    ) -> Result<u64> {
-        let proposal_u64 = proposal_id.u64();
+    ) -> Result<i64> {
+        let proposal_id = i64::try_from(proposal_id.u64())
+            .context("Error converting {proposal_id} to i64 type")?;
         let url_id = query_scalar!(
             r#"
                 INSERT INTO proposal_detail
@@ -144,20 +145,20 @@ impl Db {
                 VALUES($1, $2, $3, $4, $5)
                 RETURNING url_id
             "#,
-            proposal_u64 as i64,
+            proposal_id,
             title,
-            chain as i32,
-            environment as i32,
+            i32::from(chain),
+            i32::from(environment),
             address.to_string(),
         )
         .fetch_one(&self.pool)
         .await?;
-        Ok(url_id as u64)
+        Ok(url_id)
     }
 
     pub(crate) async fn get_proposal_detail(
         &self,
-        url_id: u64,
+        url_id: i64,
     ) -> Result<Option<ProposalInfoFromDb>> {
         query_as!(
             ProposalInfoFromDb,
@@ -170,7 +171,7 @@ impl Db {
                 FROM proposal_detail
                 WHERE url_id=$1
             "#,
-            url_id as i64
+            url_id
         )
         .fetch_optional(&self.pool)
         .await
