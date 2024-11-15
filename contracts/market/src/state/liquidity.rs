@@ -257,7 +257,20 @@ impl State<'_> {
                 let remainder = match yield_to_reinvest.raw().checked_sub(amount.raw()) {
                     Ok(remainder) => remainder,
                     Err(_) => {
-                        bail!("Requested to reinvest {amount}, but only have {yield_to_reinvest}")
+                        #[derive(serde::Serialize)]
+                        struct Data {
+                            requested_to_reinvest: NonZero<Collateral>,
+                            available_yield: NonZero<Collateral>,
+                        }
+                        perp_bail_data!(
+                            ErrorId::InsufficientForReinvest,
+                            ErrorDomain::Market,
+                            Data {
+                                requested_to_reinvest: amount,
+                                available_yield: yield_to_reinvest
+                            },
+                            "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
+                        );
                     }
                 };
                 if let Some(remainder) = NonZero::new(remainder) {
@@ -510,7 +523,9 @@ impl State<'_> {
         // Update for the individual lp_addr
         addr_stats.lp = match old_lp.raw().checked_sub(lp_amount.raw()).ok() {
             None => {
-                return Err(anyhow!(
+                return Err(perp_anyhow!(
+                    ErrorId::InvalidStakeLp,
+                    ErrorDomain::Market,
                     "unable to stake LP, attempted amount: {lp_amount}, available LP: {old_lp}"
                 ))
             }

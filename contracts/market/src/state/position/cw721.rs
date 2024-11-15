@@ -295,7 +295,11 @@ impl State<'_> {
             .collect();
 
         if filtered.is_empty() {
-            return Err(anyhow!("approval not found"));
+            return Err(perp_anyhow!(
+                ErrorId::Auth,
+                ErrorDomain::PositionToken,
+                "approval not found"
+            ));
         }
         // we expect only one item
         let approval = filtered[0].clone();
@@ -327,7 +331,11 @@ impl State<'_> {
         msg: ExecuteMsg,
     ) -> Result<()> {
         if self.config.disable_position_nft_exec {
-            return Err(anyhow!("nft execution is disabled"));
+            return Err(perp_anyhow!(
+                ErrorId::Auth,
+                ErrorDomain::PositionToken,
+                "nft execution is disabled"
+            ));
         }
         match msg {
             ExecuteMsg::Approve {
@@ -445,7 +453,11 @@ impl State<'_> {
         // reject expired data as invalid
         let expires = expires.unwrap_or_default();
         if expires.is_expired(&self.env.block) {
-            return Err(anyhow!("Already expired"));
+            return Err(perp_anyhow!(
+                ErrorId::Expired,
+                ErrorDomain::PositionToken,
+                ""
+            ));
         }
 
         // set the operator for us
@@ -492,7 +504,11 @@ impl State<'_> {
             // reject expired data as invalid
             let expires = expires.unwrap_or_default();
             if expires.is_expired(&self.env.block) {
-                return Err(anyhow!("Already expired"));
+                return Err(perp_anyhow!(
+                    ErrorId::Expired,
+                    ErrorDomain::PositionToken,
+                    ""
+                ));
             }
             let approval = Approval {
                 spender: spender.clone(),
@@ -533,12 +549,12 @@ impl State<'_> {
         match op {
             Some(ex) => {
                 if ex.is_expired(&self.env.block) {
-                    Err(anyhow!("Already expired"))
+                    Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::PositionToken, ""))
                 } else {
                     Ok(())
                 }
             }
-            None => Err(anyhow!("Operator not found")),
+            None => Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::PositionToken, "")),
         }
     }
 
@@ -627,12 +643,12 @@ impl State<'_> {
         match op {
             Some(ex) => {
                 if ex.is_expired(&self.env.block) {
-                    Err(anyhow!("Already expired"))
+                    Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::PositionToken, ""))
                 } else {
                     Ok(())
                 }
             }
-            None => Err(anyhow!("Operator not found")),
+            None => Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::PositionToken, "")),
         }
     }
     fn nft_increment_tokens(&self, ctx: &mut StateContext) -> Result<u64> {

@@ -1,5 +1,9 @@
 //! Types to represent timestamps and durations.
 use crate::prelude::*;
+use crate::{
+    error::{ErrorDomain, ErrorId, PerpError},
+    perp_error,
+};
 use anyhow::Result;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
@@ -94,11 +98,23 @@ impl Timestamp {
     ///
     /// Will fail if the right hand side is greater than the left hand side.
     pub fn checked_sub(self, rhs: Self, desc: &str) -> Result<Duration> {
+        #[derive(serde::Serialize)]
+        struct Data {
+            lhs: Timestamp,
+            rhs: Timestamp,
+            desc: String,
+        }
         match self.0.checked_sub(rhs.0) {
             Some(x) => Ok(Duration(x)),
-            None => Err(anyhow!(
-                "Invalid timestamp substraction during Action {desc}. Values {} - {rhs}",
-                self.0
+            None => Err(perp_anyhow_data!(
+                ErrorId::TimestampSubtractUnderflow,
+                ErrorDomain::Default,
+                Data {
+                    lhs: self,
+                    rhs,
+                    desc: desc.to_owned()
+                },
+                "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
             )),
         }
     }
@@ -250,18 +266,24 @@ impl Div<Duration> for Duration {
 }
 
 impl FromStr for Timestamp {
-    type Err = anyhow::Error;
+    type Err = PerpError;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let err = |msg: &str| -> PerpError {
+            perp_error!(
+                ErrorId::Conversion,
+                ErrorDomain::Default,
+                "error converting {} to Timestamp, {}",
+                s,
+                msg
+            )
+        };
+
         let (seconds, nanos) = s
             .split_once('.')
-            .ok_or_else(|| anyhow!("Missing decimal point in {s}"))?;
-        let seconds = seconds
-            .parse()
-            .map_err(|_| anyhow!("unable to parse second in {s}"))?;
-        let nanos = nanos
-            .parse()
-            .map_err(|_| anyhow!("unable to parse nanos in {s}"))?;
+            .ok_or_else(|| err("missing decimal point"))?;
+        let seconds = seconds.parse().map_err(|_| err("unable to parse second"))?;
+        let nanos = nanos.parse().map_err(|_| err("unable to parse nanos"))?;
 
         let timestamp = Timestamp::from_seconds(seconds) + Duration::from_nanos(nanos);
 

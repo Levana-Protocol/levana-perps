@@ -1450,24 +1450,26 @@ pub enum StopLoss {
 }
 
 impl FromStr for StopLoss {
-    type Err = MarketError;
-    fn from_str(src: &str) -> Result<StopLoss, MarketError> {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<StopLoss, PerpError> {
         match src {
             REMOVE_STR => Ok(StopLoss::Remove),
             _ => match src.parse() {
                 Ok(number) => Ok(StopLoss::Price(number)),
-                Err(err) => Err(MarketError::StringConversionError {
-                    original_string: src.to_owned(),
-                    r#type: "StopLoss".to_owned(),
-                    error: err.to_string(),
-                }),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to StopLoss , {}",
+                    src,
+                    err
+                )),
             },
         }
     }
 }
 
 impl TryFrom<&str> for StopLoss {
-    type Error = MarketError;
+    type Error = PerpError;
 
     fn try_from(val: &str) -> Result<Self, Self::Error> {
         Self::from_str(val)

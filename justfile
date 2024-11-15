@@ -20,7 +20,7 @@ cargo-compile:
 
 # Market tests
 market-test collateral-type token-kind:
-	env MARKET_COLLATERAL_TYPE={{collateral-type}} MARKET_TOKEN_KIND={{token-kind}} cargo nextest run --no-fail-fast --workspace --locked
+	env MARKET_COLLATERAL_TYPE={{collateral-type}} MARKET_TOKEN_KIND={{token-kind}} cargo nextest run --workspace --locked
 
 # cargo tests check
 cargo-test-check:
@@ -29,10 +29,6 @@ cargo-test-check:
 	# just market-test quote native
 	# just market-test base cw20
 	just market-test quote cw20
-
-# cargo tests on a single combination
-cargo-test-check-single:
-	just market-test base native
 
 # cargo tests check
 cargo-test-check-local:
