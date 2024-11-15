@@ -410,7 +410,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
             }
         }
         _ => {
-            return Err(anyhow!("Not a valid reply id: {}", msg.id));
+            return Err(perp_anyhow!(
+                ErrorId::InternalReply,
+                ErrorDomain::Factory,
+                "not a valid reply id: {}",
+                msg.id
+            ));
         }
     }
 

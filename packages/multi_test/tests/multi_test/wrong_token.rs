@@ -9,7 +9,7 @@ fn directly_call_receive() {
 
     let addr = mock_api.addr_make("notacw20");
     let fakesender = mock_api.addr_make("fakesender");
-    market
+    let err: PerpError = market
         .exec(
             &addr,
             &MarketExecuteMsg::Receive {
@@ -21,7 +21,10 @@ fn directly_call_receive() {
                 .unwrap(),
             },
         )
-        .unwrap_err();
+        .unwrap_err()
+        .downcast()
+        .unwrap();
+    assert_eq!(err.id, ErrorId::Cw20Funds);
 }
 
 #[test]
@@ -45,7 +48,7 @@ fn deposit_lp_token() {
         )
         .unwrap();
 
-    market
+    let err: PerpError = market
         .exec_liquidity_token_send(
             LiquidityTokenKind::Lp,
             &lp,
@@ -55,7 +58,10 @@ fn deposit_lp_token() {
                 stake_to_xlp: false,
             },
         )
-        .unwrap_err();
+        .unwrap_err()
+        .downcast()
+        .unwrap();
+    assert_eq!(err.id, ErrorId::Cw20Funds);
 
     // And confirm that a basic transfer works still, ruling out insufficient liquidity
     market

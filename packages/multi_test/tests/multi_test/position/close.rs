@@ -90,8 +90,10 @@ fn position_close_auth() {
             panic!("should not have been able to close");
         }
         Err(err) => {
-            let root_cause = err.root_cause().to_string();
-            assert!(root_cause.contains("position owner is"));
+            let err: PerpError = err.downcast().unwrap();
+            if err.id != ErrorId::Auth || err.domain != ErrorDomain::Market {
+                panic!("{:?}", err);
+            }
         }
     }
     // close

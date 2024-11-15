@@ -114,7 +114,9 @@ pub fn load_external_item<T: serde::de::DeserializeOwned>(
     };
 
     external_helper(querier, contract_addr, key, || {
-        anyhow!(
+        perp_anyhow!(
+            ErrorId::Any,
+            ErrorDomain::Default,
             "unable to load external item {}",
             debug_key_name.unwrap_or_default()
         )
@@ -129,7 +131,12 @@ pub fn load_external_map<'a, T: serde::de::DeserializeOwned>(
     key: &impl PrimaryKey<'a>,
 ) -> anyhow::Result<T> {
     external_helper(querier, contract_addr, map_key(namespace, key), || {
-        anyhow!("unable to load external map {}", namespace)
+        perp_anyhow!(
+            ErrorId::Any,
+            ErrorDomain::Default,
+            "unable to load external map {}",
+            namespace
+        )
     })
 }
 

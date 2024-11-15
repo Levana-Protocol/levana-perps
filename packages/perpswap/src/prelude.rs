@@ -8,9 +8,7 @@ pub use crate::contracts::market::entry::{
 };
 pub use crate::cosmwasm::*;
 pub use crate::direction::{DirectionToBase, DirectionToNotional};
-pub use crate::error::market::{
-    CongestionReason, MarketError, PublishTime, TriggerPriceMustBe, TriggerType,
-};
+pub use crate::error::market::{CongestionReason, MarketError, TriggerPriceMustBe, TriggerType};
 pub use crate::event::CosmwasmEventExt;
 pub use crate::leverage::*;
 pub use crate::market_type::{MarketId, MarketType};
@@ -24,7 +22,10 @@ pub use crate::{
     auth::*,
     storage::{external_map_has, load_external_item, load_external_map},
 };
-pub use crate::{error::*, perp_bail};
+pub use crate::{
+    error::*, perp_anyhow, perp_anyhow_data, perp_bail, perp_bail_data, perp_ensure, perp_error,
+    perp_error_data,
+};
 
 pub use anyhow::{anyhow, bail, Context, Result};
 pub use cosmwasm_schema::cw_serde;
