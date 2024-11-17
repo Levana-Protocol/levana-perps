@@ -17,8 +17,6 @@ pub mod compat;
 pub mod direction;
 pub mod ibc;
 pub mod leverage;
-/// Feature-gated logging functionality
-pub mod log;
 pub mod market_type;
 pub mod max_gains;
 pub mod namespace;
