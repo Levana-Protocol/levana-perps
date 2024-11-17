@@ -1,5 +1,4 @@
 pub use super::{addr::*, debug_log, debug_log_any, log::*, number::*, result::*};
-pub use crate::attr_map;
 pub use crate::contracts::factory::entry::{
     ExecuteMsg as FactoryExecuteMsg, QueryMsg as FactoryQueryMsg,
 };

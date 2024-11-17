@@ -9,7 +9,6 @@ pub(crate) use perpswap::contracts::countertrade::*;
 pub(crate) use perpswap::contracts::market::entry::{
     ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg,
 };
-pub(crate) use perpswap::{
-    attr_map,
-    storage::{Collateral, LpToken, MarketId, NonZero, Notional, Signed, UnsignedDecimal},
+pub(crate) use perpswap::storage::{
+    Collateral, LpToken, MarketId, NonZero, Notional, Signed, UnsignedDecimal,
 };

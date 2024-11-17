@@ -6,9 +6,8 @@ pub(crate) use cosmwasm_std::{
 pub(crate) use cw_storage_plus::{Bound, Item, Map};
 pub(crate) use perpswap::contracts::copy_trading::*;
 pub(crate) use perpswap::contracts::market::entry::QueryMsg as MarketQueryMsg;
-pub(crate) use perpswap::{
-    attr_map,
-    storage::{Collateral, LpToken, MarketId, NonZero, Signed, UnsignedDecimal},
+pub(crate) use perpswap::storage::{
+    Collateral, LpToken, MarketId, NonZero, Signed, UnsignedDecimal,
 };
 
 /// Perform sanity checks in dev, no-op in prod.
