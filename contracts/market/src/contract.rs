@@ -527,6 +527,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 OraclePriceResp {
                     pyth: oracle_price.pyth,
                     sei: oracle_price.sei,
+                    ruji: oracle_price.ruji,
                     stride: oracle_price.stride,
                     simple: oracle_price
                         .simple

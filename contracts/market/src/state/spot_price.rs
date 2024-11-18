@@ -48,6 +48,8 @@ pub(crate) struct OraclePriceInternal {
     pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
     pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    /// A map of each ruji used in this market to the redemption price
+    pub(crate) ruji: NumberGtZero,
     /// A map of each stride denom used in this market to the redemption price
     pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
@@ -162,7 +164,7 @@ impl OraclePriceInternal {
                     .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => *price,
-                SpotPriceFeedData::Ruji { price } => *price,
+                SpotPriceFeedData::Ruji { .. } => self.ruji,
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
@@ -491,6 +493,7 @@ impl State<'_> {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
                 let mut simple = BTreeMap::new();
+                let mut ruji = NumberGtZero::one();
                 let sei = BTreeMap::new();
 
                 let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
@@ -629,7 +632,8 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Ruji { .. } => {
-                            // nothing to do here, constant prices are used without a lookup
+                            // Placeholder for the ruji grpc data fetching logic
+                            ruji = ruji.checked_add(Decimal256::one())?;
                         }
                         SpotPriceFeedData::Constant { .. } => {
                             // nothing to do here, constant prices are used without a lookup
@@ -681,6 +685,7 @@ impl State<'_> {
                     pyth,
                     stride,
                     sei,
+                    ruji,
                     simple,
                 })
             }
