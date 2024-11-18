@@ -92,13 +92,15 @@ impl State<'_> {
         // tap or not.
         self.validate_tap_faucet_error(store, recipient, assets)?
             .map_err(|e| match e {
-                FaucetError::TooSoon { wait_secs } => perp_anyhow_data!(
-                    ErrorId::Exceeded,
-                    ErrorDomain::Faucet,
-                    e,
-                    "You can tap the faucet again in {}",
-                    PrettyTimeRemaining(wait_secs),
-                ),
+                FaucetError::TooSoon { wait_secs } => anyhow!(PerpError {
+                    id: ErrorId::Exceeded,
+                    domain: ErrorDomain::Faucet,
+                    description: format!(
+                        "You can tap the faucet again in {}",
+                        PrettyTimeRemaining(wait_secs)
+                    ),
+                    data: Some(e)
+                }),
                 FaucetError::AlreadyTapped { cw20: _ } => perp_anyhow!(
                     ErrorId::Exceeded,
                     ErrorDomain::Faucet,

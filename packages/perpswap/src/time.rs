@@ -101,18 +101,22 @@ impl Timestamp {
             rhs: Timestamp,
             desc: String,
         }
+        let data = Data {
+            lhs: self,
+            rhs,
+            desc: desc.to_owned(),
+        };
         match self.0.checked_sub(rhs.0) {
             Some(x) => Ok(Duration(x)),
-            None => Err(perp_anyhow_data!(
-                ErrorId::TimestampSubtractUnderflow,
-                ErrorDomain::Default,
-                Data {
-                    lhs: self,
-                    rhs,
-                    desc: desc.to_owned()
-                },
-                "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
-            )),
+            None => Err(anyhow!(PerpError {
+                id: ErrorId::TimestampSubtractUnderflow,
+                domain: ErrorDomain::Default,
+                description: format!(
+                    "Invalid timestamp subtraction during. Action: {desc}. Values: {} - {}",
+                    data.lhs, data.rhs
+                ),
+                data: Some(data),
+            })),
         }
     }
 
