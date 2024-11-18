@@ -1,9 +1,6 @@
 //! Types to represent timestamps and durations.
+use crate::error::{ErrorDomain, ErrorId, PerpError};
 use crate::prelude::*;
-use crate::{
-    error::{ErrorDomain, ErrorId, PerpError},
-    perp_error,
-};
 use anyhow::Result;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
@@ -270,12 +267,10 @@ impl FromStr for Timestamp {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let err = |msg: &str| -> PerpError {
-            perp_error!(
+            PerpError::new(
                 ErrorId::Conversion,
                 ErrorDomain::Default,
-                "error converting {} to Timestamp, {}",
-                s,
-                msg
+                format!("error converting {} to Timestamp, {}", s, msg),
             )
         };
 

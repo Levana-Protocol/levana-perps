@@ -228,11 +228,10 @@ impl State<'_> {
         timestamp: Timestamp,
     ) -> Result<PricePoint> {
         self.spot_price_inner_opt(store, timestamp)?.ok_or_else(|| {
-            perp_error!(
+            PerpError::new(
                 ErrorId::PriceNotFound,
                 ErrorDomain::SpotPrice,
-                "there is no spot price for timestamp {}",
-                timestamp
+                format!("there is no spot price for timestamp {timestamp}"),
             )
             .into()
         })
@@ -522,16 +521,13 @@ impl State<'_> {
                                             (*age_tolerance_seconds).into(),
                                         )
                                         .ok_or_else(|| {
-                                            perp_error!(
-                                                ErrorId::PriceTooOld,
-                                                ErrorDomain::Pyth,
-                                                "Current price is not available. Price id: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                            let error_msg = format!("Current price is not available. Price id: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
                                                 id,
                                                 current_block_time_seconds,
                                                 price_feed.get_price_unchecked().publish_time,
                                                 (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
-                                                age_tolerance_seconds
-                                            )
+                                                age_tolerance_seconds);
+                                            PerpError::new(ErrorId::PriceTooOld, ErrorDomain::Pyth, error_msg)
                                         })?
                                 } else {
                                     price_feed.get_price_unchecked()
