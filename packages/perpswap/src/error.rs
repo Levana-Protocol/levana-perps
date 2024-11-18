@@ -104,19 +104,6 @@ pub enum ErrorDomain {
     SimpleOracle,
 }
 
-/// Generate a [PerpError] value
-#[macro_export]
-macro_rules! perp_error {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        $crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None::<()>,
-        }
-    }};
-}
-
 /// Generate a [PerpError] value with additional optional data
 #[macro_export]
 macro_rules! perp_error_data {
@@ -168,19 +155,6 @@ macro_rules! perp_ensure {
                 data: None::<()>,
             }));
         }
-    }};
-}
-
-/// Like [perp_bail] but takes extra optional data
-#[macro_export]
-macro_rules! perp_bail_data {
-    ($id:expr, $domain:expr, $data:expr,  $($t:tt)*) => {{
-        return Err(anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        }));
     }};
 }
 

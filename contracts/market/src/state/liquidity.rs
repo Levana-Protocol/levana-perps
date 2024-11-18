@@ -262,15 +262,20 @@ impl State<'_> {
                             requested_to_reinvest: NonZero<Collateral>,
                             available_yield: NonZero<Collateral>,
                         }
-                        perp_bail_data!(
-                            ErrorId::InsufficientForReinvest,
-                            ErrorDomain::Market,
-                            Data {
-                                requested_to_reinvest: amount,
-                                available_yield: yield_to_reinvest
-                            },
-                            "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
+                        let data = Data {
+                            requested_to_reinvest: amount,
+                            available_yield: yield_to_reinvest,
+                        };
+                        let msg = format!(
+                            "Requested to reinvest {}, but only have {}",
+                            data.requested_to_reinvest, data.available_yield
                         );
+                        bail!(PerpError {
+                            id: ErrorId::InsufficientForReinvest,
+                            domain: ErrorDomain::Market,
+                            description: msg,
+                            data: Some(data)
+                        })
                     }
                 };
                 if let Some(remainder) = NonZero::new(remainder) {
