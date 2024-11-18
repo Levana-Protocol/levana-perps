@@ -22,8 +22,7 @@ pub use crate::{
     storage::{external_map_has, load_external_item, load_external_map},
 };
 pub use crate::{
-    error::*, perp_anyhow, perp_anyhow_data, perp_bail_data, perp_ensure, perp_error,
-    perp_error_data,
+    error::*, perp_anyhow, perp_anyhow_data, perp_ensure, perp_error, perp_error_data,
 };
 
 pub use anyhow::{anyhow, bail, Context, Result};
