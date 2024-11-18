@@ -162,6 +162,7 @@ impl OraclePriceInternal {
                     .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => *price,
+                SpotPriceFeedData::Ruji { price } => *price,
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
@@ -627,6 +628,9 @@ impl State<'_> {
                             }
                         }
 
+                        SpotPriceFeedData::Ruji { .. } => {
+                            // nothing to do here, constant prices are used without a lookup
+                        }
                         SpotPriceFeedData::Constant { .. } => {
                             // nothing to do here, constant prices are used without a lookup
                         }

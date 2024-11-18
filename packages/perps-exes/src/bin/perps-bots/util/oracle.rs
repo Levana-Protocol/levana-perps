@@ -62,6 +62,7 @@ impl OffchainPriceData {
                             }
                             SpotPriceFeedData::Stride { .. } => (),
                             SpotPriceFeedData::Sei { .. } => (),
+                            SpotPriceFeedData::Ruji { .. } => (),
                             SpotPriceFeedData::Simple { .. } => (),
                         }
                     }
@@ -314,6 +315,13 @@ fn compose_oracle_feeds(
                     true,
                 );
                 sei.price.into_decimal256()
+            }
+            SpotPriceFeedData::Ruji { price } => {
+                anyhow::ensure!(
+                    !feed.volatile.unwrap_or(false),
+                    "Constant feeds cannot be volatile"
+                );
+                price.into_decimal256()
             }
             SpotPriceFeedData::Stride {
                 denom,

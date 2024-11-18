@@ -234,6 +234,7 @@ fn strip_unneeded(spot_price: &mut SpotPriceConfig) {
                     SpotPriceFeedData::Pyth { .. } => has_pyth = true,
                     SpotPriceFeedData::Stride { .. } => has_stride = true,
                     SpotPriceFeedData::Sei { .. } => (),
+                    SpotPriceFeedData::Ruji { .. } => (),
                     SpotPriceFeedData::Simple { .. } => (),
                 }
             }

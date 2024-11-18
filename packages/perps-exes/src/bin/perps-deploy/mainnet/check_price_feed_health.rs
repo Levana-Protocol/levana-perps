@@ -82,6 +82,7 @@ async fn go(
                             }
                         }
                         SpotPriceFeedData::Sei { .. } => (),
+                        SpotPriceFeedData::Ruji { .. } => (),
                         SpotPriceFeedData::Simple {
                             contract,
                             age_tolerance_seconds: _,
