@@ -117,19 +117,6 @@ macro_rules! perp_anyhow {
     }};
 }
 
-/// Like [perp_anyhow] but accepts optional extra data
-#[macro_export]
-macro_rules! perp_anyhow_data {
-    ($id:expr, $domain:expr, $data:expr, $($t:tt)*) => {{
-        anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        })
-    }};
-}
-
 impl<T: Serialize> fmt::Display for PerpError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
