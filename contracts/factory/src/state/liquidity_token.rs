@@ -47,12 +47,11 @@ pub(crate) fn save_liquidity_token_addr(
         .may_load(store, market_id.clone())?
         .is_some()
     {
-        perp_bail!(
+        bail!(PerpError::new(
             ErrorId::AddressAlreadyExists,
             ErrorDomain::Factory,
-            "liquidity token address for market {} already exists",
-            market_id
-        );
+            "liquidity token address for market {} already exists"
+        ))
     }
 
     addrs_map(kind).save(store, market_id.clone(), addr)?;

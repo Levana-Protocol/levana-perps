@@ -98,12 +98,11 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     if msg.requires_owner() && Some(info.sender.clone()) != get_owner(deps.storage)? {
-        perp_bail!(
-            ErrorId::Auth,
+        let error = PerpError::auth(
             ErrorDomain::Default,
-            "{} is not the auth contract owner",
-            info.sender
-        )
+            format!("{} is not the auth contract owner", info.sender),
+        );
+        bail!(error)
     }
 
     execute_msg(deps, env, Some(info), msg)
@@ -112,11 +111,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn sudo(deps: DepsMut, env: Env, msg: ExecuteMsg) -> Result<Response> {
     if !msg.requires_owner() || get_owner(deps.storage)?.is_some() {
-        perp_bail!(
-            ErrorId::Auth,
+        bail!(PerpError::auth(
             ErrorDomain::Default,
-            "Sudo entrypoint is only available for the factory which does not have owner",
-        )
+            "Sudo entrypoint is only available for the factory which does not have owner"
+        ))
     }
 
     execute_msg(deps, env, None, msg)

@@ -1458,12 +1458,10 @@ impl FromStr for StopLoss {
             REMOVE_STR => Ok(StopLoss::Remove),
             _ => match src.parse() {
                 Ok(number) => Ok(StopLoss::Price(number)),
-                Err(err) => Err(perp_error!(
+                Err(err) => Err(PerpError::new(
                     ErrorId::Conversion,
                     ErrorDomain::Default,
-                    "error converting {} to StopLoss , {}",
-                    src,
-                    err
+                    format!("error converting {} to StopLoss , {}", src, err),
                 )),
             },
         }

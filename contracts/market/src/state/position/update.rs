@@ -113,11 +113,10 @@ impl State<'_> {
                     .map_err(|_| ())
             );
 
-            perp_bail!(
+            bail!(PerpError::market(
                 ErrorId::DirectionToBaseFlipped,
-                ErrorDomain::Market,
                 "Position updates caused the direction to base to flip"
-            )
+            ))
         }
 
         let leverage_delta = (new_leverage.into_number() - old_leverage.into_number())?;
@@ -341,11 +340,10 @@ impl UpdatePositionSizeExec {
             .into_number()
             .approx_gt_strict(Number::ZERO)?
         {
-            perp_bail!(
+            bail!(PerpError::market(
                 ErrorId::PositionUpdate,
-                ErrorDomain::Market,
                 "Active collateral cannot be negative!"
-            );
+            ))
         }
 
         let scale_factor = ((pos.active_collateral.into_number()
@@ -519,11 +517,10 @@ impl UpdatePositionLeverageExec {
         let original_pos = pos.clone();
 
         if notional_size.into_number().approx_eq(Number::ZERO)? {
-            perp_bail!(
+            bail!(PerpError::market(
                 ErrorId::PositionUpdate,
-                ErrorDomain::Market,
                 "Notional size cannot be zero!"
-            );
+            ))
         }
 
         // Update

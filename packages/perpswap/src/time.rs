@@ -1,9 +1,6 @@
 //! Types to represent timestamps and durations.
+use crate::error::{ErrorDomain, ErrorId, PerpError};
 use crate::prelude::*;
-use crate::{
-    error::{ErrorDomain, ErrorId, PerpError},
-    perp_error,
-};
 use anyhow::Result;
 #[cfg(feature = "chrono")]
 use chrono::{DateTime, TimeZone, Utc};
@@ -104,18 +101,22 @@ impl Timestamp {
             rhs: Timestamp,
             desc: String,
         }
+        let data = Data {
+            lhs: self,
+            rhs,
+            desc: desc.to_owned(),
+        };
         match self.0.checked_sub(rhs.0) {
             Some(x) => Ok(Duration(x)),
-            None => Err(perp_anyhow_data!(
-                ErrorId::TimestampSubtractUnderflow,
-                ErrorDomain::Default,
-                Data {
-                    lhs: self,
-                    rhs,
-                    desc: desc.to_owned()
-                },
-                "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
-            )),
+            None => Err(anyhow!(PerpError {
+                id: ErrorId::TimestampSubtractUnderflow,
+                domain: ErrorDomain::Default,
+                description: format!(
+                    "Invalid timestamp subtraction during. Action: {desc}. Values: {} - {}",
+                    data.lhs, data.rhs
+                ),
+                data: Some(data),
+            })),
         }
     }
 
@@ -270,12 +271,10 @@ impl FromStr for Timestamp {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let err = |msg: &str| -> PerpError {
-            perp_error!(
+            PerpError::new(
                 ErrorId::Conversion,
                 ErrorDomain::Default,
-                "error converting {} to Timestamp, {}",
-                s,
-                msg
+                format!("error converting {} to Timestamp, {}", s, msg),
             )
         };
 
