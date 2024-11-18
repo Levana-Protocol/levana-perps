@@ -1,5 +1,6 @@
 pub(crate) mod liquifund;
 
+use anyhow::ensure;
 use cosmwasm_std::Order;
 mod open;
 pub(crate) use open::*;
@@ -512,13 +513,15 @@ impl State<'_> {
             );
         }
 
-        perp_ensure!(
+        ensure!(
             pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
-            ErrorId::InsufficientMargin,
-            ErrorDomain::Market,
-            "Active collateral cannot be less than liquidation margin: {} vs {:?}",
-            pos.active_collateral,
-            pos.liquidation_margin
+            PerpError::market(
+                ErrorId::InsufficientMargin,
+                format!(
+                    "Active collateral cannot be less than liquidation margin: {} vs {:?}",
+                    pos.active_collateral, pos.liquidation_margin
+                )
+            )
         );
 
         pos.liquidation_price = pos.liquidation_price(

@@ -3,6 +3,7 @@ use crate::state::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 use crate::state::history::trade::trade_volume_usd;
 use crate::state::liquidity::LiquidityLock;
 use crate::state::position::take_profit::TakeProfitToCounterCollateral;
+use anyhow::ensure;
 use perpswap::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use perpswap::contracts::market::entry::{PositionActionKind, SlippageAssert};
 use perpswap::contracts::market::fees::events::FeeSource;
@@ -170,13 +171,15 @@ impl OpenPositionExec {
         pos.liquidation_margin = pos.liquidation_margin(price_point, config)?;
 
         // Check for sufficient margin
-        perp_ensure!(
+        ensure!(
             pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
-            ErrorId::InsufficientMargin,
-            ErrorDomain::Market,
-            "insufficient margin, active collateral: {}, liquidation_margin: {:?}",
-            pos.active_collateral,
-            pos.liquidation_margin,
+            PerpError::market(
+                ErrorId::InsufficientMargin,
+                format!(
+                    "insufficient margin, active collateral: {}, liquidation_margin: {:?}",
+                    pos.active_collateral, pos.liquidation_margin
+                )
+            )
         );
 
         let open_interest =
