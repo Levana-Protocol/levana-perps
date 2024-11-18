@@ -332,19 +332,23 @@ pub(crate) enum QueryType {
 }
 
 #[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub struct ProposalQueryResponse {
     pub title: String,
 }
 
 #[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub struct ProposalRecordQueryResponse {
     pub proposal: ProposalQueryResponse,
 }
 
 #[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
 pub struct ProposalsResp(Vec<ProposalRecordQueryResponse>);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum QueryMsg {
     ProposalsById { ids: Vec<Uint64> },
 }
