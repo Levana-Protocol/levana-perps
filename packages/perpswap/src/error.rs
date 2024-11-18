@@ -171,19 +171,6 @@ macro_rules! perp_ensure {
     }};
 }
 
-/// Return early with the given perp error
-#[macro_export]
-macro_rules! perp_bail {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        return Err(anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None::<()>,
-        }));
-    }};
-}
-
 /// Like [perp_bail] but takes extra optional data
 #[macro_export]
 macro_rules! perp_bail_data {
@@ -218,6 +205,36 @@ impl<T: Serialize> fmt::Debug for PerpError<T> {
 }
 
 impl PerpError {
+    /// Create a new [Self] but with empty data.
+    pub fn new(id: ErrorId, domain: ErrorDomain, desc: impl Into<String>) -> Self {
+        PerpError {
+            id,
+            domain,
+            description: desc.into(),
+            data: None,
+        }
+    }
+
+    /// Create a new auth error but with empty data.
+    pub fn auth(domain: ErrorDomain, desc: impl Into<String>) -> Self {
+        PerpError {
+            id: ErrorId::Auth,
+            domain,
+            description: desc.into(),
+            data: None,
+        }
+    }
+
+    /// Create a new [Self] for market contract, but with no data.
+    pub fn market(id: ErrorId, desc: impl Into<String>) -> Self {
+        PerpError {
+            id,
+            domain: ErrorDomain::Market,
+            description: desc.into(),
+            data: None,
+        }
+    }
+
     /// Include error information into an event
     pub fn mixin_event(&self, evt: Event) -> Event {
         // these unwraps are okay, just a shorthand helper to get the enum variants as a string

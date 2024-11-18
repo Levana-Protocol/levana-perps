@@ -661,11 +661,12 @@ impl State<'_> {
         let total_yield = addr_stats.total_yield()?;
         let total_yield = match NonZero::new(total_yield) {
             Some(total_yield) => total_yield,
-            None => perp_bail!(
-                ErrorId::NoYieldToClaim,
-                ErrorDomain::Market,
-                "liquidity_claim_yield: total yield is 0"
-            ),
+            None => {
+                bail!(PerpError::market(
+                    ErrorId::NoYieldToClaim,
+                    "liquidity_claim_yield: total yield is 0"
+                ))
+            }
         };
 
         addr_stats.lp_accrued_yield = Collateral::zero();
