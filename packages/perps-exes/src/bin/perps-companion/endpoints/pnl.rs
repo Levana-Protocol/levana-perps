@@ -33,7 +33,7 @@ use crate::{
     types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
-use super::{ErrorDescription, ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
+use super::{Error, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -156,7 +156,7 @@ impl MarketContract {
         let mut attempt = 1;
         loop {
             let res = self.0.query(&msg).await.map_err(|source| {
-                let e = Error::FailedToQueryContract {
+                let e = Error::FailedToQueryMarketContract {
                     msg: msg.clone(),
                     query_type,
                 };
@@ -390,64 +390,6 @@ pub(crate) enum QueryType {
     EntryPrice,
     ExitPrice,
     Positions,
-}
-
-#[derive(thiserror::Error, Clone, Debug)]
-pub(crate) enum Error {
-    #[error("Unknown chain ID")]
-    UnknownChainId,
-    #[error("Specified position not found")]
-    PositionNotFound,
-    #[error("The position is still open")]
-    PositionStillOpen,
-    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}")]
-    FailedToQueryContract {
-        msg: QueryMsg,
-        query_type: QueryType,
-    },
-    #[error("Error parsing path: {msg}")]
-    Path { msg: String },
-    #[error("Error returned from database")]
-    Database { msg: String },
-    #[error("Page not found")]
-    InvalidPage,
-    #[error("Missing PnL values")]
-    PnlValueMissing,
-    #[error("Math operation overflowed")]
-    MathOverflow,
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        let mut response = ErrorPage {
-            code: match &self {
-                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
-                Error::PositionNotFound => http::status::StatusCode::BAD_REQUEST,
-                Error::PositionStillOpen => http::status::StatusCode::BAD_REQUEST,
-                Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Status => http::status::StatusCode::BAD_REQUEST,
-                    QueryType::EntryPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::ExitPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                },
-                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
-                Error::Database { msg } => {
-                    tracing::error!("Database serror: {msg}");
-                    http::status::StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
-                Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-            },
-            error: self.clone(),
-        }
-        .into_response();
-        let error_description = ErrorDescription {
-            msg: self.to_string(),
-        };
-        response.extensions_mut().insert(error_description);
-        response
-    }
 }
 
 #[derive(askama::Template)]

@@ -11,14 +11,12 @@ use axum::{
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
 use axum_extra::TypedHeader;
-use cosmos::{error::AddressError, Address, Contract};
+use cosmos::{Address, Contract};
 use cosmwasm_std::Uint64;
 use headers::Host;
 use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-
-use cosmwasm_schema::{cw_serde, QueryResponses};
 
 use crate::{
     app::App,
@@ -26,10 +24,7 @@ use crate::{
     types::{ChainId, ContractEnvironment},
 };
 
-use super::{
-    ErrorDescription, ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg,
-    ProposalUrl,
-};
+use super::{Error, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl};
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
 pub(crate) struct ProposalInfoRecord {
@@ -142,7 +137,7 @@ impl GovContract {
         let mut attempt = 1;
         loop {
             let res = self.0.query(&msg).await.map_err(|source| {
-                let e = Error::FailedToQueryContract {
+                let e = Error::FailedToQueryGovContract {
                     msg: msg.clone(),
                     query_type,
                 };
@@ -336,73 +331,22 @@ pub(crate) enum QueryType {
     Proposals,
 }
 
-#[cw_serde]
+#[derive(Clone, Deserialize, Debug)]
 pub struct ProposalQueryResponse {
     pub title: String,
 }
 
-#[cw_serde]
+#[derive(Clone, Deserialize, Debug)]
 pub struct ProposalRecordQueryResponse {
     pub proposal: ProposalQueryResponse,
 }
 
-#[cw_serde]
+#[derive(Clone, Deserialize, Debug)]
 pub struct ProposalsResp(Vec<ProposalRecordQueryResponse>);
 
-#[cw_serde]
-#[derive(QueryResponses)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) enum QueryMsg {
-    #[returns(ProposalsResp)]
     ProposalsById { ids: Vec<Uint64> },
-}
-
-#[derive(thiserror::Error, Clone, Debug)]
-pub(crate) enum Error {
-    #[error("Unknown chain ID")]
-    UnknownChainId,
-    #[error("Specified proposal not found")]
-    ProposalNotFound,
-    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}")]
-    FailedToQueryContract {
-        msg: QueryMsg,
-        query_type: QueryType,
-    },
-    #[error("Error parsing path: {msg}")]
-    Path { msg: String },
-    #[error("Error returned from database")]
-    Database { msg: String },
-    #[error("Page not found")]
-    InvalidPage,
-    #[error("Invalid address: {source}")]
-    InvalidAddress { source: AddressError },
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        let mut response = ErrorPage {
-            code: match &self {
-                Error::ProposalNotFound => http::status::StatusCode::BAD_REQUEST,
-                Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Proposals => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                },
-                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
-                Error::Database { msg } => {
-                    tracing::error!("Database serror: {msg}");
-                    http::status::StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
-                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
-                Error::InvalidAddress { source: _ } => http::status::StatusCode::BAD_REQUEST,
-            },
-            error: self.clone(),
-        }
-        .into_response();
-        let error_description = ErrorDescription {
-            msg: self.to_string(),
-        };
-        response.extensions_mut().insert(error_description);
-        response
-    }
 }
 
 #[derive(askama::Template)]
