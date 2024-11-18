@@ -599,16 +599,16 @@ impl State<'_> {
                                             .checked_sub(resp.update_time)
                                     {
                                         if time_diff > (*age_tolerance_seconds).into() {
-                                            perp_bail!(
+                                            let error_msg = format!("Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}", denom
+                                                , current_block_time_seconds
+                                                , resp.update_time
+                                                , time_diff
+                                                , age_tolerance_seconds);
+                                            bail!(PerpError::new(
                                                 ErrorId::PriceTooOld,
                                                 ErrorDomain::Stride,
-                                                "Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
-                                                denom,
-                                                current_block_time_seconds,
-                                                resp.update_time,
-                                                time_diff,
-                                                age_tolerance_seconds
-                                            )
+                                                error_msg
+                                            ))
                                         }
                                     }
                                 }
@@ -654,16 +654,17 @@ impl State<'_> {
                                     if time_diff
                                         > Duration::from_seconds((*age_tolerance_seconds).into())
                                     {
-                                        perp_bail!(
-                                            ErrorId::PriceTooOld,
-                                            ErrorDomain::SimpleOracle,
-                                            "Current price is not available on simple oracle. Price contract: {}, Current block time: {}, price publish time: {}, diff: {:?}, age_tolerance: {}",
+                                        let error_msg = format!("Current price is not available on simple oracle. Price contract: {}, Current block time: {}, price publish time: {}, diff: {:?}, age_tolerance: {}",
                                             contract,
                                             current_block_time_seconds,
                                             publish_time,
                                             time_diff,
-                                            age_tolerance_seconds
-                                        )
+                                            age_tolerance_seconds);
+                                        bail!(PerpError::new(
+                                            ErrorId::PriceTooOld,
+                                            ErrorDomain::SimpleOracle,
+                                            error_msg
+                                        ))
                                     }
                                 }
 

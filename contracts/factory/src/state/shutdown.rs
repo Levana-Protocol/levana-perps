@@ -42,12 +42,9 @@ pub(crate) fn shutdown(
     } else if wind_down == info.sender {
         ShutdownWallet::WindDown
     } else {
-        perp_bail!(
-            ErrorId::Auth,
-            ErrorDomain::Factory,
-            "Shutdown actions can only be called by kill switch ({kill_switch}) and wind down ({wind_down}) wallets, executed by {}",
-            info.sender
-        );
+        let msg = format!("Shutdown actions can only be called by kill switch ({kill_switch}) and wind down ({wind_down}) wallets, executed by {}",
+            info.sender);
+        bail!(PerpError::auth(ErrorDomain::Factory, msg))
     };
 
     // Avoid interleaving reads and writes, proactively do all the lookups
