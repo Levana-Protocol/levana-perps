@@ -316,12 +316,9 @@ fn compose_oracle_feeds(
                 );
                 sei.price.into_decimal256()
             }
-            SpotPriceFeedData::Ruji { price } => {
-                anyhow::ensure!(
-                    !feed.volatile.unwrap_or(false),
-                    "Constant feeds cannot be volatile"
-                );
-                price.into_decimal256()
+            SpotPriceFeedData::Ruji { .. } => {
+                let ruji = oracle_price.ruji;
+                ruji.into_decimal256()
             }
             SpotPriceFeedData::Stride {
                 denom,
