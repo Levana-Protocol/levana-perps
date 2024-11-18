@@ -6,6 +6,7 @@
 //!
 //! * Any collateral that is sent is actually gets used
 
+use anyhow::ensure;
 use cosmwasm_std::{from_json, MessageInfo};
 use perpswap::token::Token;
 
@@ -81,11 +82,9 @@ impl State<'_> {
                     }
                 };
 
-                perp_ensure!(
+                ensure!(
                     info.funds.is_empty(),
-                    ErrorId::Cw20Funds,
-                    ErrorDomain::Market,
-                    "Sent native funds to a CW20 market"
+                    PerpError::market(ErrorId::Cw20Funds, "Sent native funds to a CW20 market")
                 );
 
                 Ok(PerpsMessageInfo {
@@ -117,11 +116,9 @@ impl State<'_> {
                 // We got one coin already. Make sure there are no more. If
                 // there are more, the caller sent in too many kinds of coins
                 // and we should exit.
-                perp_ensure!(
+                ensure!(
                     funds.next().is_none(),
-                    ErrorId::NativeFunds,
-                    ErrorDomain::Market,
-                    "More than 1 denom of coins attached"
+                    PerpError::market(ErrorId::NativeFunds, "More than 1 denom of coins attached")
                 );
 
                 match self.get_token(store)? {
@@ -131,12 +128,15 @@ impl State<'_> {
                     } => {
                         // This contract expects a native coin, make sure the
                         // user sent the right kind.
-                        perp_ensure!(
+                        ensure!(
                             coin.denom == *denom,
-                            ErrorId::NativeFunds,
-                            ErrorDomain::Market,
-                            "Expected native coin denom {denom}, received {}",
-                            coin.denom
+                            PerpError::market(
+                                ErrorId::NativeFunds,
+                                format!(
+                                    "Expected native coin denom {denom}, received {}",
+                                    coin.denom
+                                )
+                            )
                         );
 
                         // Convert from the native coin representation to a

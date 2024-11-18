@@ -213,132 +213,117 @@ impl Config {
         // note - crank_execs_after_push and mute_events are inherently always valid
 
         if self.trading_fee_notional_size >= "0.0999".parse().unwrap() {
-            perp_bail!(ErrorId::Config, ErrorDomain::Market, "trading_fee_notional_size must be in the range 0 to 0.0999 inclusive ({} is invalid)", self.trading_fee_notional_size );
+            let error_msg = format!("trading_fee_notional_size must be in the range 0 to 0.0999 inclusive ({} is invalid)", self.trading_fee_notional_size);
+            bail!(PerpError::market(ErrorId::Config, error_msg))
         }
 
         if self.trading_fee_counter_collateral >= "0.0999".parse().unwrap() {
-            perp_bail!(ErrorId::Config, ErrorDomain::Market, "trading_fee_counter_collateral must be in the range 0 to 0.0999 inclusive ({} is invalid)", self.trading_fee_counter_collateral );
+            let error_msg = format!("trading_fee_counter_collateral must be in the range 0 to 0.0999 inclusive ({} is invalid)", self.trading_fee_counter_collateral);
+            bail!(PerpError::market(ErrorId::Config, error_msg))
         }
 
         if self.crank_execs == 0 {
-            perp_bail!(
+            bail!(PerpError::market(
                 ErrorId::Config,
-                ErrorDomain::Market,
                 "crank_execs_per_batch must be greater than zero"
-            );
+            ))
         }
 
         if self.max_leverage <= Number::ONE {
-            perp_bail!(
+            bail!(PerpError::market(
                 ErrorId::Config,
-                ErrorDomain::Market,
-                "max_leverage must be greater than one ({} is invalid)",
-                self.max_leverage
-            );
+                format!(
+                    "max_leverage must be greater than one ({} is invalid)",
+                    self.max_leverage
+                )
+            ))
         }
 
         if self.carry_leverage <= Decimal256::one() {
-            perp_bail!(
+            bail!(PerpError::market(
                 ErrorId::Config,
-                ErrorDomain::Market,
-                "carry_leverage must be greater than one ({} is invalid)",
-                self.carry_leverage
-            );
+                format!(
+                    "carry_leverage must be greater than one ({} is invalid)",
+                    self.carry_leverage
+                )
+            ))
         }
 
         if (self.carry_leverage.into_number() + Number::ONE)? > self.max_leverage {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
-                "carry_leverage must be at least one less than max_leverage ({} is invalid, max_leverage is {})",
+            let msg = format!("carry_leverage must be at least one less than max_leverage ({} is invalid, max_leverage is {})",
                 self.carry_leverage,
-                self.max_leverage
-            );
+                self.max_leverage);
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.borrow_fee_rate_max_annualized < self.borrow_fee_rate_min_annualized {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
-                "borrow_fee_rate_min_annualized ({}) must be less than borrow_fee_rate_max_annualized ({})",
+            let msg = format!("borrow_fee_rate_min_annualized ({}) must be less than borrow_fee_rate_max_annualized ({})",
                 self.borrow_fee_rate_min_annualized,
-                self.borrow_fee_rate_max_annualized
-            );
+                self.borrow_fee_rate_max_annualized);
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.protocol_tax >= Decimal256::one() {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "protocol_tax must be less than or equal to 1 ({} is invalid)",
                 self.protocol_tax
             );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.unstake_period_seconds == 0 {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "unstake period must be greater than 0 ({} is invalid)",
                 self.unstake_period_seconds
             );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if Number::from(self.target_utilization) >= Number::ONE {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "Target utilization ratio must be between 0 and 1 exclusive ({} is invalid)",
                 self.target_utilization
             );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if Number::from(self.min_xlp_rewards_multiplier) < Number::ONE {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "Min xLP rewards multiplier must be at least 1 ({} is invalid)",
                 self.max_xlp_rewards_multiplier
-            )
+            );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.max_xlp_rewards_multiplier < self.min_xlp_rewards_multiplier {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "Max xLP rewards multiplier ({}) must be greater than or equal to the min ({})",
-                self.max_xlp_rewards_multiplier,
-                self.min_xlp_rewards_multiplier
-            )
+                self.max_xlp_rewards_multiplier, self.min_xlp_rewards_multiplier
+            );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.crank_fee_charged < self.crank_fee_reward {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "Crank fee charged ({}) must be greater than or equal to the crank fee reward ({})",
-                self.crank_fee_charged,
-                self.crank_fee_reward
-            )
+                self.crank_fee_charged, self.crank_fee_reward
+            );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.delta_neutrality_fee_tax > Decimal256::one() {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
+            let msg = format!(
                 "Delta neutrality fee tax ({}) must be less than or equal to 1",
                 self.delta_neutrality_fee_tax
-            )
+            );
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         if self.liquifunding_delay_fuzz_seconds >= self.liquifunding_delay_seconds {
-            perp_bail!(
-                ErrorId::Config,
-                ErrorDomain::Market,
-                "Liquifunding delay fuzz ({}) must be less than or equal to the liquifunding delay ({})",
+            let msg = format!("Liquifunding delay fuzz ({}) must be less than or equal to the liquifunding delay ({})",
                 self.liquifunding_delay_fuzz_seconds,
-                self.liquifunding_delay_seconds,
-            )
+                self.liquifunding_delay_seconds);
+            bail!(PerpError::market(ErrorId::Config, msg))
         }
 
         Ok(())

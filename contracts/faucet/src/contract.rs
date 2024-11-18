@@ -59,12 +59,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
     fn validate_owner(store: &dyn Storage, info: &MessageInfo) -> Result<()> {
         if !is_admin(store, &info.sender) {
-            perp_bail!(
-                ErrorId::Auth,
+            bail!(PerpError::auth(
                 ErrorDomain::Faucet,
-                "{} is not owner",
-                info.sender
-            );
+                format!("{} is not owner", info.sender)
+            ))
         }
 
         Ok(())
@@ -357,12 +355,11 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response> {
         ))
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-        Ok(attr_map! {
-            "old_contract_name" => old_cw2.contract,
-            "old_contract_version" => old_cw2.version,
-            "new_contract_name" => CONTRACT_NAME,
-            "new_contract_version" => CONTRACT_VERSION,
-        })
+        let response = Response::new()
+            .add_attribute("old_contract_name", old_cw2.contract)
+            .add_attribute("old_contract_version", old_cw2.version)
+            .add_attribute("new_contract_name", CONTRACT_NAME)
+            .add_attribute("new_contract_version", CONTRACT_VERSION);
+        Ok(response)
     }
 }

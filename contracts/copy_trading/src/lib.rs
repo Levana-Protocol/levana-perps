@@ -96,13 +96,12 @@ pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Res
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)
             .context("Could not set contract version during migration")?;
-
-        Ok(attr_map! {
-            "old_contract_name" => old_cw2.contract,
-            "old_contract_version" => old_cw2.version,
-            "new_contract_name" => CONTRACT_NAME,
-            "new_contract_version" => CONTRACT_VERSION,
-        })
+        let response = Response::new()
+            .add_attribute("old_contract_name", old_cw2.contract)
+            .add_attribute("old_contract_version", old_cw2.version)
+            .add_attribute("new_contract_name", CONTRACT_NAME)
+            .add_attribute("new_contract_version", CONTRACT_VERSION);
+        Ok(response)
     };
     sanity(deps.storage, &env);
     response

@@ -357,22 +357,11 @@ fn token_balance(
     fund_transfers: &HashMap<Addr, NonZero<Collateral>>,
 ) -> Result<()> {
     let subtotals = SubTotals::load(state, store, fund_transfers)?;
-    debug_log!(
-        DebugLog::SanityFundsSubtotal,
-        "[sanity funds] {:#?}",
-        subtotals
-    );
-
     let calculated_total = subtotals.total()?;
 
     // check that it all adds up
     let token = TOKEN.load(store)?;
     let token_balance = token.query_balance(querier, &env.contract.address)?;
-
-    debug_log!(
-        DebugLog::SanityFundsBalanceAssertion,
-        "[sanity funds] asserting that token balance {token_balance} == {calculated_total}"
-    );
 
     // Check equality up to 4 decimal points. CW20s support 6 decimals of
     // precision, so there are known errors that can occur versus our 18 digits

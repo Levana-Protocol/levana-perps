@@ -540,12 +540,10 @@ impl FromStr for TakeProfitTrader {
             POS_INF_STR => Ok(TakeProfitTrader::PosInfinity),
             _ => match src.parse() {
                 Ok(number) => Ok(TakeProfitTrader::Finite(number)),
-                Err(err) => Err(perp_error!(
+                Err(err) => Err(PerpError::new(
                     ErrorId::Conversion,
                     ErrorDomain::Default,
-                    "error converting {} to TakeProfitPrice , {}",
-                    src,
-                    err
+                    format!("error converting {} to TakeProfitPrice , {}", src, err),
                 )),
             },
         }

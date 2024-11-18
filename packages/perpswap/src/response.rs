@@ -10,8 +10,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::ibc::{ack_fail, ack_success};
-#[cfg(debug_assertions)]
-use crate::prelude::*;
 
 /// Helper data type, following builder pattern, for constructing a [Response].
 pub struct ResponseBuilder {
@@ -130,36 +128,6 @@ impl ResponseBuilder {
     /// Add an event to the response.
     pub fn add_event(&mut self, event: impl Into<Event>) {
         let event: Event = event.into();
-
-        #[cfg(debug_assertions)]
-        {
-            match event.ty.as_ref() {
-                "funding-payment" => debug_log!(DebugLog::FundingPaymentEvent, "{:#?}", event),
-                "funding-rate-change" => {
-                    debug_log!(DebugLog::FundingRateChangeEvent, "{:#?}", event)
-                }
-                "fee" => {
-                    if let Ok(source) = event.string_attr("source") {
-                        match source.as_str() {
-                            "trading" => debug_log!(DebugLog::TradingFeeEvent, "{:#?}", event),
-                            "borrow" => debug_log!(DebugLog::BorrowFeeEvent, "{:#?}", event),
-                            "delta-neutrality" => {
-                                debug_log!(DebugLog::DeltaNeutralityFeeEvent, "{:#?}", event)
-                            }
-                            "limit-order" => {
-                                debug_log!(DebugLog::LimitOrderFeeEvent, "{:#?}", event)
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                "delta-neutrality-ratio" => {
-                    debug_log!(DebugLog::DeltaNeutralityRatioEvent, "{:#?}", event)
-                }
-                _ => {}
-            }
-        }
-
         match &self.event_type {
             EventType::MuteEvents => (),
             EventType::EmitEvents { common_attrs } => {
