@@ -9,7 +9,6 @@ use cosmwasm_std::Event;
 use serde::de::DeserializeOwned;
 
 use crate::error::{ErrorDomain, ErrorId};
-use crate::perp_anyhow;
 
 /// Extension trait to add methods to native cosmwasm events
 pub trait CosmwasmEventExt {

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::error::{ErrorDomain, ErrorId, PerpError};
 use crate::storage::load_external_item;
-use crate::{namespace, perp_anyhow};
+use crate::namespace;
 use anyhow::{anyhow, Result};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Empty, QuerierWrapper};
