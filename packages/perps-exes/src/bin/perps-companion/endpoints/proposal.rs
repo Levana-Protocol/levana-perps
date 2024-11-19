@@ -27,6 +27,7 @@ use crate::{
 use super::{Error, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl};
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ProposalInfoRecord {
     address: Address,
     chain: ChainId,
