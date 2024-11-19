@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::error::{ErrorDomain, ErrorId, PerpError};
+use crate::error::{ErrorDomain, PerpError};
 use crate::storage::load_external_item;
 use crate::namespace;
 use anyhow::{anyhow, Result};
