@@ -9,6 +9,8 @@ anyhow = "1.0.93"
 perpswap = { path = "../perpswap", package = "levana_perpswap_cosmos", features = [
 	"bridge", "chrono"
 ] }
+serde_yaml = "0.9.2"
+cosmwasm-schema = { workspace = true }
 serde = { version = "1.0.214", features = ["derive"] }
 serde_json = "1.0.132"
 cosmos = { workspace = true }

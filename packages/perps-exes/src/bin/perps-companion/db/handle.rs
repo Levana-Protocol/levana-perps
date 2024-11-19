@@ -6,7 +6,7 @@ use sqlx::{query_as, query_scalar, PgPool};
 use crate::types::*;
 
 use super::super::endpoints::pnl::PositionInfo;
-use super::models::{PositionInfoFromDb, PositionInfoToDb};
+use super::models::{PositionInfoFromDb, PositionInfoToDb, ProposalInfoFromDb, ProposalInfoToDb};
 
 #[derive(Clone)]
 pub(crate) struct Db {
@@ -117,6 +117,58 @@ impl Db {
                     wallet
                 FROM position_detail INNER JOIN market
                 ON position_detail.market = market.id
+                WHERE url_id=$1
+            "#,
+            url_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn insert_proposal_detail(
+        &self,
+        ProposalInfoToDb {
+            proposal_id,
+            title,
+            chain,
+            environment,
+            address,
+        }: ProposalInfoToDb,
+    ) -> Result<i64> {
+        let proposal_id = i64::try_from(proposal_id.u64())
+            .context("Error converting {proposal_id} to i64 type")?;
+        let url_id = query_scalar!(
+            r#"
+                INSERT INTO proposal_detail
+                (id, title, chain, environment, address)
+                VALUES($1, $2, $3, $4, $5)
+                RETURNING url_id
+            "#,
+            proposal_id,
+            title,
+            i32::from(chain),
+            i32::from(environment),
+            address.to_string(),
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(url_id)
+    }
+
+    pub(crate) async fn get_proposal_detail(
+        &self,
+        url_id: i64,
+    ) -> Result<Option<ProposalInfoFromDb>> {
+        query_as!(
+            ProposalInfoFromDb,
+            r#"
+                SELECT
+                    title,
+                    chain as "chain: ChainId",
+                    environment as "environment: ContractEnvironment",
+                    address
+                FROM proposal_detail
                 WHERE url_id=$1
             "#,
             url_id

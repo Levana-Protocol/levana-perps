@@ -1,6 +1,7 @@
 mod common;
 mod export;
 pub(crate) mod pnl;
+pub(crate) mod proposal;
 mod whales;
 
 use std::sync::Arc;
@@ -15,9 +16,13 @@ use axum::{
     Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
+use cosmos::error::AddressError;
 use cosmos::Address;
 use http::status::StatusCode;
 
+use perpswap::contracts::market::entry::QueryMsg as MarketQueryMsg;
+use pnl::QueryType as MarketQueryType;
+use proposal::{QueryMsg as GovQueryMsg, QueryType as GovQueryType};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -31,7 +36,82 @@ use tracing::Level;
 use crate::app::App;
 use crate::types::ChainId;
 
-use self::pnl::ErrorDescription;
+#[derive(thiserror::Error, Clone, Debug)]
+pub(crate) enum Error {
+    #[error("Unknown chain ID")]
+    UnknownChainId,
+    #[error("Error parsing path: {msg}")]
+    Path { msg: String },
+    #[error("Error returned from database")]
+    Database { msg: String },
+    #[error("Page not found")]
+    InvalidPage,
+    #[error("Invalid address: {source}")]
+    InvalidAddress { source: AddressError },
+    #[error("Math operation overflowed")]
+    MathOverflow,
+    #[error("Failed to query Market contract with {query_type:?}\nQuery: {msg:?}")]
+    FailedToQueryMarketContract {
+        msg: MarketQueryMsg,
+        query_type: MarketQueryType,
+    },
+    #[error("Specified position not found")]
+    PositionNotFound,
+    #[error("The position is still open")]
+    PositionStillOpen,
+    #[error("Missing PnL values")]
+    PnlValueMissing,
+    #[error("Failed to query Gov contract with {query_type:?}\nQuery: {msg:?}")]
+    FailedToQueryGovContract {
+        msg: GovQueryMsg,
+        query_type: GovQueryType,
+    },
+    #[error("Specified proposal not found")]
+    ProposalNotFound,
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let mut response = ErrorPage {
+            code: match &self {
+                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
+                Error::Database { msg } => {
+                    tracing::error!("Database serror: {msg}");
+                    http::status::StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
+                Error::InvalidAddress { source: _ } => http::status::StatusCode::BAD_REQUEST,
+                Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::FailedToQueryMarketContract { query_type, msg: _ } => match query_type {
+                    MarketQueryType::Status => http::status::StatusCode::BAD_REQUEST,
+                    MarketQueryType::EntryPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    MarketQueryType::ExitPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    MarketQueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                },
+                Error::PositionNotFound => http::status::StatusCode::BAD_REQUEST,
+                Error::PositionStillOpen => http::status::StatusCode::BAD_REQUEST,
+                Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::FailedToQueryGovContract { query_type, msg: _ } => match query_type {
+                    GovQueryType::Proposals => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                },
+                Error::ProposalNotFound => http::status::StatusCode::BAD_REQUEST,
+            },
+            error: self.clone(),
+        }
+        .into_response();
+        let error_description = ErrorDescription {
+            msg: self.to_string(),
+        };
+        response.extensions_mut().insert(error_description);
+        response
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorDescription {
+    pub(crate) msg: String,
+}
 
 #[derive(TypedPath)]
 #[typed_path("/")]
@@ -54,6 +134,10 @@ pub(crate) struct BuildVersionRoute;
 pub(crate) struct PnlCssRoute;
 
 #[derive(TypedPath)]
+#[typed_path("/proposal.css")]
+pub(crate) struct ProposalCssRoute;
+
+#[derive(TypedPath)]
 #[typed_path("/whale.css")]
 pub(crate) struct WhaleCssRoute;
 
@@ -74,24 +158,45 @@ pub(crate) struct RobotRoute;
 pub(crate) struct PnlUrl;
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl/:pnl_id", rejection(pnl::Error))]
+#[typed_path("/pnl/:pnl_id", rejection(Error))]
 pub(crate) struct PnlHtml {
     pub(crate) pnl_id: i64,
 }
-
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl/:pnl_id/image.png", rejection(pnl::Error))]
+#[typed_path("/pnl/:pnl_id/image.png", rejection(Error))]
 pub(crate) struct PnlImage {
     pub(crate) pnl_id: i64,
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl/:pnl_id/image.svg", rejection(pnl::Error))]
+#[typed_path("/pnl/:pnl_id/image.svg", rejection(Error))]
 pub(crate) struct PnlImageSvg {
     pub(crate) pnl_id: i64,
 }
 
-impl From<PathRejection> for pnl::Error {
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal-url")]
+pub(crate) struct ProposalUrl;
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:proposal_id", rejection(Error))]
+pub(crate) struct ProposalHtml {
+    pub(crate) proposal_id: i64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:proposal_id/image.png", rejection(Error))]
+pub(crate) struct ProposalImage {
+    pub(crate) proposal_id: i64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:proposal_id/image.svg", rejection(Error))]
+pub(crate) struct ProposalImageSvg {
+    pub(crate) proposal_id: i64,
+}
+
+impl From<PathRejection> for Error {
     fn from(rejection: PathRejection) -> Self {
         Self::Path {
             msg: rejection.to_string(),
@@ -140,6 +245,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(common::grpc_health)
         .typed_get(common::build_version)
         .typed_get(pnl::pnl_css)
+        .typed_get(proposal::proposal_css)
         .typed_get(common::error_css)
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)
@@ -148,6 +254,10 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
         .typed_get(pnl::pnl_image_svg)
+        .typed_post(proposal::proposal_url)
+        .typed_get(proposal::proposal_html)
+        .typed_get(proposal::proposal_image)
+        .typed_get(proposal::proposal_image_svg)
         .typed_get(export::history)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)

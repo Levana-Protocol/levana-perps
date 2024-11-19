@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO proposal_detail\n                (id, title, chain, environment, address)\n                VALUES($1, $2, $3, $4, $5)\n                RETURNING url_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "url_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Int4",
+        "Int4",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "40074a329f14bd0f99422ad62cee32063cef42b1f506bea65353a00f9944f3ce"
+}
