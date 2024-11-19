@@ -38,12 +38,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             let minter_addr = state.minter_addr(ctx.storage)?;
 
             if minter_addr != info.sender {
-                return Err(perp_anyhow!(
-                    ErrorId::Auth,
+                return Err(anyhow!(PerpError::auth(
                     ErrorDomain::Cw20,
-                    "Cannot SetMarket, sender is {}, minter is {minter_addr}",
-                    info.sender
-                ));
+                    format!(
+                        "Cannot SetMarket, sender is {}, minter is {minter_addr}",
+                        info.sender
+                    ),
+                )));
             }
 
             state.set_market_addr(&mut ctx, &addr.validate(state.api)?)?;

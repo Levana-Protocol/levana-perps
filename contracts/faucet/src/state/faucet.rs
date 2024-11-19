@@ -101,11 +101,11 @@ impl State<'_> {
                     ),
                     data: Some(e)
                 }),
-                FaucetError::AlreadyTapped { cw20: _ } => perp_anyhow!(
+                FaucetError::AlreadyTapped { cw20: _ } => anyhow!(PerpError::new(
                     ErrorId::Exceeded,
                     ErrorDomain::Faucet,
                     "You cannot tap a trading competition faucet more than once"
-                ),
+                )),
             })
     }
 
@@ -189,12 +189,11 @@ impl State<'_> {
                 let cw20_amount = amount
                     .to_u128_with_precision(token_info.decimals.into())
                     .ok_or_else(|| {
-                        perp_anyhow!(
+                        anyhow!(PerpError::new(
                             ErrorId::Conversion,
                             ErrorDomain::Faucet,
-                            "unable to convert {} to u128!",
-                            amount
-                        )
+                            format!("unable to convert {amount} to u128!",)
+                        ))
                     })?;
 
                 ctx.response.add_execute_submessage_oneshot(
@@ -209,12 +208,11 @@ impl State<'_> {
                 let native_amount = amount
                     .to_u128_with_precision(NATIVE_DECIMAL_PLACES)
                     .ok_or_else(|| {
-                        perp_anyhow!(
+                        anyhow!(PerpError::new(
                             ErrorId::Conversion,
                             ErrorDomain::Faucet,
-                            "unable to convert {} to u128!",
-                            amount
-                        )
+                            format!("unable to convert {amount} to u128!",)
+                        ))
                     })?;
                 let coin = Coin {
                     denom: denom.clone(),

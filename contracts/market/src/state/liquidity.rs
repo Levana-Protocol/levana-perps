@@ -526,16 +526,16 @@ impl State<'_> {
         let mut stats = self.load_liquidity_stats(ctx.storage)?;
 
         // Update for the individual lp_addr
-        addr_stats.lp = match old_lp.raw().checked_sub(lp_amount.raw()).ok() {
-            None => {
-                return Err(perp_anyhow!(
+        addr_stats.lp =
+            match old_lp.raw().checked_sub(lp_amount.raw()).ok() {
+                None => return Err(anyhow!(PerpError::market(
                     ErrorId::InvalidStakeLp,
-                    ErrorDomain::Market,
-                    "unable to stake LP, attempted amount: {lp_amount}, available LP: {old_lp}"
-                ))
-            }
-            Some(new_lp) => new_lp,
-        };
+                    format!(
+                        "unable to stake LP, attempted amount: {lp_amount}, available LP: {old_lp}"
+                    )
+                ))),
+                Some(new_lp) => new_lp,
+            };
         addr_stats.xlp = addr_stats.xlp.checked_add(lp_amount.raw())?;
         self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
 

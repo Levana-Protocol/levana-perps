@@ -168,6 +168,15 @@ impl PerpError {
         }
     }
 
+    /// Create a new [Self] for Cw20 contract with no data
+    pub fn cw20(id: ErrorId, desc: impl Into<String>) -> Self {
+        PerpError {
+            id,
+            domain: ErrorDomain::Cw20,
+            description: desc.into(),
+            data: None,
+        }
+    }
     /// Include error information into an event
     pub fn mixin_event(&self, evt: Event) -> Event {
         // these unwraps are okay, just a shorthand helper to get the enum variants as a string

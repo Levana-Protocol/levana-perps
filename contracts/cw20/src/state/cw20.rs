@@ -174,11 +174,7 @@ impl State<'_> {
                 mime_type: "image/png".to_owned(),
                 data: logo,
             }),
-            Logo::Url(_) => Err(perp_anyhow!(
-                ErrorId::MsgValidation,
-                ErrorDomain::Cw20,
-                "logo"
-            )),
+            Logo::Url(_) => Err(anyhow!(PerpError::cw20(ErrorId::MsgValidation, "logo"))),
         }
     }
 
@@ -209,11 +205,10 @@ impl State<'_> {
         if let Some(minter_cap) = minter.cap {
             MINTER_CAP.save(ctx.storage, &minter_cap)?;
             if total_supply > minter_cap {
-                return Err(perp_anyhow!(
+                return Err(anyhow!(PerpError::cw20(
                     ErrorId::MsgValidation,
-                    ErrorDomain::Cw20,
                     "initial supply greater than cap"
-                ));
+                )));
             }
         }
 
@@ -265,11 +260,10 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
                 "amount cannot be zero"
-            ));
+            )));
         }
 
         BALANCES.update(
@@ -345,11 +339,10 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
                 "amount cannot be zero"
-            ));
+            )));
         }
 
         // lower balance
@@ -420,11 +413,10 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
                 "amount cannot be zero"
-            ));
+            )));
         }
 
         // move the tokens to the contract
@@ -512,24 +504,22 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
                 "amount cannot be zero"
-            ));
+            )));
         }
 
         let mut config = TOKEN_INFO
             .may_load(ctx.storage)?
-            .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?;
+            .ok_or_else(|| anyhow!(PerpError::cw20(ErrorId::Auth, "")))?;
 
         let minter = self.minter_addr(ctx.storage)?;
         if minter != sender {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Auth,
-                ErrorDomain::Cw20,
-                "Cannot mint, sender is {sender}, minter is {minter}"
-            ));
+                format!("Cannot mint, sender is {sender}, minter is {minter}")
+            )));
         }
 
         // update supply and enforce cap
@@ -537,11 +527,10 @@ impl State<'_> {
 
         if let Some(limit) = self.minter_cap(ctx.storage)? {
             if config.total_supply > limit {
-                return Err(perp_anyhow!(
+                return Err(anyhow!(PerpError::cw20(
                     ErrorId::Cw20Funds,
-                    ErrorDomain::Cw20,
                     "amount cannot be zero"
-                ));
+                )));
             }
         }
         TOKEN_INFO.save(ctx.storage, &config)?;
@@ -573,11 +562,10 @@ impl State<'_> {
         });
 
         if spender == owner {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Auth,
-                ErrorDomain::Cw20,
                 "cannot increase allowance to own account"
-            ));
+            )));
         }
 
         let update_fn = |allow: Option<AllowanceResponse>| -> Result<_> {
@@ -611,11 +599,10 @@ impl State<'_> {
         });
 
         if spender == owner {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Auth,
-                ErrorDomain::Cw20,
                 "cannot decrease allowance to own account"
-            ));
+            )));
         }
 
         let key = (&owner, &spender);
@@ -657,18 +644,14 @@ impl State<'_> {
             match current {
                 Some(mut a) => {
                     if a.expires.is_expired(&block) {
-                        Err(perp_anyhow!(ErrorId::Expired, ErrorDomain::Cw20, ""))
+                        Err(anyhow!(PerpError::cw20(ErrorId::Expired, "")))
                     } else {
                         // deduct the allowance if enough
                         a.allowance = a.allowance.checked_sub(amount)?;
                         Ok(a)
                     }
                 }
-                None => Err(perp_anyhow!(
-                    ErrorId::Auth,
-                    ErrorDomain::Cw20,
-                    "no allowance"
-                )),
+                None => Err(anyhow!(PerpError::cw20(ErrorId::Auth, "no allowance"))),
             }
         };
         ALLOWANCES.update(ctx.storage, (owner, spender), update_fn)?;
@@ -694,10 +677,10 @@ impl State<'_> {
         if marketing_info
             .marketing
             .as_ref()
-            .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?
+            .ok_or_else(|| anyhow!(PerpError::cw20(ErrorId::Auth, "")))?
             != sender
         {
-            return Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""));
+            return Err(anyhow!(PerpError::cw20(ErrorId::Auth, "")));
         }
 
         match project {
@@ -739,10 +722,10 @@ impl State<'_> {
         if marketing_info
             .marketing
             .as_ref()
-            .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?
+            .ok_or_else(|| anyhow!(PerpError::cw20(ErrorId::Auth, "")))?
             != sender
         {
-            return Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""));
+            return Err(anyhow!(PerpError::cw20(ErrorId::Auth, "")));
         }
 
         LOGO.save(ctx.storage, &logo)?;
@@ -767,11 +750,10 @@ impl State<'_> {
         let old_minter_addr = self.minter_addr(ctx.storage)?;
 
         if old_minter_addr != sender {
-            return Err(perp_anyhow!(
+            return Err(anyhow!(PerpError::cw20(
                 ErrorId::Auth,
-                ErrorDomain::Cw20,
                 "Not the minter! Sender is {sender}, minter is {old_minter_addr}"
-            ));
+            )));
         }
 
         let new_minter = new_minter.validate(self.api)?;

@@ -168,12 +168,11 @@ pub trait CosmwasmEventExt {
     fn map_attr_ok<B>(&self, key: &str, f: impl Fn(&str) -> B) -> anyhow::Result<B> {
         match self.try_map_attr(key, f) {
             Some(x) => Ok(x),
-            None => Err(perp_anyhow!(
+            None => Err(anyhow!(PerpError::new(
                 ErrorId::Any,
                 ErrorDomain::Default,
-                "no such key {}",
-                key
-            )),
+                format!("no such key {key}")
+            ))),
         }
     }
 
