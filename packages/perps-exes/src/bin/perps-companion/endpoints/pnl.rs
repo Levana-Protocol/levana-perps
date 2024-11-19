@@ -137,6 +137,7 @@ pub(super) async fn pnl_css(_: PnlCssRoute) -> Css<&'static str> {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PositionInfo {
     pub(crate) address: Address,
     pub(crate) chain: ChainId,
