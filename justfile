@@ -172,6 +172,7 @@ migrate-osmoci:
 build-docs:
 	mkdir -p ./.output/temp/schema/cosmos
 	cargo doc --no-deps --package levana_perpswap_cosmos --target-dir=./.output/temp/
+	cp ./.ci/index.html ./.output/temp/doc/index.html
 	echo "<html><body><h1>404 page not found</h1></body></html>" > ./.output/temp/doc/404.html
 
 # Coverage with specific collateral and market token kind
