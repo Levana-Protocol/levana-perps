@@ -353,20 +353,16 @@ impl State<'_> {
         addr: &Addr,
     ) -> Result<()> {
         match get_position(store, pos_id) {
-            Err(_) => Err(perp_anyhow!(
+            Err(_) => Err(anyhow!(PerpError::market(
                 ErrorId::Auth,
-                ErrorDomain::Market,
-                "position owner does not exist",
-            )),
+                "position owner does not exist"
+            ))),
             Ok(pos) => {
                 if pos.owner != *addr {
-                    Err(perp_anyhow!(
+                    Err(anyhow!(PerpError::market(
                         ErrorId::Auth,
-                        ErrorDomain::Market,
-                        "position owner is {} not {}",
-                        pos.owner,
-                        addr
-                    ))
+                        format!("position owner is {} not {}", pos.owner, addr)
+                    )))
                 } else {
                     Ok(())
                 }

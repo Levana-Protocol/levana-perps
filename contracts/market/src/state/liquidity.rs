@@ -528,11 +528,12 @@ impl State<'_> {
         // Update for the individual lp_addr
         addr_stats.lp = match old_lp.raw().checked_sub(lp_amount.raw()).ok() {
             None => {
-                return Err(perp_anyhow!(
+                return Err(anyhow!(PerpError::market(
                     ErrorId::InvalidStakeLp,
-                    ErrorDomain::Market,
-                    "unable to stake LP, attempted amount: {lp_amount}, available LP: {old_lp}"
-                ))
+                    format!(
+                        "unable to stake LP, attempted amount: {lp_amount}, available LP: {old_lp}"
+                    )
+                )))
             }
             Some(new_lp) => new_lp,
         };

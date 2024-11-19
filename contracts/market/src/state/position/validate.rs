@@ -208,17 +208,13 @@ impl State<'_> {
         match slippage_opt {
             None => Ok(()),
             Some(slippage) => {
-
-                Err(perp_anyhow!(
-                    ErrorId::SlippageAssert,
-                    ErrorDomain::Market,
-                    "Slippage is exceeding provided tolerance. Slippage is {}%, max tolerance is {}%. Current price: {}. Current price including DNF: {}. Asserted price: {}.",
+                let msg = format!("Slippage is exceeding provided tolerance. Slippage is {}%, max tolerance is {}%. Current price: {}. Current price including DNF: {}. Asserted price: {}.",
                     slippage.map_or("Inf".to_string(), |s| format!("{:?}", s)),
                     (Number::from(100u64) * slippage_assert.tolerance)?,
                     price_point.price_base,
                     price,
-                    slippage_assert.price,
-                ))
+                    slippage_assert.price);
+                Err(anyhow!(PerpError::market(ErrorId::SlippageAssert, msg)))
             }
         }
     }
