@@ -21,7 +21,7 @@ pub use crate::{
     auth::*,
     storage::{external_map_has, load_external_item, load_external_map},
 };
-pub use crate::{error::*, perp_anyhow};
+pub use crate::error::*;
 
 pub use anyhow::{anyhow, bail, Context, Result};
 pub use cosmwasm_schema::cw_serde;

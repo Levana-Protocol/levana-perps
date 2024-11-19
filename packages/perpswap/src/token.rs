@@ -310,13 +310,15 @@ impl Token {
                 let msg = self
                     .into_cw20_execute_send_msg(contract_addr, amount, &execute_msg)
                     .map_err(|err| {
-                        perp_anyhow!(
+                        let downcast = err
+                            .downcast_ref::<PerpError>()
+                            .map(|item| item.description.clone());
+                        let msg = format!("{downcast:?} (exec inner msg: {execute_msg:?})!");
+                        anyhow!(PerpError::new(
                             ErrorId::Conversion,
                             ErrorDomain::Wallet,
-                            "{} (exec inner msg: {:?})!",
-                            err.downcast_ref::<PerpError>().unwrap().description,
-                            execute_msg
-                        )
+                            msg
+                        ))
                     })?;
 
                 match msg {
@@ -345,13 +347,15 @@ impl Token {
                     let coin = self
                         .into_native_coin(amount)
                         .map_err(|err| {
-                            perp_anyhow!(
+                            let downcast = err
+                                .downcast_ref::<PerpError>()
+                                .map(|item| item.description.clone());
+                            let msg = format!("{downcast:?} (exec inner msg: {execute_msg:?})!");
+                            anyhow!(PerpError::new(
                                 ErrorId::Conversion,
                                 ErrorDomain::Wallet,
-                                "{} (exec inner msg: {:?})!",
-                                err.downcast_ref::<PerpError>().unwrap().description,
-                                execute_msg
-                            )
+                                msg
+                            ))
                         })?
                         .unwrap();
 
