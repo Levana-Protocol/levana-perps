@@ -104,19 +104,6 @@ pub enum ErrorDomain {
     SimpleOracle,
 }
 
-/// Generate a [PerpError] and then wrap it up in an anyhow error
-#[macro_export]
-macro_rules! perp_anyhow {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None::<()>,
-        })
-    }};
-}
-
 impl<T: Serialize> fmt::Display for PerpError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
