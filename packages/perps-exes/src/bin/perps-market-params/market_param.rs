@@ -84,12 +84,12 @@ pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> MaxL
     MaxLeverage::new(leverage)
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default, Debug)]
 pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{:.2}", self.0)
     }
 }
 
@@ -113,7 +113,7 @@ pub(crate) struct DnfInUsd(pub(crate) f64);
 
 impl Display for DnfInUsd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{:.2}", self.0)
     }
 }
 
@@ -389,7 +389,7 @@ impl MaxLeverage {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 pub(crate) struct DnfNotify {
     pub(crate) configured_dnf: DnfInNotional,
     pub(crate) computed_dnf: DnfInNotional,
@@ -398,7 +398,7 @@ pub(crate) struct DnfNotify {
     pub(crate) status: ConfiguredDnfStatus,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 pub(crate) enum ConfiguredDnfStatus {
     // If configured_dnf - computed_dnf is positive, it means that the
     // configured_dnf should be modified to be lower.  And hence the
@@ -663,7 +663,7 @@ pub(crate) async fn compute_coin_dnfs(
                     historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
                 let historical_max_leverage =
                     historical_data.compute_max_leverage(serve_opt.cmc_data_age_days)?;
-                let dnf_notify = check_market_status(
+                let market_status = check_market_status(
                     &market_config,
                     market_id,
                     &http_app,
@@ -674,7 +674,7 @@ pub(crate) async fn compute_coin_dnfs(
                 .await?;
                 app.market_params
                     .write()
-                    .insert(market_id.clone(), dnf_notify);
+                    .insert(market_id.clone(), market_status);
                 historical_data = new_historical_data?;
 
                 let entry = last_notified_dates.entry(market_id.to_owned()).or_default();
@@ -703,6 +703,13 @@ pub(crate) async fn compute_coin_dnfs(
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct MarketStatusResult {
+    pub(crate) dnf_notify: DnfNotify,
+    pub(crate) historical_max_leverage: MaxLeverage,
+    pub(crate) configured_max_leverage: MaxLeverage,
+}
+
 async fn check_market_status(
     market_config: &MarketsConfig,
     market_id: &MarketId,
@@ -710,7 +717,7 @@ async fn check_market_status(
     historical_market_dnf: &Dnf,
     serve_opt: ServeOpt,
     historical_max_leverage: MaxLeverage,
-) -> anyhow::Result<DnfNotify> {
+) -> anyhow::Result<MarketStatusResult> {
     tracing::info!("Checking market status for {market_id}");
     let configured_dnf = market_config
         .get_chain_dnf(market_id)
@@ -776,7 +783,12 @@ async fn check_market_status(
         dnf_notify.computed_dnf.0,
         dnf_notify.configured_dnf.0
     );
-    Ok(dnf_notify)
+    let result = MarketStatusResult {
+        dnf_notify,
+        historical_max_leverage,
+        configured_max_leverage,
+    };
+    Ok(result)
 }
 
 #[cfg(test)]

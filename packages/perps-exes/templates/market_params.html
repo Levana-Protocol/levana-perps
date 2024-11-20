@@ -19,9 +19,11 @@
 	<table class="table table-secondary shadow rounded overflow-hidden">
           <thead>
             <th>Coin</th>
-            <th>Computed DNF Sensitivity</th>
+            <th>Computed DNF</th>
             <th>Configured DNF</th>
-            <th>Percentage diff</th>
+            <th>Percentage DNF diff</th>
+	    <th>Computed max_leverage</th>
+	    <th>Configured max_leverage</th>
           </thead>
           <tbody>
             {% for (key, value) in market_params %}
@@ -29,15 +31,21 @@
               <td class="table-light">
 		            {{ key }}
               </td>
-              <td class="table-light">
-                {{ value.computed_dnf|fmt("{:.2}") }}
+              <td class="table-light {% if value.dnf_notify.should_notify %} text-danger {% else %} text-success {% endif %}">
+                {{ value.dnf_notify.computed_dnf|fmt("{:.2}") }}
               </td>
               <td class="table-light">
-                {{ value.configured_dnf }}
+                {{ value.dnf_notify.configured_dnf }}
               </td>
-              <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
-                {{ value.percentage_diff|fmt("{:.2}") }}
+              <td class="table-light {% if value.dnf_notify.should_notify %} text-danger {% else %} text-success {% endif %}">
+                {{ value.dnf_notify.percentage_diff|fmt("{:.2}") }}
               </td>
+	      <td class="table-light {% if value.historical_max_leverage == value.configured_max_leverage %} {% else %} text-danger {% endif %}">
+		{{ value.historical_max_leverage }}
+	      </td>
+	      <td class="table-light">
+		{{ value.configured_max_leverage }}
+	      </td>
             </tr>
             {% endfor %}
           </tbody>
