@@ -84,7 +84,9 @@ pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> MaxL
     MaxLeverage::new(leverage)
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default, Debug)]
+#[derive(
+    PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default, Debug,
+)]
 pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
