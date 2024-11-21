@@ -189,7 +189,7 @@ borrow_fee_rate_min_annualized = "0.03"
 borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
-delta_neutrality_fee_sensitivity = "273180"
+delta_neutrality_fee_sensitivity = "50000000000"
 delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
@@ -205,7 +205,7 @@ borrow_fee_rate_min_annualized = "0.03"
 borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
-delta_neutrality_fee_sensitivity = "274031"
+delta_neutrality_fee_sensitivity = "50000000000"
 delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
@@ -221,7 +221,7 @@ borrow_fee_rate_min_annualized = "0.03"
 borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
-delta_neutrality_fee_sensitivity = "273229"
+delta_neutrality_fee_sensitivity = "50000000000"
 delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
@@ -444,8 +444,8 @@ exposure_margin_ratio = "0.004"
 initial-borrow-fee-rate = "0.16"
 
 [markets.INJ_USD.config]
-carry_leverage = "5"
-max_leverage = "10"
+carry_leverage = "7"
+max_leverage = "30"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -458,8 +458,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.16"
 
 [markets.INJ_USDC.config]
-carry_leverage = "5"
-max_leverage = "10"
+carry_leverage = "7"
+max_leverage = "30"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -530,8 +530,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.2"
 
 [markets.MEME_USDC.config]
-carry_leverage = "2"
-max_leverage = "4"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.1"
 target_utilization = "0.5"
@@ -770,8 +770,8 @@ initial-borrow-fee-rate = "0.16"
 [markets.TIA_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "10"
-carry_leverage = "5"
+max_leverage = "30"
+carry_leverage = "7"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -826,8 +826,7 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.2"
 
 [markets.amATOM_USD.config]
-carry_leverage = "5"
-max_leverage = "10"
+carry_leverage = "7"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.1"
 target_utilization = "0.5"
@@ -856,8 +855,8 @@ initial-borrow-fee-rate = "0.16"
 [markets.milkTIA_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "10"
-carry_leverage = "5"
+max_leverage = "30"
+carry_leverage = "7"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -975,8 +974,8 @@ initial-borrow-fee-rate = "0.16"
 [markets.stTIA_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "10"
-carry_leverage = "5"
+max_leverage = "30"
+carry_leverage = "7"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -1013,7 +1012,7 @@ borrow_fee_rate_min_annualized = "0.03"
 borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
-delta_neutrality_fee_sensitivity = "274031"
+delta_neutrality_fee_sensitivity = "50000000000"
 delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
