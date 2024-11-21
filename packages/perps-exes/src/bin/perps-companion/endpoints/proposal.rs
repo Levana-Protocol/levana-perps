@@ -89,7 +89,7 @@ impl ProposalInfo {
             host: host.hostname().to_owned(),
             amplitude_key: environment.amplitude_key().to_string(),
             chain: chain_id,
-            address: address,
+            address,
         })
     }
 }

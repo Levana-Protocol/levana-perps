@@ -16,7 +16,6 @@ use axum::{
     Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
-use cosmos::error::AddressError;
 use cosmos::Address;
 use http::status::StatusCode;
 
@@ -79,7 +78,6 @@ impl IntoResponse for Error {
                     http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
-                Error::InvalidAddress { source: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                 Error::FailedToQueryMarketContract { query_type, msg: _ } => match query_type {
                     MarketQueryType::Status => http::status::StatusCode::BAD_REQUEST,
