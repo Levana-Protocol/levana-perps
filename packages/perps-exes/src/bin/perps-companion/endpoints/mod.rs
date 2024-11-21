@@ -46,8 +46,6 @@ pub(crate) enum Error {
     Database { msg: String },
     #[error("Page not found")]
     InvalidPage,
-    #[error("Invalid address: {source}")]
-    InvalidAddress { source: AddressError },
     #[error("Math operation overflowed")]
     MathOverflow,
     #[error("Failed to query Market contract with {query_type:?}\nQuery: {msg:?}")]
@@ -175,24 +173,32 @@ pub(crate) struct PnlImageSvg {
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal-url")]
-pub(crate) struct ProposalUrl;
-
-#[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal/:proposal_id", rejection(Error))]
+#[typed_path("/proposal/:chain_id/:address/:proposal_id", rejection(Error))]
 pub(crate) struct ProposalHtml {
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
     pub(crate) proposal_id: i64,
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal/:proposal_id/image.png", rejection(Error))]
+#[typed_path(
+    "/proposal/:chain_id/:address/:proposal_id/image.png",
+    rejection(Error)
+)]
 pub(crate) struct ProposalImage {
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
     pub(crate) proposal_id: i64,
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal/:proposal_id/image.svg", rejection(Error))]
+#[typed_path(
+    "/proposal/:chain_id/:address/:proposal_id/image.svg",
+    rejection(Error)
+)]
 pub(crate) struct ProposalImageSvg {
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
     pub(crate) proposal_id: i64,
 }
 
@@ -254,7 +260,6 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
         .typed_get(pnl::pnl_image_svg)
-        .typed_post(proposal::proposal_url)
         .typed_get(proposal::proposal_html)
         .typed_get(proposal::proposal_image)
         .typed_get(proposal::proposal_image_svg)

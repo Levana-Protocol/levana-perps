@@ -1,4 +1,4 @@
-use std::{borrow::Cow, str::FromStr, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -6,7 +6,6 @@ use axum::{
     extract::State,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    Json,
 };
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
@@ -16,23 +15,13 @@ use cosmwasm_std::Uint64;
 use headers::Host;
 use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 
 use crate::{
     app::App,
-    db::models::{ProposalInfoFromDb, ProposalInfoToDb},
     types::{ChainId, ContractEnvironment},
 };
 
-use super::{Error, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl};
-
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct ProposalInfoRecord {
-    address: Address,
-    chain: ChainId,
-    proposal_id: Uint64,
-}
+use super::{Error, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg};
 
 #[derive(askama::Template)]
 #[template(path = "proposal.html")]
@@ -48,78 +37,101 @@ pub(crate) struct ProposalInfo {
     address: Address,
 }
 
-pub(super) async fn proposal_url(
-    _: ProposalUrl,
-    app: State<Arc<App>>,
-    Json(proposal_info_record): Json<ProposalInfoRecord>,
-) -> Result<Json<Value>, Error> {
-    let db = &app.db;
-    let to_db = proposal_info_record.get_info_to_db(&app).await?;
-    let url_id = db
-        .insert_proposal_detail(to_db)
-        .await
-        .map_err(|e| Error::Database { msg: e.to_string() })?;
-    let url = ProposalHtml {
-        proposal_id: url_id,
-    };
-    Ok(Json(json!({ "url": url.to_uri().to_string() })))
-}
-
 impl ProposalInfo {
-    async fn load_from_database(app: &App, proposal_id: i64, host: &Host) -> Result<Self, Error> {
-        let ProposalInfoFromDb {
-            title,
-            environment,
-            chain,
-            address,
-        }: ProposalInfoFromDb = app
-            .db
-            .get_proposal_detail(proposal_id)
-            .await
-            .map_err(|e| Error::Database { msg: e.to_string() })?
-            .ok_or(Error::InvalidPage)?;
-
+    async fn load(
+        app: &App,
+        proposal_id: i64,
+        chain_id: ChainId,
+        address: Address,
+        host: &Host,
+    ) -> Result<Self, Error> {
         let id_u64 = u64::try_from(proposal_id).map_err(|_| Error::ProposalNotFound)?;
+
+        let cosmos = app.cosmos.get(&chain_id).ok_or(Error::UnknownChainId)?;
+        let contract = GovContract(cosmos.make_contract(address));
+        let label = match contract.0.info().await {
+            Ok(info) => Cow::Owned(info.label),
+            Err(_) => "unknown contract".into(),
+        };
+        let environment = ContractEnvironment::from_market(chain_id, &label);
+
+        let mut res = contract
+            .query::<ProposalsResp>(
+                QueryMsg::ProposalsById {
+                    ids: vec![id_u64.into()],
+                },
+                QueryType::Proposals,
+            )
+            .await?;
+
+        let proposal = match res.0.pop() {
+            Some(proposal) => proposal.proposal,
+            None => return Err(Error::ProposalNotFound),
+        };
+
         Ok(ProposalInfo {
             id: id_u64.into(),
-            title,
-            image_url: ProposalImage { proposal_id }.to_uri().to_string(),
-            html_url: ProposalHtml { proposal_id }.to_uri().to_string(),
+            title: proposal.title,
+            image_url: ProposalImage {
+                proposal_id,
+                chain_id,
+                address,
+            }
+            .to_uri()
+            .to_string(),
+            html_url: ProposalHtml {
+                proposal_id,
+                chain_id,
+                address,
+            }
+            .to_uri()
+            .to_string(),
             host: host.hostname().to_owned(),
             amplitude_key: environment.amplitude_key().to_string(),
-            chain,
-            address: Address::from_str(&address)
-                .map_err(|source| Error::InvalidAddress { source })?,
+            chain: chain_id,
+            address: address,
         })
     }
 }
 
 pub(super) async fn proposal_html(
-    ProposalHtml { proposal_id }: ProposalHtml,
+    ProposalHtml {
+        proposal_id,
+        chain_id,
+        address,
+    }: ProposalHtml,
     TypedHeader(host): TypedHeader<Host>,
     State(app): State<Arc<App>>,
 ) -> Result<Response, Error> {
-    ProposalInfo::load_from_database(&app, proposal_id, &host)
+    ProposalInfo::load(&app, proposal_id, chain_id, address, &host)
         .await
         .map(ProposalInfo::html)
 }
 
 pub(super) async fn proposal_image(
-    ProposalImage { proposal_id }: ProposalImage,
+    ProposalImage {
+        proposal_id,
+        chain_id,
+        address,
+    }: ProposalImage,
     TypedHeader(host): TypedHeader<Host>,
     State(app): State<Arc<App>>,
 ) -> Result<Response, Error> {
-    ProposalInfo::load_from_database(&app, proposal_id, &host)
+    ProposalInfo::load(&app, proposal_id, chain_id, address, &host)
         .await
         .map(|info| info.image(&app.fontdb))
 }
 
 pub(super) async fn proposal_image_svg(
-    ProposalImageSvg { proposal_id }: ProposalImageSvg,
+    ProposalImageSvg {
+        proposal_id,
+        chain_id,
+        address,
+    }: ProposalImageSvg,
     TypedHeader(host): TypedHeader<Host>,
     State(app): State<Arc<App>>,
 ) -> Result<Response, Error> {
-    ProposalInfo::load_from_database(&app, proposal_id, &host)
+    ProposalInfo::load(&app, proposal_id, chain_id, address, &host)
         .await
         .map(ProposalInfo::image_svg)
 }
@@ -159,47 +171,9 @@ impl GovContract {
     }
 }
 
-impl ProposalInfoRecord {
-    async fn get_info_to_db(self, app: &App) -> Result<ProposalInfoToDb, Error> {
-        let ProposalInfoRecord {
-            proposal_id,
-            chain,
-            address,
-            ..
-        } = &self;
-        let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
-        let label = match cosmos.make_contract(*address).info().await {
-            Ok(info) => Cow::Owned(info.label),
-            Err(_) => "unknown contract".into(),
-        };
-        let contract = GovContract(cosmos.make_contract(*address));
-
-        let mut res = contract
-            .query::<ProposalsResp>(
-                QueryMsg::ProposalsById {
-                    ids: vec![*proposal_id],
-                },
-                QueryType::Proposals,
-            )
-            .await?;
-
-        let proposal = match res.0.pop() {
-            Some(proposal) => proposal.proposal,
-            None => return Err(Error::ProposalNotFound),
-        };
-
-        Ok(ProposalInfoToDb {
-            environment: ContractEnvironment::from_market(*chain, &label),
-            proposal_id: self.proposal_id,
-            title: proposal.title,
-            chain: self.chain,
-            address: self.address,
-        })
-    }
-}
-
-fn wrap_text(text: String, max_length: usize, max_lines: usize) -> Vec<String> {
-    let words = text.split_ascii_whitespace();
+fn get_title_lines(proposal: &ProposalInfo, max_length: usize, max_lines: usize) -> Vec<String> {
+    let title = format!("#{} {}", proposal.id, proposal.title);
+    let words = title.split_ascii_whitespace();
     let mut line = "".to_string();
     let mut text_lines = vec![];
 
@@ -271,7 +245,7 @@ impl ProposalInfo {
     fn image_svg(self) -> Response {
         // Generate the raw SVG text by rendering the template
         let svg = ProposalSvg {
-            title_lines: wrap_text(self.title.to_string(), TITLE_MAX_WIDTH, TITLE_MAX_LINES),
+            title_lines: get_title_lines(&self, TITLE_MAX_WIDTH, TITLE_MAX_LINES),
         }
         .render()
         .unwrap();
@@ -288,10 +262,10 @@ impl ProposalInfo {
         res
     }
 
-    fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
+    fn image_inner(self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
         let svg = ProposalSvg {
-            title_lines: wrap_text(self.title.to_string(), TITLE_MAX_WIDTH, TITLE_MAX_LINES),
+            title_lines: get_title_lines(&self, TITLE_MAX_WIDTH, TITLE_MAX_LINES),
         }
         .render()
         .unwrap();

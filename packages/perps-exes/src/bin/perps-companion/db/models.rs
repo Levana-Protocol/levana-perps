@@ -1,5 +1,3 @@
-use cosmos::Address;
-use cosmwasm_std::Uint64;
 use perpswap::storage::{MarketId, PriceBaseInQuote};
 
 use crate::{
@@ -34,22 +32,4 @@ pub(crate) struct PositionInfoToDb {
     pub(crate) leverage: String,
     pub(crate) environment: ContractEnvironment,
     pub(crate) wallet: Option<String>,
-}
-
-/// Proposal data returned from the database for a given URL ID.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ProposalInfoFromDb {
-    pub(crate) title: String,
-    pub(crate) environment: ContractEnvironment,
-    pub(crate) chain: ChainId,
-    pub(crate) address: String,
-}
-
-/// Information sent to the database to insert a new proposal.
-pub(crate) struct ProposalInfoToDb {
-    pub(crate) proposal_id: Uint64,
-    pub(crate) title: String,
-    pub(crate) environment: ContractEnvironment,
-    pub(crate) chain: ChainId,
-    pub(crate) address: Address,
 }
