@@ -39,6 +39,8 @@ use crate::types::ChainId;
 pub(crate) enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
+    #[error("Unknown contract")]
+    UnknownContract,
     #[error("Error parsing path: {msg}")]
     Path { msg: String },
     #[error("Error returned from database")]
@@ -72,6 +74,7 @@ impl IntoResponse for Error {
         let mut response = ErrorPage {
             code: match &self {
                 Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::UnknownContract => http::status::StatusCode::BAD_REQUEST,
                 Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
                     tracing::error!("Database serror: {msg}");
@@ -175,7 +178,7 @@ pub(crate) struct PnlImageSvg {
 pub(crate) struct ProposalHtml {
     pub(crate) chain_id: ChainId,
     pub(crate) address: Address,
-    pub(crate) proposal_id: i64,
+    pub(crate) proposal_id: u64,
 }
 
 #[derive(TypedPath, Deserialize)]
@@ -186,7 +189,7 @@ pub(crate) struct ProposalHtml {
 pub(crate) struct ProposalImage {
     pub(crate) chain_id: ChainId,
     pub(crate) address: Address,
-    pub(crate) proposal_id: i64,
+    pub(crate) proposal_id: u64,
 }
 
 #[derive(TypedPath, Deserialize)]
@@ -197,7 +200,7 @@ pub(crate) struct ProposalImage {
 pub(crate) struct ProposalImageSvg {
     pub(crate) chain_id: ChainId,
     pub(crate) address: Address,
-    pub(crate) proposal_id: i64,
+    pub(crate) proposal_id: u64,
 }
 
 impl From<PathRejection> for Error {

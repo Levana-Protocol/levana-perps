@@ -40,25 +40,27 @@ pub(crate) struct ProposalInfo {
 impl ProposalInfo {
     async fn load(
         app: &App,
-        proposal_id: i64,
+        proposal_id: u64,
         chain_id: ChainId,
         address: Address,
         host: &Host,
     ) -> Result<Self, Error> {
-        let id_u64 = u64::try_from(proposal_id).map_err(|_| Error::ProposalNotFound)?;
-
         let cosmos = app.cosmos.get(&chain_id).ok_or(Error::UnknownChainId)?;
         let contract = GovContract(cosmos.make_contract(address));
-        let label = match contract.0.info().await {
-            Ok(info) => Cow::Owned(info.label),
-            Err(_) => "unknown contract".into(),
-        };
+        let label = Cow::Owned(
+            contract
+                .0
+                .info()
+                .await
+                .map_err(|_| Error::UnknownContract)?
+                .label,
+        );
         let environment = ContractEnvironment::from_market(chain_id, &label);
 
         let mut res = contract
             .query::<ProposalsResp>(
                 QueryMsg::ProposalsById {
-                    ids: vec![id_u64.into()],
+                    ids: vec![proposal_id.into()],
                 },
                 QueryType::Proposals,
             )
@@ -70,7 +72,7 @@ impl ProposalInfo {
         };
 
         Ok(ProposalInfo {
-            id: id_u64.into(),
+            id: proposal_id.into(),
             title: proposal.title,
             image_url: ProposalImage {
                 proposal_id,
