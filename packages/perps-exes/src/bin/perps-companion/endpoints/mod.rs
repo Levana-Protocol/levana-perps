@@ -16,7 +16,6 @@ use axum::{
     Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
-use cosmos::error::AddressError;
 use cosmos::Address;
 use http::status::StatusCode;
 
@@ -40,14 +39,14 @@ use crate::types::ChainId;
 pub(crate) enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
+    #[error("Unknown contract")]
+    UnknownContract,
     #[error("Error parsing path: {msg}")]
     Path { msg: String },
     #[error("Error returned from database")]
     Database { msg: String },
     #[error("Page not found")]
     InvalidPage,
-    #[error("Invalid address: {source}")]
-    InvalidAddress { source: AddressError },
     #[error("Math operation overflowed")]
     MathOverflow,
     #[error("Failed to query Market contract with {query_type:?}\nQuery: {msg:?}")]
@@ -75,13 +74,13 @@ impl IntoResponse for Error {
         let mut response = ErrorPage {
             code: match &self {
                 Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::UnknownContract => http::status::StatusCode::BAD_REQUEST,
                 Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
                     tracing::error!("Database serror: {msg}");
                     http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
-                Error::InvalidAddress { source: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                 Error::FailedToQueryMarketContract { query_type, msg: _ } => match query_type {
                     MarketQueryType::Status => http::status::StatusCode::BAD_REQUEST,
@@ -175,25 +174,33 @@ pub(crate) struct PnlImageSvg {
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal-url")]
-pub(crate) struct ProposalUrl;
-
-#[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal/:proposal_id", rejection(Error))]
+#[typed_path("/proposal/:chain_id/:address/:proposal_id", rejection(Error))]
 pub(crate) struct ProposalHtml {
-    pub(crate) proposal_id: i64,
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
+    pub(crate) proposal_id: u64,
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal/:proposal_id/image.png", rejection(Error))]
+#[typed_path(
+    "/proposal/:chain_id/:address/:proposal_id/image.png",
+    rejection(Error)
+)]
 pub(crate) struct ProposalImage {
-    pub(crate) proposal_id: i64,
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
+    pub(crate) proposal_id: u64,
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/proposal/:proposal_id/image.svg", rejection(Error))]
+#[typed_path(
+    "/proposal/:chain_id/:address/:proposal_id/image.svg",
+    rejection(Error)
+)]
 pub(crate) struct ProposalImageSvg {
-    pub(crate) proposal_id: i64,
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
+    pub(crate) proposal_id: u64,
 }
 
 impl From<PathRejection> for Error {
@@ -254,7 +261,6 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
         .typed_get(pnl::pnl_image_svg)
-        .typed_post(proposal::proposal_url)
         .typed_get(proposal::proposal_html)
         .typed_get(proposal::proposal_image)
         .typed_get(proposal::proposal_image_svg)
