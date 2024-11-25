@@ -30,6 +30,7 @@ pub(crate) struct ProposalInfo {
     id: Uint64,
     title: String,
     image_url: String,
+    svg_url: String,
     html_url: String,
     host: String,
     chain: ChainId,
@@ -75,6 +76,13 @@ impl ProposalInfo {
             id: proposal_id.into(),
             title: proposal.title,
             image_url: ProposalImage {
+                proposal_id,
+                chain_id,
+                address,
+            }
+            .to_uri()
+            .to_string(),
+            svg_url: ProposalImageSvg {
                 proposal_id,
                 chain_id,
                 address,
