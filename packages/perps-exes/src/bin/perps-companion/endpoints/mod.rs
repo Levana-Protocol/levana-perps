@@ -9,6 +9,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::extract::Request;
+use axum::Router;
 use axum::{
     extract::rejection::PathRejection,
     middleware::{from_fn, Next},
@@ -224,29 +225,33 @@ pub(crate) async fn launch(app: App) -> Result<()> {
 
     let app = Arc::new(app);
 
-    let service_builder = ServiceBuilder::new()
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
-                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
-        )
-        .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
-        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
-            app.opt.request_timeout_seconds,
-        )))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods([
-                    http::method::Method::GET,
-                    http::method::Method::HEAD,
-                    http::method::Method::POST,
-                    http::method::Method::PUT,
-                ])
-                .allow_headers([http::header::CONTENT_TYPE]),
-        );
+    let service_builder = |timeout| {
+        ServiceBuilder::new()
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                    .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+            )
+            .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
+            .layer(TimeoutLayer::new(std::time::Duration::from_secs(timeout)))
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods([
+                        http::method::Method::GET,
+                        http::method::Method::HEAD,
+                        http::method::Method::POST,
+                        http::method::Method::PUT,
+                    ])
+                    .allow_headers([http::header::CONTENT_TYPE]),
+            )
+    };
 
-    let router = axum::Router::new()
+    let export_route = Router::new()
+        .typed_get(export::history)
+        .layer(service_builder(app.opt.export_handler_timeout_seconds));
+
+    let router = Router::new()
         .typed_get(common::homepage)
         .typed_get(common::healthz)
         .typed_get(common::grpc_health)
@@ -264,12 +269,12 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(proposal::proposal_html)
         .typed_get(proposal::proposal_image)
         .typed_get(proposal::proposal_image_svg)
-        .typed_get(export::history)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)
-        .with_state(app)
         .fallback(common::not_found)
-        .layer(service_builder)
+        .layer(service_builder(app.opt.request_timeout_seconds))
+        .merge(export_route)
+        .with_state(app.clone())
         .layer(from_fn(error_response_handler));
 
     tracing::info!("Launching server");
