@@ -8,6 +8,7 @@ pub enum PerpsNetwork {
     Regular(CosmosNetwork),
     DymensionTestnet,
     NibiruTestnet,
+    RujiraTestnet,
 }
 
 impl FromStr for PerpsNetwork {
@@ -17,6 +18,7 @@ impl FromStr for PerpsNetwork {
         Ok(match s {
             "dymension-testnet" => PerpsNetwork::DymensionTestnet,
             "nibiru-testnet" => PerpsNetwork::NibiruTestnet,
+            "rujira-testnet" => PerpsNetwork::RujiraTestnet,
             _ => PerpsNetwork::Regular(s.parse()?),
         })
     }
@@ -38,6 +40,12 @@ impl PerpsNetwork {
                 Self::NibiruTestnet.get_address_hrp(),
                 "https://grpc.testnet-1.nibiru.fi",
             )),
+            PerpsNetwork::RujiraTestnet => Ok(CosmosBuilder::new(
+                "dev-1",
+                "rune",
+                Self::RujiraTestnet.get_address_hrp(),
+                "https://thornode-devnet-grpc.bryanlabs.net",
+            )),
         }
     }
 }
@@ -54,6 +62,7 @@ impl HasAddressHrp for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.get_address_hrp(),
             PerpsNetwork::DymensionTestnet => AddressHrp::from_static("rol"),
             PerpsNetwork::NibiruTestnet => AddressHrp::from_static("nibi"),
+            PerpsNetwork::RujiraTestnet => AddressHrp::from_static("sthor"),
         }
     }
 }
@@ -67,6 +76,7 @@ impl serde::Serialize for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.serialize(serializer),
             PerpsNetwork::DymensionTestnet => serializer.serialize_str("dymension-testnet"),
             PerpsNetwork::NibiruTestnet => serializer.serialize_str("nibiru-testnet"),
+            PerpsNetwork::RujiraTestnet => serializer.serialize_str("rujira-testnet"),
         }
     }
 }
@@ -103,6 +113,7 @@ impl Display for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.fmt(f),
             PerpsNetwork::DymensionTestnet => f.write_str("dymension-testnet"),
             PerpsNetwork::NibiruTestnet => f.write_str("nibiru-testnet"),
+            PerpsNetwork::RujiraTestnet => f.write_str("rujira-testnet"),
         }
     }
 }
