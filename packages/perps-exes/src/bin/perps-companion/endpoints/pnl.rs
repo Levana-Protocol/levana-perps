@@ -23,7 +23,7 @@ use perpswap::{
 };
 
 use perpswap::storage::{MarketId, MarketType};
-use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
+use resvg::usvg::fontdb::Database;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -355,20 +355,25 @@ impl PnlInfo {
         let svg = PnlSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
-        let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
-
-        tree.convert_text(fontsdb);
-
-        // Now that our usvg tree has text converted, convert into an resvg tree
-        let rtree = resvg::Tree::from_usvg(&tree);
+        let tree = resvg::usvg::Tree::from_str(
+            &svg,
+            &resvg::usvg::Options {
+                fontdb: Arc::new(fontsdb.to_owned()),
+                ..resvg::usvg::Options::default()
+            },
+        )?;
 
         // Generate a new pixmap to hold the rasterized image
-        let pixmap_size = rtree.size.to_int_size();
+        let pixmap_size = tree.size().to_int_size();
         let mut pixmap = resvg::tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
             .context("Could not generate new Pixmap")?;
 
         // Render the rasterized image from the resvg SVG tree into the pixmap
-        rtree.render(resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::default(),
+            &mut pixmap.as_mut(),
+        );
 
         // Take the binary PNG output and return is as a response
         let png = pixmap.encode_png()?;
