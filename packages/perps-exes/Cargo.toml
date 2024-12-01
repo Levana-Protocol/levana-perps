@@ -51,7 +51,7 @@ tonic = "0.12.3"
 askama = "0.12.1"
 cw-utils = "2.0.0"
 thiserror = "2.0.0"
-resvg = "0.36.0"
+resvg = "0.44.0"
 axum-macros = "0.4.2"
 mime = "0.3.17"
 sqlx = { version = "0.8.2", features = [
