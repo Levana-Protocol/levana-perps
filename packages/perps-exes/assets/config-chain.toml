@@ -246,4 +246,4 @@ faucet = "sthor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s8w5s3v"
 rpc-nodes = ["https://thornode-devnet-rpc.bryanlabs.net"]
 gas-decimals = 8
 spot-price = {}
-explorer = "https://does-not-exist.explorer.thorchain-devnet"
+explorer = "https://explore.bryanlabs.net/thornode/tx/"
