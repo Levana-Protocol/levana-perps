@@ -239,3 +239,11 @@ faucet = "nibi1e5e52yd7hk2j3plfxwfldsn33v4dye2ez0zmjwqea0upcvgmhs2q07mhlj"
 # explorer = "https://dymension-fake-explorer"
 rpc-nodes = ["https://rpc.testnet-1.nibiru.fi"]
 gas-decimals = 6
+
+[rujira-testnet]
+tracker = "sthor18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3qrhfwda"
+faucet = "sthor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s8w5s3v"
+rpc-nodes = ["https://thornode-devnet-rpc.bryanlabs.net"]
+gas-decimals = 8
+spot-price = {}
+explorer = "https://explore.bryanlabs.net/thornode/tx/"

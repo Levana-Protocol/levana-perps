@@ -162,6 +162,9 @@ impl ChainId {
             PerpsNetwork::NibiruTestnet => Err(anyhow::anyhow!(
                 "Cannot run companion server for Nibiru testnet"
             )),
+            PerpsNetwork::RujiraTestnet => Err(anyhow::anyhow!(
+                "Cannot run companion server for Rujira testnet"
+            )),
         }
     }
 

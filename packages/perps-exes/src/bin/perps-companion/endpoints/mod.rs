@@ -1,6 +1,7 @@
 mod common;
 mod export;
 pub(crate) mod pnl;
+pub(crate) mod proposal;
 mod whales;
 
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::extract::Request;
+use axum::Router;
 use axum::{
     extract::rejection::PathRejection,
     middleware::{from_fn, Next},
@@ -18,6 +20,9 @@ use axum_extra::routing::{RouterExt, TypedPath};
 use cosmos::Address;
 use http::status::StatusCode;
 
+use perpswap::contracts::market::entry::QueryMsg as MarketQueryMsg;
+use pnl::QueryType as MarketQueryType;
+use proposal::{QueryMsg as GovQueryMsg, QueryType as GovQueryType};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::net::TcpListener;
@@ -31,7 +36,82 @@ use tracing::Level;
 use crate::app::App;
 use crate::types::ChainId;
 
-use self::pnl::ErrorDescription;
+#[derive(thiserror::Error, Clone, Debug)]
+pub(crate) enum Error {
+    #[error("Unknown chain ID")]
+    UnknownChainId,
+    #[error("Unknown contract")]
+    UnknownContract,
+    #[error("Error parsing path: {msg}")]
+    Path { msg: String },
+    #[error("Error returned from database")]
+    Database { msg: String },
+    #[error("Page not found")]
+    InvalidPage,
+    #[error("Math operation overflowed")]
+    MathOverflow,
+    #[error("Failed to query Market contract with {query_type:?}\nQuery: {msg:?}")]
+    FailedToQueryMarketContract {
+        msg: MarketQueryMsg,
+        query_type: MarketQueryType,
+    },
+    #[error("Specified position not found")]
+    PositionNotFound,
+    #[error("The position is still open")]
+    PositionStillOpen,
+    #[error("Missing PnL values")]
+    PnlValueMissing,
+    #[error("Failed to query Gov contract with {query_type:?}\nQuery: {msg:?}")]
+    FailedToQueryGovContract {
+        msg: GovQueryMsg,
+        query_type: GovQueryType,
+    },
+    #[error("Specified proposal not found")]
+    ProposalNotFound,
+}
+
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let mut response = ErrorPage {
+            code: match &self {
+                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::UnknownContract => http::status::StatusCode::BAD_REQUEST,
+                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
+                Error::Database { msg } => {
+                    tracing::error!("Database serror: {msg}");
+                    http::status::StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
+                Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::FailedToQueryMarketContract { query_type, msg: _ } => match query_type {
+                    MarketQueryType::Status => http::status::StatusCode::BAD_REQUEST,
+                    MarketQueryType::EntryPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    MarketQueryType::ExitPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    MarketQueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                },
+                Error::PositionNotFound => http::status::StatusCode::BAD_REQUEST,
+                Error::PositionStillOpen => http::status::StatusCode::BAD_REQUEST,
+                Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::FailedToQueryGovContract { query_type, msg: _ } => match query_type {
+                    GovQueryType::Proposals => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                },
+                Error::ProposalNotFound => http::status::StatusCode::BAD_REQUEST,
+            },
+            error: self.clone(),
+        }
+        .into_response();
+        let error_description = ErrorDescription {
+            msg: self.to_string(),
+        };
+        response.extensions_mut().insert(error_description);
+        response
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorDescription {
+    pub(crate) msg: String,
+}
 
 #[derive(TypedPath)]
 #[typed_path("/")]
@@ -54,6 +134,10 @@ pub(crate) struct BuildVersionRoute;
 pub(crate) struct PnlCssRoute;
 
 #[derive(TypedPath)]
+#[typed_path("/proposal.css")]
+pub(crate) struct ProposalCssRoute;
+
+#[derive(TypedPath)]
 #[typed_path("/whale.css")]
 pub(crate) struct WhaleCssRoute;
 
@@ -74,24 +158,53 @@ pub(crate) struct RobotRoute;
 pub(crate) struct PnlUrl;
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl/:pnl_id", rejection(pnl::Error))]
+#[typed_path("/pnl/:pnl_id", rejection(Error))]
 pub(crate) struct PnlHtml {
     pub(crate) pnl_id: i64,
 }
-
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl/:pnl_id/image.png", rejection(pnl::Error))]
+#[typed_path("/pnl/:pnl_id/image.png", rejection(Error))]
 pub(crate) struct PnlImage {
     pub(crate) pnl_id: i64,
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl/:pnl_id/image.svg", rejection(pnl::Error))]
+#[typed_path("/pnl/:pnl_id/image.svg", rejection(Error))]
 pub(crate) struct PnlImageSvg {
     pub(crate) pnl_id: i64,
 }
 
-impl From<PathRejection> for pnl::Error {
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:chain_id/:address/:proposal_id", rejection(Error))]
+pub(crate) struct ProposalHtml {
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
+    pub(crate) proposal_id: u64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path(
+    "/proposal/:chain_id/:address/:proposal_id/image.png",
+    rejection(Error)
+)]
+pub(crate) struct ProposalImage {
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
+    pub(crate) proposal_id: u64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path(
+    "/proposal/:chain_id/:address/:proposal_id/image.svg",
+    rejection(Error)
+)]
+pub(crate) struct ProposalImageSvg {
+    pub(crate) chain_id: ChainId,
+    pub(crate) address: Address,
+    pub(crate) proposal_id: u64,
+}
+
+impl From<PathRejection> for Error {
     fn from(rejection: PathRejection) -> Self {
         Self::Path {
             msg: rejection.to_string(),
@@ -112,34 +225,39 @@ pub(crate) async fn launch(app: App) -> Result<()> {
 
     let app = Arc::new(app);
 
-    let service_builder = ServiceBuilder::new()
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
-                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
-        )
-        .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
-        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
-            app.opt.request_timeout_seconds,
-        )))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods([
-                    http::method::Method::GET,
-                    http::method::Method::HEAD,
-                    http::method::Method::POST,
-                    http::method::Method::PUT,
-                ])
-                .allow_headers([http::header::CONTENT_TYPE]),
-        );
+    let service_builder = |timeout| {
+        ServiceBuilder::new()
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                    .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+            )
+            .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
+            .layer(TimeoutLayer::new(std::time::Duration::from_secs(timeout)))
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods([
+                        http::method::Method::GET,
+                        http::method::Method::HEAD,
+                        http::method::Method::POST,
+                        http::method::Method::PUT,
+                    ])
+                    .allow_headers([http::header::CONTENT_TYPE]),
+            )
+    };
 
-    let router = axum::Router::new()
+    let export_route = Router::new()
+        .typed_get(export::history)
+        .layer(service_builder(app.opt.export_handler_timeout_seconds));
+
+    let router = Router::new()
         .typed_get(common::homepage)
         .typed_get(common::healthz)
         .typed_get(common::grpc_health)
         .typed_get(common::build_version)
         .typed_get(pnl::pnl_css)
+        .typed_get(proposal::proposal_css)
         .typed_get(common::error_css)
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)
@@ -148,12 +266,15 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
         .typed_get(pnl::pnl_image_svg)
-        .typed_get(export::history)
+        .typed_get(proposal::proposal_html)
+        .typed_get(proposal::proposal_image)
+        .typed_get(proposal::proposal_image_svg)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)
-        .with_state(app)
         .fallback(common::not_found)
-        .layer(service_builder)
+        .layer(service_builder(app.opt.request_timeout_seconds))
+        .merge(export_route)
+        .with_state(app.clone())
         .layer(from_fn(error_response_handler));
 
     tracing::info!("Launching server");

@@ -2100,3 +2100,16 @@ inverted = false
 [networks.dymension-testnet.DYM_USD.feeds-usd.pyth]
 key = "DYM_USD"
 inverted = false
+
+[[networks.rujira-testnet.BTC_USDC.feeds]]
+
+[networks.rujira-testnet.BTC_USDC.feeds.simple]
+contract = "sthor15nczwuqh0zcu6syeqsc4td6dphql7n2p7cgkl9raz97z5s3zdjrsnyrq3s"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.rujira-testnet.BTC_USDC.feeds-usd]]
+
+[networks.rujira-testnet.BTC_USDC.feeds-usd.constant]
+price = "1"
+inverted = false

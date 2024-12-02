@@ -104,19 +104,6 @@ pub enum ErrorDomain {
     SimpleOracle,
 }
 
-/// Generate a [PerpError] and then wrap it up in an anyhow error
-#[macro_export]
-macro_rules! perp_anyhow {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None::<()>,
-        })
-    }};
-}
-
 impl<T: Serialize> fmt::Display for PerpError<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -168,6 +155,15 @@ impl PerpError {
         }
     }
 
+    /// Create a new [Self] for Cw20 contract with no data
+    pub fn cw20(id: ErrorId, desc: impl Into<String>) -> Self {
+        PerpError {
+            id,
+            domain: ErrorDomain::Cw20,
+            description: desc.into(),
+            data: None,
+        }
+    }
     /// Include error information into an event
     pub fn mixin_event(&self, evt: Event) -> Event {
         // these unwraps are okay, just a shorthand helper to get the enum variants as a string

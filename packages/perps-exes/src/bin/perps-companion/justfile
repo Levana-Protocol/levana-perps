@@ -24,6 +24,9 @@ db-reset:
 run:
 	cargo run --bin perps-companion uri --postgres-uri postgresql://postgres:postgres@localhost/companion
 
+prepare:
+	cd ../../.. && cargo sqlx prepare
+
 # Postgres terminate connection
 pg-terminate-conn:
 	psql -U postgres -h localhost -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'companion' AND pid <> pg_backend_pid();"
@@ -39,3 +42,7 @@ get-test:
 # Run image
 run-remote-image:
 	docker run --name comp --net=host -p 3000:3000 --rm -it ghcr.io/levana-protocol/levana-perps/companion:023e218903f69b079bbb8812ab18c4da732c410e --app-environment test --app-version test perps-companion uri -- --postgres-uri postgresql://postgres:postgres@localhost/companion
+
+# Hurl tests
+hurl:
+	hurl --test companion.hurl

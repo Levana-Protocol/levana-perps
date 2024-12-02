@@ -190,13 +190,11 @@ impl Token {
             .into_number()
             .to_u128_with_precision(self.decimal_places().into())
             .ok_or_else(|| {
-                perp_anyhow!(
+                anyhow!(PerpError::new(
                     ErrorId::Conversion,
                     ErrorDomain::Wallet,
-                    "{} unable to convert {} to u128!",
-                    self.name(),
-                    amount
-                )
+                    format!("{} unable to convert {amount} to u128!", self.name(),)
+                ))
             })?;
 
         if value > 0 {
@@ -220,12 +218,11 @@ impl Token {
                         amount: amount.into(),
                     }))
             }
-            Self::Cw20 { .. } => Err(perp_anyhow!(
+            Self::Cw20 { .. } => Err(anyhow!(PerpError::new(
                 ErrorId::NativeFunds,
                 ErrorDomain::Wallet,
-                "{} cannot be turned into a native coin",
-                self.name()
-            )),
+                format!("{} cannot be turned into a native coin", self.name())
+            ))),
         }
     }
 
@@ -249,12 +246,11 @@ impl Token {
         submsg: &T,
     ) -> Result<Option<Cw20ExecuteMsg>> {
         match self {
-            Self::Native { .. } => Err(perp_anyhow!(
+            Self::Native { .. } => Err(anyhow!(PerpError::new(
                 ErrorId::Cw20Funds,
                 ErrorDomain::Wallet,
-                "{} cannot be turned into a cw20 message",
-                self.name()
-            )),
+                format!("{} cannot be turned into a cw20 message", self.name())
+            ))),
             Self::Cw20 { .. } => {
                 let msg = to_json_binary(submsg)?;
                 Ok(self
@@ -278,12 +274,11 @@ impl Token {
         amount: NonZero<Collateral>,
     ) -> Result<Option<Cw20ExecuteMsg>> {
         match self {
-            Self::Native { .. } => Err(perp_anyhow!(
+            Self::Native { .. } => Err(anyhow!(PerpError::new(
                 ErrorId::Cw20Funds,
                 ErrorDomain::Wallet,
-                "{} cannot be turned into a cw20 message",
-                self.name()
-            )),
+                format!("{} cannot be turned into a cw20 message", self.name())
+            ))),
             Self::Cw20 { .. } => Ok(self.into_u128(amount.into_decimal256())?.map(|amount| {
                 Cw20ExecuteMsg::Transfer {
                     recipient: recipient.into(),
@@ -315,13 +310,15 @@ impl Token {
                 let msg = self
                     .into_cw20_execute_send_msg(contract_addr, amount, &execute_msg)
                     .map_err(|err| {
-                        perp_anyhow!(
+                        let downcast = err
+                            .downcast_ref::<PerpError>()
+                            .map(|item| item.description.clone());
+                        let msg = format!("{downcast:?} (exec inner msg: {execute_msg:?})!");
+                        anyhow!(PerpError::new(
                             ErrorId::Conversion,
                             ErrorDomain::Wallet,
-                            "{} (exec inner msg: {:?})!",
-                            err.downcast_ref::<PerpError>().unwrap().description,
-                            execute_msg
-                        )
+                            msg
+                        ))
                     })?;
 
                 match msg {
@@ -350,13 +347,15 @@ impl Token {
                     let coin = self
                         .into_native_coin(amount)
                         .map_err(|err| {
-                            perp_anyhow!(
+                            let downcast = err
+                                .downcast_ref::<PerpError>()
+                                .map(|item| item.description.clone());
+                            let msg = format!("{downcast:?} (exec inner msg: {execute_msg:?})!");
+                            anyhow!(PerpError::new(
                                 ErrorId::Conversion,
                                 ErrorDomain::Wallet,
-                                "{} (exec inner msg: {:?})!",
-                                err.downcast_ref::<PerpError>().unwrap().description,
-                                execute_msg
-                            )
+                                msg
+                            ))
                         })?
                         .unwrap();
 
@@ -386,10 +385,11 @@ impl Token {
             }
         }
 
-        Err(perp_anyhow!(
+        let msg = format!("Token Collateral must be as precise as the Token (is {}, only {} decimal places supported)", value, self.decimal_places());
+        Err(anyhow!(PerpError::new(
             ErrorId::Conversion,
             ErrorDomain::Wallet,
-            "Token Collateral must be as precise as the Token (is {}, only {} decimal places supported)", value, self.decimal_places()
-        ))
+            msg
+        )))
     }
 }

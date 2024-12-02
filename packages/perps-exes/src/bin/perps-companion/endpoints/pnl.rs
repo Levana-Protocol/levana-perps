@@ -23,7 +23,7 @@ use perpswap::{
 };
 
 use perpswap::storage::{MarketId, MarketType};
-use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
+use resvg::usvg::fontdb::Database;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -33,7 +33,7 @@ use crate::{
     types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
-use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
+use super::{Error, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -137,6 +137,7 @@ pub(super) async fn pnl_css(_: PnlCssRoute) -> Css<&'static str> {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct PositionInfo {
     pub(crate) address: Address,
     pub(crate) chain: ChainId,
@@ -156,7 +157,7 @@ impl MarketContract {
         let mut attempt = 1;
         loop {
             let res = self.0.query(&msg).await.map_err(|source| {
-                let e = Error::FailedToQueryContract {
+                let e = Error::FailedToQueryMarketContract {
                     msg: msg.clone(),
                     query_type,
                 };
@@ -354,20 +355,25 @@ impl PnlInfo {
         let svg = PnlSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
-        let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
-
-        tree.convert_text(fontsdb);
-
-        // Now that our usvg tree has text converted, convert into an resvg tree
-        let rtree = resvg::Tree::from_usvg(&tree);
+        let tree = resvg::usvg::Tree::from_str(
+            &svg,
+            &resvg::usvg::Options {
+                fontdb: Arc::new(fontsdb.to_owned()),
+                ..resvg::usvg::Options::default()
+            },
+        )?;
 
         // Generate a new pixmap to hold the rasterized image
-        let pixmap_size = rtree.size.to_int_size();
+        let pixmap_size = tree.size().to_int_size();
         let mut pixmap = resvg::tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
             .context("Could not generate new Pixmap")?;
 
         // Render the rasterized image from the resvg SVG tree into the pixmap
-        rtree.render(resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::default(),
+            &mut pixmap.as_mut(),
+        );
 
         // Take the binary PNG output and return is as a response
         let png = pixmap.encode_png()?;
@@ -390,69 +396,6 @@ pub(crate) enum QueryType {
     EntryPrice,
     ExitPrice,
     Positions,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ErrorDescription {
-    pub(crate) msg: String,
-}
-
-#[derive(thiserror::Error, Clone, Debug)]
-pub(crate) enum Error {
-    #[error("Unknown chain ID")]
-    UnknownChainId,
-    #[error("Specified position not found")]
-    PositionNotFound,
-    #[error("The position is still open")]
-    PositionStillOpen,
-    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}")]
-    FailedToQueryContract {
-        msg: QueryMsg,
-        query_type: QueryType,
-    },
-    #[error("Error parsing path: {msg}")]
-    Path { msg: String },
-    #[error("Error returned from database")]
-    Database { msg: String },
-    #[error("Page not found")]
-    InvalidPage,
-    #[error("Missing PnL values")]
-    PnlValueMissing,
-    #[error("Math operation overflowed")]
-    MathOverflow,
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        let mut response = ErrorPage {
-            code: match &self {
-                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
-                Error::PositionNotFound => http::status::StatusCode::BAD_REQUEST,
-                Error::PositionStillOpen => http::status::StatusCode::BAD_REQUEST,
-                Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Status => http::status::StatusCode::BAD_REQUEST,
-                    QueryType::EntryPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::ExitPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                },
-                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
-                Error::Database { msg } => {
-                    tracing::error!("Database serror: {msg}");
-                    http::status::StatusCode::INTERNAL_SERVER_ERROR
-                }
-                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
-                Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-                Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
-            },
-            error: self.clone(),
-        }
-        .into_response();
-        let error_description = ErrorDescription {
-            msg: self.to_string(),
-        };
-        response.extensions_mut().insert(error_description);
-        response
-    }
 }
 
 #[derive(askama::Template)]

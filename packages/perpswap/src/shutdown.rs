@@ -81,11 +81,8 @@ impl ShutdownImpact {
         if self.can_perform(shutdown_wallet) {
             Ok(())
         } else {
-            Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Factory,
-                "{shutdown_wallet:?} cannot perform {self:?}"
-            ))
+            let msg = format!("{shutdown_wallet:?} cannot perform {self:?}");
+            Err(anyhow!(PerpError::auth(ErrorDomain::Factory, msg)))
         }
     }
 
