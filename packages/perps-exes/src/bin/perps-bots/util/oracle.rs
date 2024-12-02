@@ -316,9 +316,12 @@ fn compose_oracle_feeds(
                 );
                 sei.price.into_decimal256()
             }
-            SpotPriceFeedData::Ruji { .. } => {
-                let ruji = oracle_price.ruji;
-                ruji.into_decimal256()
+            SpotPriceFeedData::Ruji { asset } => {
+                let rujira = oracle_price
+                    .rujira
+                    .get(asset)
+                    .with_context(|| format!("Missing price for Ruji asset: {asset}"))?;
+                rujira.price.into_decimal256()
             }
             SpotPriceFeedData::Stride {
                 denom,
