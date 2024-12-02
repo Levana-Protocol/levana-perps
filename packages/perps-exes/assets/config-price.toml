@@ -2104,7 +2104,7 @@ inverted = false
 [[networks.rujira-testnet.BTC_USDC.feeds]]
 
 [networks.rujira-testnet.BTC_USDC.feeds.simple]
-contract = "sthor1xhcxq4fvxth2hn3msmkpftkfpw73um7s4et3lh4r8cfmumk3qsmszyyepy"
+contract = "sthor15nczwuqh0zcu6syeqsc4td6dphql7n2p7cgkl9raz97z5s3zdjrsnyrq3s"
 inverted = false
 age_tolerance = 31536000
 
