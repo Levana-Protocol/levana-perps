@@ -632,7 +632,7 @@ async fn validate_spot_price_config(
                     SpotPriceFeedDataInit::Sei { denom } => anyhow::bail!(
                         "No longer supporting Sei native oracle, provided denom is: {denom}"
                     ),
-                    SpotPriceFeedDataInit::Ruji { price: _ } => (),
+                    SpotPriceFeedDataInit::Ruji { asset: _ } => (),
                     SpotPriceFeedDataInit::Simple {
                         contract,
                         age_tolerance_seconds: _,

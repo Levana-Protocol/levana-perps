@@ -1,11 +1,11 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
-use cosmwasm_std::{Binary, Order};
+use cosmwasm_std::{Binary, Order, Uint128};
 use perpswap::contracts::market::{
     entry::{
-        OraclePriceFeedPythResp, OraclePriceFeedSeiResp, OraclePriceFeedSimpleResp,
-        OraclePriceFeedStrideResp, PriceForQuery,
+        OraclePriceFeedPythResp, OraclePriceFeedRujiraResp, OraclePriceFeedSeiResp,
+        OraclePriceFeedSimpleResp, OraclePriceFeedStrideResp, PriceForQuery,
     },
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
@@ -49,7 +49,7 @@ pub(crate) struct OraclePriceInternal {
     /// A map of each sei denom used in this market to the price
     pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each ruji used in this market to the redemption price
-    pub(crate) ruji: NumberGtZero,
+    pub(crate) rujira: BTreeMap<String, OraclePriceFeedRujiraResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
@@ -164,7 +164,11 @@ impl OraclePriceInternal {
                     .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => *price,
-                SpotPriceFeedData::Ruji { .. } => self.ruji,
+                SpotPriceFeedData::Ruji { asset } => self
+                    .rujira
+                    .get(asset)
+                    .map(|x| x.price)
+                    .with_context(|| format!("no rujira price for asset {}", asset))?,
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
@@ -492,7 +496,7 @@ impl State<'_> {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
                 let mut simple = BTreeMap::new();
-                let mut ruji = NumberGtZero::one();
+                let mut rujira = BTreeMap::new();
                 let sei = BTreeMap::new();
 
                 let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
@@ -627,9 +631,26 @@ impl State<'_> {
                             }
                         }
 
-                        SpotPriceFeedData::Ruji { .. } => {
-                            // Placeholder for the ruji grpc data fetching logic
-                            ruji = ruji.checked_add(Decimal256::one())?;
+                        SpotPriceFeedData::Ruji { asset } => {
+                            if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
+                                let pool = rujira_rs::query::Pool::load(
+                                    self.querier,
+                                    &rujira_rs::Layer1Asset::new(rujira_rs::Chain::Bsc, asset),
+                                )?;
+
+                                let price = Decimal256::from(pool.asset_tor_price);
+                                let price = price.checked_div(Decimal256::from_atomics(
+                                    Uint128::new(100000000),
+                                    1,
+                                )?)?;
+                                let price = Number::from(price);
+                                let price =
+                                    NumberGtZero::try_from(price).context("price must be > 0")?;
+                                entry.insert(OraclePriceFeedRujiraResp {
+                                    price,
+                                    volatile: feed.volatile.unwrap_or_default(),
+                                });
+                            }
                         }
                         SpotPriceFeedData::Constant { .. } => {
                             // nothing to do here, constant prices are used without a lookup
@@ -682,7 +703,7 @@ impl State<'_> {
                     pyth,
                     stride,
                     sei,
-                    ruji,
+                    rujira,
                     simple,
                 })
             }

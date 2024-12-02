@@ -113,8 +113,8 @@ pub enum SpotPriceFeedData {
     },
     /// Ruji chain
     Ruji {
-        /// The constant price
-        price: NumberGtZero,
+        /// The asset to use
+        asset: String,
     },
     /// Simple contract with a QueryMsg::Price call
     Simple {
@@ -257,8 +257,8 @@ pub enum SpotPriceFeedDataInit {
     },
     /// Ruji chain
     Ruji {
-        /// The constant price
-        price: NumberGtZero,
+        /// The asset to use
+        asset: String,
     },
     /// Simple contract with a QueryMsg::Price call
     Simple {
@@ -287,7 +287,7 @@ impl From<SpotPriceFeedData> for SpotPriceFeedDataInit {
                 age_tolerance_seconds,
             },
             SpotPriceFeedData::Sei { denom } => SpotPriceFeedDataInit::Sei { denom },
-            SpotPriceFeedData::Ruji { price } => SpotPriceFeedDataInit::Ruji { price },
+            SpotPriceFeedData::Ruji { asset } => SpotPriceFeedDataInit::Ruji { asset },
             SpotPriceFeedData::Simple {
                 contract,
                 age_tolerance_seconds,
