@@ -1,7 +1,7 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
-use cosmwasm_std::{Binary, Order, Uint128};
+use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
         OraclePriceFeedPythResp, OraclePriceFeedRujiraResp, OraclePriceFeedSeiResp,
@@ -645,10 +645,6 @@ impl State<'_> {
                                 )?;
 
                                 let price = Decimal256::from(pool.asset_tor_price);
-                                let price = price.checked_div(Decimal256::from_atomics(
-                                    Uint128::new(100000000),
-                                    1,
-                                )?)?;
                                 let price = Number::from(price);
                                 let price =
                                     NumberGtZero::try_from(price).context("price must be > 0")?;
