@@ -2112,3 +2112,15 @@ inverted = false
 [networks.rujira-testnet.KUJI_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
+
+[[networks.rujira-testnet.ATOM_USDC.feeds]]
+
+[networks.rujira-testnet.ATOM_USDC.feeds.rujira]
+asset = "GAIA.ATOM"
+inverted = false
+
+[[networks.rujira-testnet.ATOM_USDC.feeds-usd]]
+
+[networks.rujira-testnet.ATOM_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
