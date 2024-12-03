@@ -62,7 +62,7 @@ impl OffchainPriceData {
                             }
                             SpotPriceFeedData::Stride { .. } => (),
                             SpotPriceFeedData::Sei { .. } => (),
-                            SpotPriceFeedData::Ruji { .. } => (),
+                            SpotPriceFeedData::Rujira { .. } => (),
                             SpotPriceFeedData::Simple { .. } => (),
                         }
                     }
@@ -316,7 +316,7 @@ fn compose_oracle_feeds(
                 );
                 sei.price.into_decimal256()
             }
-            SpotPriceFeedData::Ruji { asset } => {
+            SpotPriceFeedData::Rujira { asset } => {
                 let rujira = oracle_price
                     .rujira
                     .get(asset)

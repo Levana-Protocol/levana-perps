@@ -258,7 +258,7 @@ impl Opt {
                     }
                     MarketPriceFeedConfig::Rujira { asset, inverted } => {
                         feeds.push(SpotPriceFeed {
-                            data: SpotPriceFeedData::Ruji { asset },
+                            data: SpotPriceFeedData::Rujira { asset },
                             inverted,
                             volatile: None,
                         });

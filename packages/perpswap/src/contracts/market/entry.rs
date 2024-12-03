@@ -749,7 +749,7 @@ pub struct OraclePriceResp {
     pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
     pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
-    /// A map of each ruji used in this market to the redemption price
+    /// A map of each rujira used in this market to the redemption price
     pub rujira: BTreeMap<String, OraclePriceFeedRujiraResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,

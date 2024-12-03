@@ -48,7 +48,7 @@ pub(crate) struct OraclePriceInternal {
     pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
     pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
-    /// A map of each ruji used in this market to the redemption price
+    /// A map of each rujira used in this market to the redemption price
     pub(crate) rujira: BTreeMap<String, OraclePriceFeedRujiraResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
@@ -170,7 +170,7 @@ impl OraclePriceInternal {
                     .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => *price,
-                SpotPriceFeedData::Ruji { asset } => self
+                SpotPriceFeedData::Rujira { asset } => self
                     .rujira
                     .get(asset)
                     .map(|x| x.price)
@@ -637,7 +637,7 @@ impl State<'_> {
                             }
                         }
 
-                        SpotPriceFeedData::Ruji { asset } => {
+                        SpotPriceFeedData::Rujira { asset } => {
                             if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
                                 let pool = rujira_rs::query::Pool::load(
                                     self.querier,
