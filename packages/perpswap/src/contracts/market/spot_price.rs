@@ -111,8 +111,8 @@ pub enum SpotPriceFeedData {
         /// The denom to use
         denom: String,
     },
-    /// Ruji chain
-    Ruji {
+    /// Rujira chain
+    Rujira {
         /// The asset to use
         asset: String,
     },
@@ -255,8 +255,8 @@ pub enum SpotPriceFeedDataInit {
         /// The denom to use
         denom: String,
     },
-    /// Ruji chain
-    Ruji {
+    /// Rujira chain
+    Rujira {
         /// The asset to use
         asset: String,
     },
@@ -287,7 +287,7 @@ impl From<SpotPriceFeedData> for SpotPriceFeedDataInit {
                 age_tolerance_seconds,
             },
             SpotPriceFeedData::Sei { denom } => SpotPriceFeedDataInit::Sei { denom },
-            SpotPriceFeedData::Ruji { asset } => SpotPriceFeedDataInit::Ruji { asset },
+            SpotPriceFeedData::Rujira { asset } => SpotPriceFeedDataInit::Rujira { asset },
             SpotPriceFeedData::Simple {
                 contract,
                 age_tolerance_seconds,

@@ -62,7 +62,7 @@ impl OffchainPriceData {
                             }
                             SpotPriceFeedData::Stride { .. } => (),
                             SpotPriceFeedData::Sei { .. } => (),
-                            SpotPriceFeedData::Ruji { .. } => (),
+                            SpotPriceFeedData::Rujira { .. } => (),
                             SpotPriceFeedData::Simple { .. } => (),
                         }
                     }
@@ -316,11 +316,12 @@ fn compose_oracle_feeds(
                 );
                 sei.price.into_decimal256()
             }
-            SpotPriceFeedData::Ruji { asset } => {
+            SpotPriceFeedData::Rujira { asset } => {
                 let rujira = oracle_price
                     .rujira
                     .get(asset)
                     .with_context(|| format!("Missing price for Ruji asset: {asset}"))?;
+                update_publish_time(Utc::now(), feed.volatile, true);
                 rujira.price.into_decimal256()
             }
             SpotPriceFeedData::Stride {

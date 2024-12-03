@@ -238,8 +238,8 @@ pub(crate) fn convert_spot_price_init(
                                 SpotPriceFeedDataInit::Sei { denom } => {
                                     SpotPriceFeedData::Sei { denom }
                                 }
-                                SpotPriceFeedDataInit::Ruji { asset } => {
-                                    SpotPriceFeedData::Ruji { asset }
+                                SpotPriceFeedDataInit::Rujira { asset } => {
+                                    SpotPriceFeedData::Rujira { asset }
                                 }
                                 SpotPriceFeedDataInit::Simple {
                                     contract,

@@ -514,12 +514,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 let price_storage =
                     oracle_price.compose_price(market_id, &feeds, &feeds_usd, state.now())?;
 
+                let block_time = state.now();
                 let oracle_publish_time = oracle_price
-                    .calculate_publish_time(if validate_age {
-                        state.config_volatile_time()
-                    } else {
-                        u32::MAX
-                    })?
+                    .calculate_publish_time(
+                        if validate_age {
+                            state.config_volatile_time()
+                        } else {
+                            u32::MAX
+                        },
+                        block_time,
+                    )?
                     .context("couldn't get an oracle price (no-volatile)")?;
 
                 let price_point =
