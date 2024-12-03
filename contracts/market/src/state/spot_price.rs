@@ -633,10 +633,7 @@ impl State<'_> {
 
                         SpotPriceFeedData::Ruji { asset } => {
                             if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
-                                let pool = rujira_rs::query::Pool::load(
-                                    self.querier,
-                                    &rujira_rs::Layer1Asset::new(rujira_rs::Chain::Bsc, asset),
-                                )?;
+                                let pool = rujira_rs::query::Pool::load(self.querier, asset)?;
 
                                 let price = Decimal256::from(pool.asset_tor_price);
                                 let price = price.checked_div(Decimal256::from_atomics(
