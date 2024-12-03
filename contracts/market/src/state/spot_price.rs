@@ -63,6 +63,7 @@ impl OraclePriceInternal {
     pub(crate) fn calculate_publish_time(
         &self,
         volatile_diff_seconds: u32,
+        block_time: Timestamp,
     ) -> Result<Option<Timestamp>> {
         let mut oldest_newest = None::<(Timestamp, Timestamp)>;
 
@@ -93,6 +94,11 @@ impl OraclePriceInternal {
                 if let Some(timestamp) = simple.timestamp {
                     add_new_timestamp(timestamp);
                 }
+            }
+        }
+        for rujira in self.rujira.values() {
+            if rujira.volatile {
+                add_new_timestamp(block_time);
             }
         }
 
@@ -423,7 +429,7 @@ impl State<'_> {
             } => {
                 let internal = self.get_oracle_price(true)?;
                 let new_publish_time = internal
-                    .calculate_publish_time(self.config_volatile_time())?
+                    .calculate_publish_time(self.config_volatile_time(), self.now())?
                     .ok_or(MarketError::NoPricePublishTimeFound.into_anyhow())?;
                 // self.now() usage is OK, it's explicitly for saving the block time in storage
                 let price_storage =
@@ -633,7 +639,10 @@ impl State<'_> {
 
                         SpotPriceFeedData::Ruji { asset } => {
                             if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
-                                let pool = rujira_rs::query::Pool::load(self.querier, asset)?;
+                                let pool = rujira_rs::query::Pool::load(
+                                    self.querier,
+                                    &asset.to_owned().try_into()?,
+                                )?;
 
                                 let price = Decimal256::from(pool.asset_tor_price);
                                 let price = price.checked_div(Decimal256::from_atomics(
@@ -645,7 +654,7 @@ impl State<'_> {
                                     NumberGtZero::try_from(price).context("price must be > 0")?;
                                 entry.insert(OraclePriceFeedRujiraResp {
                                     price,
-                                    volatile: feed.volatile.unwrap_or_default(),
+                                    volatile: feed.volatile.unwrap_or(true),
                                 });
                             }
                         }

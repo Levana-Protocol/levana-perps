@@ -160,6 +160,10 @@ pub enum MarketPriceFeedConfig {
         inverted: bool,
         age_tolerance: u32,
     },
+    Rujira {
+        asset: String,
+        inverted: bool,
+    },
 }
 
 /// Number of decimals in the gas coin
