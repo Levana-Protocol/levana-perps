@@ -2,8 +2,6 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     fmt::Display,
-    fs::File,
-    io::BufReader,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -16,6 +14,7 @@ use perpswap::storage::MarketId;
 use crate::{
     cli::{Opt, ServeOpt},
     coingecko::{CmcMarketPair, ExchangeKind},
+    s3::S3,
     slack::HttpApp,
     web::NotifyApp,
 };
@@ -453,13 +452,15 @@ pub(crate) struct DnfRecord {
 }
 
 impl HistoricalData {
-    pub(crate) fn save(
+    pub(crate) async fn save(
         &self,
         market_id: &MarketId,
         data_dir: PathBuf,
         until: Option<u16>,
+        s3_client: &S3,
     ) -> anyhow::Result<()> {
-        save_historical_data(market_id, data_dir, self.clone(), until)
+        save_historical_data(market_id, data_dir, self.clone(), until, s3_client).await?;
+        Ok(())
     }
 
     pub(crate) fn append(
@@ -567,31 +568,32 @@ impl HistoricalData {
     }
 }
 
-pub(crate) fn load_historical_data(
+pub(crate) async fn load_historical_data(
     market_id: &MarketId,
     data_dir: PathBuf,
+    s3_client: &S3,
 ) -> anyhow::Result<HistoricalData> {
-    let file = get_market_file_path(market_id, &data_dir);
-    if file.exists() {
-        let file = File::open(file)?;
-        let reader = BufReader::new(file);
-        let result = serde_json::from_reader(reader)?;
-        Ok(result)
-    } else {
-        Ok(HistoricalData { data: vec![] })
-    }
+    let path = get_market_file_path(market_id, &data_dir);
+    let historical_data = s3_client
+        .download(&path)
+        .await
+        .context("Error downloading file from S3")?;
+    Ok(historical_data)
 }
 
-pub(crate) fn save_historical_data(
+pub(crate) async fn save_historical_data(
     market_id: &MarketId,
     data_dir: PathBuf,
     data: HistoricalData,
     untill: Option<u16>,
+    s3_client: &S3,
 ) -> anyhow::Result<()> {
     let path = get_market_file_path(market_id, &data_dir);
     let data = data.till_days(untill)?;
-    let data = serde_json::to_string(&data)?;
-    fs_err::write(path, data.as_bytes())?;
+    s3_client
+        .upload(&path, &data)
+        .await
+        .context("Error writing historical data to S3 Bucket")?;
     Ok(())
 }
 
@@ -602,6 +604,9 @@ pub(crate) async fn compute_coin_dnfs(
 ) -> anyhow::Result<()> {
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook.clone()), opt.cmc_key.clone());
     let data_dir = serve_opt.cmc_data_dir.clone();
+    let s3_client = S3::new(serve_opt.bucket_id.clone())
+        .await
+        .context("Could not create AWS S3 client")?;
     let mut market_analysis_counter = 0;
     let mut last_notified_dates: HashMap<MarketId, NaiveDate> = HashMap::new();
     loop {
@@ -622,7 +627,8 @@ pub(crate) async fn compute_coin_dnfs(
             let market_id = &market_id.status.market_id;
             app.markets.write().insert(market_id.clone());
             tracing::info!("Going to compute DNF for {market_id:?}");
-            let mut historical_data = load_historical_data(market_id, data_dir.clone())?;
+            let mut historical_data =
+                load_historical_data(market_id, data_dir.clone(), &s3_client).await?;
             tracing::info!(
                 "Fetched  historical data for {market_id}: {}",
                 historical_data.data.len()
@@ -682,7 +688,9 @@ pub(crate) async fn compute_coin_dnfs(
                 let entry = last_notified_dates.entry(market_id.to_owned()).or_default();
                 *entry = now.date_naive();
             }
-            historical_data.save(market_id, data_dir.clone(), until_days)?;
+            historical_data
+                .save(market_id, data_dir.clone(), until_days, &s3_client)
+                .await?;
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
                     "Going to sleep {} seconds to avoid getting rate limited",

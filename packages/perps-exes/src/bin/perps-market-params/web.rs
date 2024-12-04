@@ -19,6 +19,7 @@ use crate::{
     cli::{Opt, ServeOpt},
     market_param::{compute_coin_dnfs, load_historical_data, DnfRecord, MarketStatusResult},
     routes::{HealthRoute, HistoryRoute, HomeRoute},
+    s3::S3,
 };
 
 pub(crate) async fn axum_main(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
@@ -30,20 +31,25 @@ pub(crate) struct NotifyApp {
     pub(crate) market_params: Arc<RwLock<HashMap<MarketId, MarketStatusResult>>>,
     pub(crate) markets: Arc<RwLock<HashSet<MarketId>>>,
     pub(crate) data_dir: PathBuf,
+    pub(crate) s3_client: S3,
 }
 
 impl NotifyApp {
-    pub(crate) fn new(data_dir: PathBuf) -> Self {
-        NotifyApp {
+    pub(crate) async fn new(data_dir: PathBuf, bucket_id: String) -> Result<Self> {
+        let s3_client = S3::new(bucket_id).await?;
+        Ok(NotifyApp {
             market_params: Arc::new(RwLock::new(HashMap::new())),
             markets: Arc::new(RwLock::new(HashSet::new())),
             data_dir,
-        }
+            s3_client,
+        })
     }
 }
 
 async fn main_inner(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
-    let state = Arc::new(NotifyApp::new(serve_opt.cmc_data_dir.clone()));
+    let state = Arc::new(
+        NotifyApp::new(serve_opt.cmc_data_dir.clone(), serve_opt.bucket_id.clone()).await?,
+    );
 
     let mut set = JoinSet::new();
     let dnf_state = state.clone();
@@ -113,7 +119,8 @@ pub(crate) async fn history(
     app: State<Arc<NotifyApp>>,
     _: Query<NoQueryString>,
 ) -> axum::response::Response {
-    let historical_data = load_historical_data(&market_id, app.data_dir.clone());
+    let historical_data =
+        load_historical_data(&market_id, app.data_dir.clone(), &app.s3_client).await;
     let historical_data = match historical_data {
         Ok(result) => result,
         Err(err) => {

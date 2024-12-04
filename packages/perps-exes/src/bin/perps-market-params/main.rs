@@ -18,6 +18,7 @@ mod cli;
 mod coingecko;
 mod market_param;
 mod routes;
+mod s3;
 mod slack;
 mod web;
 

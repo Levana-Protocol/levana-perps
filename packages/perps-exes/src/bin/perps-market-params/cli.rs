@@ -111,6 +111,9 @@ pub(crate) struct ServeOpt {
     /// Required runs before sending a slack alert
     #[arg(long, env = "LEVANA_MPARAM_MIN_RUNS_SLACK_ALERT", default_value = "6")]
     pub(crate) required_runs_slack_alert: u16,
+    /// AWS S3 Bucket Id
+    #[arg(long, env = "S3_BUCKET_ID", default_value = ".")]
+    pub(crate) bucket_id: String,
 }
 
 /// Parse a single key-value pair
