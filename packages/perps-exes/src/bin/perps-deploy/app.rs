@@ -97,6 +97,9 @@ impl Opt {
         if let Some(chain_id) = &self.cosmos_chain_id {
             builder.set_chain_id(chain_id.clone());
         }
+        if let Some(cosmos_gas_coin) = &self.cosmos_gas_coin {
+            builder.set_gas_coin(cosmos_gas_coin.clone());
+        }
         builder.set_referer_header(Some("https://querier.levana.finance".to_owned()));
         if let Some(x) = self.cosmos_gas_multiplier {
             builder.set_gas_estimate_multiplier(x);
