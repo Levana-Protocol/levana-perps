@@ -33,6 +33,7 @@ cw-utils = "2.0.0"
 once_cell = "1"
 indoc = "1.0.8"
 pyth-sdk-cw = { workspace = true}
+rujira-rs = { git = "https://gitlab.com/thorchain/rujira.git", rev = "acdbaa19836bb9cfa2e62ada6e8a2227373fe9df" }
 
 [dev-dependencies]
 cosmwasm-schema = { workspace = true }

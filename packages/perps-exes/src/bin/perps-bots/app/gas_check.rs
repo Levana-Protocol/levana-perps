@@ -176,6 +176,11 @@ impl GasCheck {
                             amount: app.config.gas_decimals.to_u128(*amount)?.to_string(),
                         }],
                     });
+
+                    // Temporary limitation: only a single Send can be sent in a tx.
+                    if address.hrp().as_str() == "sthor" {
+                        break;
+                    }
                 }
             }
 

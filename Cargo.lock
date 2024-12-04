@@ -135,6 +135,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anybuf"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb5f1dee23caf80904249463cc4493b6789c2250f88c8f8d9160de5c6099bfe7"
+
+[[package]]
 name = "anyhow"
 version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2655,6 +2661,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "pyth-sdk-cw",
+ "rujira-rs",
  "semver",
  "serde",
 ]
@@ -3712,6 +3719,20 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rujira-rs"
+version = "0.0.1"
+source = "git+https://gitlab.com/thorchain/rujira.git?rev=acdbaa19836bb9cfa2e62ada6e8a2227373fe9df#acdbaa19836bb9cfa2e62ada6e8a2227373fe9df"
+dependencies = [
+ "anybuf",
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-utils",
+ "prost",
+ "regex",
+ "thiserror 1.0.68",
 ]
 
 [[package]]

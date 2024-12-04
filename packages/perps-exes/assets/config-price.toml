@@ -2101,15 +2101,26 @@ inverted = false
 key = "DYM_USD"
 inverted = false
 
-[[networks.rujira-testnet.BTC_USDC.feeds]]
+[[networks.rujira-testnet.KUJI_USDC.feeds]]
 
-[networks.rujira-testnet.BTC_USDC.feeds.simple]
-contract = "sthor15nczwuqh0zcu6syeqsc4td6dphql7n2p7cgkl9raz97z5s3zdjrsnyrq3s"
+[networks.rujira-testnet.KUJI_USDC.feeds.rujira]
+asset = "GAIA.KUJI"
 inverted = false
-age_tolerance = 31536000
 
-[[networks.rujira-testnet.BTC_USDC.feeds-usd]]
+[[networks.rujira-testnet.KUJI_USDC.feeds-usd]]
 
-[networks.rujira-testnet.BTC_USDC.feeds-usd.constant]
+[networks.rujira-testnet.KUJI_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-testnet.ATOM_USDC.feeds]]
+
+[networks.rujira-testnet.ATOM_USDC.feeds.rujira]
+asset = "GAIA.ATOM"
+inverted = false
+
+[[networks.rujira-testnet.ATOM_USDC.feeds-usd]]
+
+[networks.rujira-testnet.ATOM_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
