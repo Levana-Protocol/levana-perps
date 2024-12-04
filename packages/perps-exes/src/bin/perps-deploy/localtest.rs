@@ -110,7 +110,15 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
     )
     .await?;
 
-    let perp_app = PerpApp::new(raw_wallet, factory, None, opts.market_id, network).await?;
+    let perp_app = PerpApp::new(
+        raw_wallet,
+        factory,
+        None,
+        opts.market_id,
+        network,
+        Some("stake".to_owned()),
+    )
+    .await?;
 
     test_funding_market(&perp_app).await?;
     test_wallet_balance_decrease(&perp_app).await?;

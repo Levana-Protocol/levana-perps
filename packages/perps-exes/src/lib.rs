@@ -58,8 +58,12 @@ impl PerpApp {
         faucet_contract_addr: Option<Address>,
         market_id: MarketId,
         network: PerpsNetwork,
+        cosmos_gas_coin: Option<String>,
     ) -> Result<PerpApp> {
-        let builder = network.builder().await?;
+        let mut builder = network.builder().await?;
+        if let Some(cosmos_gas_coin) = cosmos_gas_coin {
+            builder.set_gas_coin(cosmos_gas_coin);
+        }
         let cosmos = builder.build()?;
         let factory_contract = cosmos.make_contract(factory_contract_addr);
 
