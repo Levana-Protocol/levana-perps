@@ -21,37 +21,45 @@ impl S3 {
     pub(crate) async fn upload(&self, path: &Path, data: &HistoricalData) -> anyhow::Result<()> {
         let market_data =
             serde_json::to_vec(&data).context("Could not serialize Historical Data to JSON")?;
-        let key_path = path.to_string_lossy().into_owned();
-        let body = aws_sdk_s3::primitives::ByteStream::from(market_data);
+        match path.to_str() {
+            Some(key_path) => {
+                let body = aws_sdk_s3::primitives::ByteStream::from(market_data);
 
-        self.client
-            .put_object()
-            .bucket(self.bucket.clone())
-            .body(body)
-            .key(key_path)
-            .send()
-            .await
-            .context("Failed to upload to s3")?;
+                self.client
+                    .put_object()
+                    .bucket(self.bucket.clone())
+                    .body(body)
+                    .key(key_path)
+                    .send()
+                    .await
+                    .context("Failed uploading file to s3")?;
 
-        Ok(())
+                Ok(())
+            }
+            None => Err(anyhow::Error::msg("Error uploading file, invalid path")),
+        }
     }
 
     pub(crate) async fn download(&self, path: &Path) -> anyhow::Result<HistoricalData> {
-        let key_path = path.to_string_lossy().into_owned();
-        let object = self
-            .client
-            .get_object()
-            .bucket(self.bucket.clone())
-            .key(key_path)
-            .send()
-            .await
-            .context("Fail dowloading form S3")?;
+        match path.to_str() {
+            Some(key_path) => {
+                let object = self
+                    .client
+                    .get_object()
+                    .bucket(self.bucket.clone())
+                    .key(key_path)
+                    .send()
+                    .await
+                    .context("Failed downloading file from S3")?;
 
-        let stream = object.body;
-        let bytes = stream.collect().await?.into_bytes();
-        let historical_data: HistoricalData = serde_json::from_slice(&bytes)
-            .context("Error deserializing Historical Data from S3")?;
+                let stream = object.body;
+                let bytes = stream.collect().await?.into_bytes();
+                let historical_data: HistoricalData = serde_json::from_slice(&bytes)
+                    .context("Error deserializing Historical Data from S3")?;
 
-        Ok(historical_data)
+                Ok(historical_data)
+            }
+            None => Err(anyhow::Error::msg("Error downloading file, invalid path")),
+        }
     }
 }

@@ -112,7 +112,7 @@ pub(crate) struct ServeOpt {
     #[arg(long, env = "LEVANA_MPARAM_MIN_RUNS_SLACK_ALERT", default_value = "6")]
     pub(crate) required_runs_slack_alert: u16,
     /// AWS S3 Bucket Id
-    #[arg(long, env = "S3_BUCKET_ID", default_value = ".")]
+    #[arg(long, env = "LEVANA_MPARAM_S3_BUCKET_ID")]
     pub(crate) bucket_id: String,
 }
 

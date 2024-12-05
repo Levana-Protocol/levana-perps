@@ -574,11 +574,14 @@ pub(crate) async fn load_historical_data(
     s3_client: &S3,
 ) -> anyhow::Result<HistoricalData> {
     let path = get_market_file_path(market_id, &data_dir);
-    let historical_data = s3_client
+    let result = s3_client
         .download(&path)
         .await
-        .context("Error downloading file from S3")?;
-    Ok(historical_data)
+        .context("Error downloading file from S3");
+    match result {
+        Ok(historical_data) => Ok(historical_data),
+        Err(_) => Ok(HistoricalData { data: vec![] }),
+    }
 }
 
 pub(crate) async fn save_historical_data(
