@@ -286,6 +286,9 @@ pub enum ExecuteMsg {
     WithdrawLiquidity {
         /// Amount of LP tokens to burn
         lp_amount: Option<NonZero<LpToken>>,
+        /// Claim yield as well?
+        #[serde(default)]
+        claim_yield: bool,
     },
 
     /// Claims accrued yield based on LP share allocation
@@ -1308,6 +1311,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
             }),
             14 => Ok(ExecuteMsg::WithdrawLiquidity {
                 lp_amount: u.arbitrary()?,
+                claim_yield: false,
             }),
             15 => Ok(ExecuteMsg::ClaimYield {}),
             16 => Ok(ExecuteMsg::StakeLp {

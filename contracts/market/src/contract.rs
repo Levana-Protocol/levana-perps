@@ -379,7 +379,13 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.reinvest_yield(&mut ctx, &info.sender, amount, stake_to_xlp)?;
         }
 
-        ExecuteMsg::WithdrawLiquidity { lp_amount } => {
+        ExecuteMsg::WithdrawLiquidity {
+            lp_amount,
+            claim_yield,
+        } => {
+            if claim_yield {
+                state.liquidity_claim_yield(&mut ctx, &info.sender, true)?;
+            }
             state.liquidity_withdraw(&mut ctx, &info.sender, lp_amount)?;
         }
 

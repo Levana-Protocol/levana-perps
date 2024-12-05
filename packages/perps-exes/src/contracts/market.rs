@@ -158,6 +158,7 @@ impl MarketContract {
                 vec![],
                 &MarketExecuteMsg::WithdrawLiquidity {
                     lp_amount: Some(lp_tokens),
+                    claim_yield: false,
                 },
             )
             .await

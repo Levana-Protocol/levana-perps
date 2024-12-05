@@ -1142,12 +1142,23 @@ impl PerpsMarket {
                             .context("exec_withdraw_liquidity")?,
                     ),
                 },
+                claim_yield: false,
             },
         )
     }
 
     pub fn exec_claim_yield(&self, addr: &Addr) -> Result<AppResponse> {
         self.exec(addr, &MarketExecuteMsg::ClaimYield {})
+    }
+
+    pub fn exec_claim_yield_and_withdraw(&self, addr: &Addr) -> Result<AppResponse> {
+        self.exec(
+            addr,
+            &MarketExecuteMsg::WithdrawLiquidity {
+                lp_amount: None,
+                claim_yield: true,
+            },
+        )
     }
 
     pub fn exec_mint_and_deposit_liquidity(

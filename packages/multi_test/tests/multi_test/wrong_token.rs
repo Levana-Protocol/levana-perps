@@ -86,7 +86,10 @@ fn unneeded_funds() {
     market
         .exec_funds(
             &trader,
-            &MarketExecuteMsg::WithdrawLiquidity { lp_amount: None },
+            &MarketExecuteMsg::WithdrawLiquidity {
+                lp_amount: None,
+                claim_yield: false,
+            },
             "10".parse().unwrap(),
         )
         .unwrap_err();
