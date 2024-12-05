@@ -2252,3 +2252,53 @@ proptest! {
         );
     }
 }
+#[test]
+fn claim_and_withdraw_one_tx() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+    let lp1 = MockApi::default().addr_make("lp1");
+
+    // Mint & Deposit separately
+
+    market
+        .exec_mint_tokens(&lp1, Number::from(1100u64))
+        .unwrap();
+
+    market.exec_deposit_liquidity(&lp1, 1000u64.into()).unwrap();
+
+    // No yield yet, this needs to fail
+    market.exec_claim_yield_and_withdraw(&lp1).unwrap_err();
+
+    // Open position
+
+    let collateral = Number::from(100u64);
+    market
+        .exec_open_position(
+            &trader,
+            collateral,
+            "10",
+            DirectionToBase::Long,
+            "1",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    // Trigger liquifunding
+
+    market.set_time(TimeJump::Liquifundings(1)).unwrap();
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let wallet_balance_before_claim = market.query_collateral_balance(&lp1).unwrap();
+    let lp_info_before = market.query_lp_info(&lp1).unwrap();
+    market.exec_claim_yield_and_withdraw(&lp1).unwrap();
+    let wallet_balance_after_claim = market.query_collateral_balance(&lp1).unwrap();
+    let lp_info_after = market.query_lp_info(&lp1).unwrap();
+
+    let actual_yield = (wallet_balance_after_claim - wallet_balance_before_claim).unwrap();
+    assert_ne!(actual_yield, Signed::zero());
+    assert_ne!(lp_info_before.lp_collateral, lp_info_after.lp_collateral);
+}
