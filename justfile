@@ -90,7 +90,7 @@ local-deploy-wasmd:
 
 # Run on chain tests
 contracts-test:
-	COSMOS_GAS_COIN=stake COSMOS_WALLET=osmosis-local cargo run --bin perps-deploy on-chain-tests --network osmosis-local
+	COSMOS_WALLET=osmosis-local cargo run --bin perps-deploy on-chain-tests --network osmosis-local
 
 # Run on chain tests without running local osmosis
 contracts-test-skip-osmosis:
