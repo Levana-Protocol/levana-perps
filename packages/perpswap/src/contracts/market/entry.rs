@@ -749,6 +749,9 @@ pub struct OraclePriceResp {
     pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
     pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    /// A map of each rujira used in this market to the redemption price
+    #[serde(default)]
+    pub rujira: BTreeMap<String, OraclePriceFeedRujiraResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the contract price
@@ -776,6 +779,15 @@ pub struct OraclePriceFeedSeiResp {
     pub price: NumberGtZero,
     /// The Sei publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedRujiraResp {
+    /// The Rujira price
+    pub price: NumberGtZero,
     /// Is this considered a volatile feed?
     pub volatile: bool,
 }

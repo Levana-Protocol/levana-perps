@@ -4,8 +4,8 @@ use crate::prelude::*;
 use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
-        OraclePriceFeedPythResp, OraclePriceFeedSeiResp, OraclePriceFeedSimpleResp,
-        OraclePriceFeedStrideResp, PriceForQuery,
+        OraclePriceFeedPythResp, OraclePriceFeedRujiraResp, OraclePriceFeedSeiResp,
+        OraclePriceFeedSimpleResp, OraclePriceFeedStrideResp, PriceForQuery,
     },
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
@@ -48,6 +48,8 @@ pub(crate) struct OraclePriceInternal {
     pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
     pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    /// A map of each rujira used in this market to the redemption price
+    pub(crate) rujira: BTreeMap<String, OraclePriceFeedRujiraResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
@@ -61,6 +63,7 @@ impl OraclePriceInternal {
     pub(crate) fn calculate_publish_time(
         &self,
         volatile_diff_seconds: u32,
+        block_time: Timestamp,
     ) -> Result<Option<Timestamp>> {
         let mut oldest_newest = None::<(Timestamp, Timestamp)>;
 
@@ -91,6 +94,11 @@ impl OraclePriceInternal {
                 if let Some(timestamp) = simple.timestamp {
                     add_new_timestamp(timestamp);
                 }
+            }
+        }
+        for rujira in self.rujira.values() {
+            if rujira.volatile {
+                add_new_timestamp(block_time);
             }
         }
 
@@ -162,6 +170,11 @@ impl OraclePriceInternal {
                     .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => *price,
+                SpotPriceFeedData::Rujira { asset } => self
+                    .rujira
+                    .get(asset)
+                    .map(|x| x.price)
+                    .with_context(|| format!("no rujira price for asset {}", asset))?,
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
@@ -416,7 +429,7 @@ impl State<'_> {
             } => {
                 let internal = self.get_oracle_price(true)?;
                 let new_publish_time = internal
-                    .calculate_publish_time(self.config_volatile_time())?
+                    .calculate_publish_time(self.config_volatile_time(), self.now())?
                     .ok_or(MarketError::NoPricePublishTimeFound.into_anyhow())?;
                 // self.now() usage is OK, it's explicitly for saving the block time in storage
                 let price_storage =
@@ -489,6 +502,7 @@ impl State<'_> {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
                 let mut simple = BTreeMap::new();
+                let mut rujira = BTreeMap::new();
                 let sei = BTreeMap::new();
 
                 let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
@@ -623,6 +637,23 @@ impl State<'_> {
                             }
                         }
 
+                        SpotPriceFeedData::Rujira { asset } => {
+                            if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
+                                let pool = rujira_rs::query::Pool::load(
+                                    self.querier,
+                                    &asset.to_owned().try_into()?,
+                                )?;
+
+                                let price = Decimal256::from(pool.asset_tor_price);
+                                let price = Number::from(price);
+                                let price =
+                                    NumberGtZero::try_from(price).context("price must be > 0")?;
+                                entry.insert(OraclePriceFeedRujiraResp {
+                                    price,
+                                    volatile: feed.volatile.unwrap_or(true),
+                                });
+                            }
+                        }
                         SpotPriceFeedData::Constant { .. } => {
                             // nothing to do here, constant prices are used without a lookup
                         }
@@ -674,6 +705,7 @@ impl State<'_> {
                     pyth,
                     stride,
                     sei,
+                    rujira,
                     simple,
                 })
             }

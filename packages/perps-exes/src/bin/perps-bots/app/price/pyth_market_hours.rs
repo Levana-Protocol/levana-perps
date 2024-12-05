@@ -95,6 +95,7 @@ fn get_ids_from_config(config: &Config) -> IdsCache {
                         } => Some(id),
                         SpotPriceFeedData::Stride { .. } => None,
                         SpotPriceFeedData::Sei { .. } => None,
+                        SpotPriceFeedData::Rujira { .. } => None,
                         SpotPriceFeedData::Simple { .. } => None,
                     })
                     // Get rid of duplicates

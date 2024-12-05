@@ -121,6 +121,9 @@ pub(crate) struct Opt {
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
     pub(crate) wallet: Option<SeedPhrase>,
+    /// Gas coin (e.g. uosmo)
+    #[clap(long, global = true, env = "COSMOS_GAS_COIN")]
+    pub(crate) cosmos_gas_coin: Option<String>,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,
