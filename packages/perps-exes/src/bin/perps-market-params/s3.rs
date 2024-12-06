@@ -1,5 +1,6 @@
 use crate::market_param::HistoricalData;
 use anyhow::Context;
+use aws_sdk_s3::error::SdkError;
 use std::path::Path;
 
 #[derive(Clone)]
@@ -43,21 +44,28 @@ impl S3 {
     pub(crate) async fn download(&self, path: &Path) -> anyhow::Result<HistoricalData> {
         match path.to_str() {
             Some(key_path) => {
-                let object = self
+                let result = self
                     .client
                     .get_object()
                     .bucket(self.bucket.clone())
                     .key(key_path)
                     .send()
-                    .await
-                    .context("Failed downloading file from S3")?;
+                    .await;
 
-                let stream = object.body;
-                let bytes = stream.collect().await?.into_bytes();
-                let historical_data: HistoricalData = serde_json::from_slice(&bytes)
-                    .context("Error deserializing Historical Data from S3")?;
+                match result {
+                    Ok(object) => {
+                        let stream = object.body;
+                        let bytes = stream.collect().await?.into_bytes();
+                        let historical_data: HistoricalData = serde_json::from_slice(&bytes)
+                            .context("Error deserializing Historical Data from S3")?;
 
-                Ok(historical_data)
+                        Ok(historical_data)
+                    }
+                    Err(SdkError::ServiceError(err)) if err.err().is_no_such_key() => {
+                        Ok(HistoricalData { data: vec![] })
+                    }
+                    Err(e) => Err(anyhow::Error::new(e).context("Error getting object from S3")),
+                }
             }
             None => Err(anyhow::Error::msg("Error downloading file, invalid path")),
         }

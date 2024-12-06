@@ -580,7 +580,10 @@ pub(crate) async fn load_historical_data(
         .context("Error downloading file from S3");
     match result {
         Ok(historical_data) => Ok(historical_data),
-        Err(_) => Ok(HistoricalData { data: vec![] }),
+        Err(e) => Err(anyhow::Error::msg(format!(
+            "Error getting object from S3: {}",
+            e
+        ))),
     }
 }
 

@@ -8,7 +8,7 @@ You need to install aws-cli in your system from https://aws.amazon.com/cli/
 # Check your version
 aws --version
 ```
-Configure your profile in a file. Example `aws-config`
+Configure your AWS profile in a file. Example aws configuration file:
 ```bash
 [profile lvn-sandbox]
 sso_region = ap-northeast-2
@@ -36,7 +36,7 @@ export LEVANA_MPARAM_SLACK_WEBHOOK=https://hooks.slack.com/services/xxxxxxxxxxxx
 Now you can test perps_market_params
 ```bash
 # Ask for cmc-key
-cargo run --bin perps-market-params -- --cmc-key=xxxxxxxxxxxxxxxxxxxxxxxxxxx serve
+just serve
 ```
 # Usage
 
