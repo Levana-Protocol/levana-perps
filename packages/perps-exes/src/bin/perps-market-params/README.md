@@ -2,7 +2,42 @@
 
 This tool aids in checking of market parameters. Currently it only
 supports DNF sensitivity check.
-
+# Prepare your test environment
+You need to install aws-cli in your system from https://aws.amazon.com/cli/
+```bash
+# Check your version
+aws --version
+```
+Configure your AWS profile in a file. Example aws configuration file:
+```bash
+[profile lvn-sandbox]
+sso_region = ap-northeast-2
+sso_start_url = https://levanafinance.awsapps.com/start
+sso_account_id = 264635650474
+sso_role_name = AdministratorAccess
+region = eu-west-3
+```
+Set these environment variables
+```bash
+export AWS_CONFIG_FILE="/home/norys/fpco/levana/aws/aws-config"
+export AWS_PROFILE="lvn-sandbox"
+```
+Sign in to AWS
+```bash
+aws sso login --profile lvn-sandbox
+```
+Set these environment variables
+```bash
+# S3 test bucket
+export LEVANA_MPARAM_S3_BUCKET_ID=levtest-frontend-cache
+# Ask for this
+export LEVANA_MPARAM_SLACK_WEBHOOK=https://hooks.slack.com/services/xxxxxxxxxxxxxxxxxxxxxxx
+```
+Now you can test perps_market_params
+```bash
+# Ask for cmc-key
+just serve
+```
 # Usage
 
 ``` shellsession

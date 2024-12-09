@@ -6,6 +6,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.93"
+aws-config = { version = "1.5.10", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.64.0"
 perpswap = { path = "../perpswap", package = "levana_perpswap_cosmos", features = [
 	"bridge", "chrono"
 ] }
