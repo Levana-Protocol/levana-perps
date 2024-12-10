@@ -34,15 +34,16 @@ jobs:
         with:
           toolchain: 1.81.0
           components: rustfmt, clippy
-          targets: x86_64-unknown-linux-musl
+          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
         with:
+          prefix-key: "v1-rust"
           workspaces: |
             .
       - name: Dependencies
         run: sudo apt install musl-tools -y
       - name: Build companion binary
-        run: just cargo-companion-release
+        run: just cargo-companion-release-arm
       - name: Build image
         run: just build-companion-image
       - name: Push image
