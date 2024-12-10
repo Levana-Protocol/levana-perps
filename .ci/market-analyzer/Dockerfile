@@ -11,6 +11,6 @@ WORKDIR /app
 COPY --chmod=755 ./mainnet-factories.toml /app/packages/perps-exes/assets
 COPY --chmod=755 perps-market-params /usr/bin/perps-market-params
 
-ENTRYPOINT [ "/usr/bin/health-check", "--task-output-timeout", "90000", "--app-description", "Market Analyzer (K8s mainnet)", "perps-market-params" ]
+ENTRYPOINT [ "/usr/bin/health-check", "--task-output-timeout", "90000", "--app-description", "Market Analyzer (ECS Testnet)", "perps-market-params" ]
 
 CMD [ "serve" ]
