@@ -129,12 +129,16 @@ cargo-release:
 cargo-bots-release:
     cargo build --bin perps-bots --release --target x86_64-unknown-linux-musl
 
+# Build bots binary in release mode
+cargo-bots-release-arm:
+    cross build --bin perps-bots --release --target aarch64-unknown-linux-musl
+
 # Build bots docker image
 build-bots-image:
 	rm -rf .ci/bots/etc
 	cp -r packages/perps-exes/assets .ci/bots/etc
-	cp target/x86_64-unknown-linux-musl/release/perps-bots .ci/bots
-	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
+	cp target/aarch64-unknown-linux-musl/release/perps-bots .ci/bots
+	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}} --platform linux/arm64
 
 # Push bots docker image
 push-bots-image:

@@ -1,7 +1,7 @@
-FROM alpine:3.19.1
+FROM alpine:3.21
 
-ADD --chmod=755  https://github.com/fpco/amber/releases/download/v0.1.3/amber-x86_64-unknown-linux-musl /usr/bin/amber
-ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.4.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
+ADD --chmod=755 https://github.com/fpco/amber/releases/download/v0.1.7/amber-aarch64-unknown-linux-musl /usr/bin/amber
+ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.6.0/health-check-aarch64-unknown-linux-musl /usr/bin/health-check
 
 ENV AMBER_YAML=/etc/amber.yaml
 ENV LEVANA_BOTS_PRICE_CONFIG=/etc/config-price.toml
@@ -11,9 +11,7 @@ ENV NO_COLOR=1
 
 COPY amber.yaml /etc/amber.yaml
 COPY ["etc/*.toml", "/etc"]
-COPY perps-bots /usr/bin
-
-RUN chmod 755 /usr/bin/perps-bots
+COPY --chmod=755 perps-bots /usr/bin
 
 ENTRYPOINT [ "health-check", "--task-output-timeout", "120" ]
 
