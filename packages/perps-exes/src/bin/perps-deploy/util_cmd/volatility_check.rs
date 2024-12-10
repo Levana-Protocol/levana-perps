@@ -1,6 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
 use cosmwasm_std::Decimal256;
-use futures::lock::Mutex;
 use perps_exes::contracts::MarketContract;
 use perps_exes::{config::MainnetFactories, contracts::Factory, PerpsNetwork};
 use perpswap::number::{NonZero, UnsignedDecimal};
@@ -70,6 +69,7 @@ async fn go(
 
     let factory = Factory::from_contract(cosmos.make_contract(factory.address));
     let markets = factory.get_markets().await?;
+    let market_count = markets.len();
 
     let mut to_process = Vec::<ToProcess>::new();
 
@@ -79,15 +79,23 @@ async fn go(
         to_process.push(ToProcess { market, market_id })
     }
 
-    let to_process = Arc::new(Mutex::new(to_process));
+    let to_process = Arc::new(to_process);
 
     let mut set = JoinSet::new();
 
-    for _ in 0..workers {
+    let market_count_per_worker = market_count.div_euclid(workers.try_into()?);
+    let market_remainder = market_count.rem_euclid(workers.try_into()?);
+    let mut start = 0;
+    for worker_id in 0..workers.try_into()? {
+        let extra = if worker_id < market_remainder { 1 } else { 0 };
+        let end = start + market_count_per_worker + extra;
         set.spawn(volatility_check_helper(
             to_process.clone(),
             liquidity_threshold,
+            start,
+            end,
         ));
+        start = end;
     }
 
     let mut volatile_market_ids = Vec::new();
@@ -108,32 +116,28 @@ async fn go(
         }
     }
 
-    send_slack_notification(
-        slack_webhook,
-        "Volatile markets found".to_owned(),
-        format!("Markets: {:?}", volatile_market_ids),
-    )
-    .await?;
+    if !volatile_market_ids.is_empty() {
+        send_slack_notification(
+            slack_webhook,
+            "Volatile markets found".to_owned(),
+            format!("Markets: {:?}", volatile_market_ids),
+        )
+        .await?;
+    }
     Ok(())
 }
 
 async fn volatility_check_helper(
-    to_process: Arc<Mutex<Vec<ToProcess>>>,
+    to_process: Arc<Vec<ToProcess>>,
     liquidity_threshold: u32,
+    start_index: usize,
+    end_index: usize,
 ) -> Result<Vec<Arc<MarketId>>> {
     let mut volatile_market_ids = Vec::new();
-    loop {
-        let (contract, market_id) = {
-            let mut to_process_guard = to_process.lock().await;
-            match to_process_guard.last() {
-                None => break,
-                Some(to_process) => {
-                    let market_info = (to_process.market.clone(), to_process.market_id.clone());
-                    to_process_guard.pop();
-                    market_info
-                }
-            }
-        };
+
+    for target_market in &to_process[start_index..end_index] {
+        let contract = target_market.market.clone();
+        let market_id = target_market.market_id.clone();
 
         let status = contract.status().await?;
 
