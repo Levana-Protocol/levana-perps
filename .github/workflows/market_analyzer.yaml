@@ -34,15 +34,15 @@ jobs:
         with:
           toolchain: 1.81.0
           components: rustfmt, clippy
-          targets: x86_64-unknown-linux-musl
+          targets: aarch64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             .
       - name: Dependencies
         run: sudo apt install musl-tools -y
-      - name: Build market-params binary
-        run: just cargo-market-params-release
+      - name: Build market-params binary (ARM64)
+        run: just cargo-market-params-arm
       - name: Build image
         run: just build-market-params-image
       - name: Push image

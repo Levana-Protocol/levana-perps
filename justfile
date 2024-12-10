@@ -252,14 +252,14 @@ create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override
 
 # Build perps-market-params binary in release mode
-cargo-market-params-release:
-    cargo build --bin perps-market-params --release --target x86_64-unknown-linux-musl
+cargo-market-params-arm:
+    cross build --bin perps-market-params --release --target aarch64-unknown-linux-musl
 
 # Build perps-market-params docker image
 build-market-params-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/market-analyzer/
-	cp target/x86_64-unknown-linux-musl/release/perps-market-params .ci/market-analyzer/
-	cd .ci/market-analyzer && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
+	cp target/aarch64-unknown-linux-musl/release/perps-market-params .ci/market-analyzer/
+	cd .ci/market-analyzer && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}} --platform linux/arm64
 
 # Push perps-market-params docker image
 push-market-params-image:
