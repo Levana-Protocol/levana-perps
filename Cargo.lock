@@ -1063,7 +1063,19 @@ version = "2.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f86b4d949b6041519c58993a73f4bbfba8083ba14f7001eae704865a09065845"
 dependencies = [
- "cosmwasm-schema-derive",
+ "cosmwasm-schema-derive 2.1.4",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.68",
+]
+
+[[package]]
+name = "cosmwasm-schema"
+version = "2.2.0-rc.1"
+source = "git+https://github.com/Levana-Protocol/cosmwasm?rev=e0aa92ac1dd95e484744c2fa52bf184e26ae0e96#e0aa92ac1dd95e484744c2fa52bf184e26ae0e96"
+dependencies = [
+ "cosmwasm-schema-derive 2.2.0-rc.1",
  "schemars",
  "serde",
  "serde_json",
@@ -1075,6 +1087,16 @@ name = "cosmwasm-schema-derive"
 version = "2.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8ef1b5835a65fcca3ab8b9a02b4f4dacc78e233a5c2f20b270efb9db0666d12"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "cosmwasm-schema-derive"
+version = "2.2.0-rc.1"
+source = "git+https://github.com/Levana-Protocol/cosmwasm?rev=e0aa92ac1dd95e484744c2fa52bf184e26ae0e96#e0aa92ac1dd95e484744c2fa52bf184e26ae0e96"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1277,7 +1299,7 @@ checksum = "1149fe104344cc4f4ca0fc784b7411042fd1626813fe85fd412b05252a0ae9d8"
 dependencies = [
  "anyhow",
  "bech32",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.1.4",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -1306,7 +1328,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07dfee7f12f802431a856984a32bce1cb7da1e6c006b5409e3981035ce562dec"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 2.1.4",
  "cosmwasm-std",
  "schemars",
  "serde",
@@ -1319,7 +1341,7 @@ version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b04852cd38f044c0751259d5f78255d07590d136b8a86d4e09efdd7666bd6d27"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 2.1.4",
  "cosmwasm-std",
  "cw-storage-plus",
  "schemars",
@@ -2549,7 +2571,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "chrono",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2584,7 +2606,7 @@ name = "levana_perpswap_cosmos_cw20"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2601,7 +2623,7 @@ name = "levana_perpswap_cosmos_factory"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2618,7 +2640,7 @@ name = "levana_perpswap_cosmos_faucet"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2634,7 +2656,7 @@ name = "levana_perpswap_cosmos_liquidity_token"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2651,7 +2673,7 @@ name = "levana_perpswap_cosmos_market"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2671,7 +2693,7 @@ name = "levana_perpswap_cosmos_position_token"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2704,7 +2726,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "cosmos-sdk-proto",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
@@ -3122,7 +3144,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "cosmos",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.2.0-rc.1",
  "cosmwasm-std",
  "csv",
  "cw-multi-test",
@@ -3389,7 +3411,7 @@ name = "pyth-sdk-cw"
 version = "1.2.1"
 source = "git+https://github.com/lvn-hasky-dragon/pyth-crosschain.git?rev=0d45c60ee97bfa20a81de1d5cd523f9d16f2c282#0d45c60ee97bfa20a81de1d5cd523f9d16f2c282"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 2.1.4",
  "cosmwasm-std",
  "pyth-sdk",
  "thiserror 1.0.68",
@@ -3727,7 +3749,7 @@ version = "0.0.1"
 source = "git+https://gitlab.com/thorchain/rujira.git?rev=acdbaa19836bb9cfa2e62ada6e8a2227373fe9df#acdbaa19836bb9cfa2e62ada6e8a2227373fe9df"
 dependencies = [
  "anybuf",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.1.4",
  "cosmwasm-std",
  "cw-utils",
  "prost",
