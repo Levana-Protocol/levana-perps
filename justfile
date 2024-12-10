@@ -141,14 +141,14 @@ push-bots-image:
 	docker push ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
 # Build companion binary in release mode
-cargo-companion-release:
-    cargo build --bin perps-companion --release --target x86_64-unknown-linux-musl
+cargo-companion-release-arm:
+    cross build --bin perps-companion --release --target aarch64-unknown-linux-musl
 
 # Build companion docker image
 build-companion-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/companion/
-	cp target/x86_64-unknown-linux-musl/release/perps-companion .ci/companion
-	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
+	cp target/aarch-unknown-linux-musl/release/perps-companion .ci/companion
+	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}} --platform linux/arm64
 
 # Push bots docker image
 push-companion-image:
