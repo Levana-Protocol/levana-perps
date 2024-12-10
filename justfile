@@ -118,8 +118,8 @@ typescript-schema:
 
 # Generate the schema and copy to a webapp directory located at ../webapp
 typescript-schema-copy: typescript-schema
-	rm -rf ../webapp/src/apps/perps/sdk/types/.generated/
-	mv schema/typescript ../webapp/src/apps/perps/sdk/types/.generated/
+	rm -rf ../webapp/apps/perps/src/apps/perps/sdk/types/.generated/
+	mv schema/typescript ../webapp/apps/perps/src/apps/perps/sdk/types/.generated/
 
 # Build perps-qa binary in release mode
 cargo-release:
