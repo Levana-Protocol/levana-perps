@@ -1,6 +1,6 @@
-FROM alpine:3.20.1
+FROM alpine:3.21
 
-ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.4.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
+ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.6.0/health-check-aarch64-unknown-linux-musl /usr/bin/health-check
 
 ENV NO_COLOR=1
 
