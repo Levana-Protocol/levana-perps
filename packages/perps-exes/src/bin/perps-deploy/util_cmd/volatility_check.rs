@@ -40,7 +40,8 @@ impl VolatilityCheckOpt {
     }
 }
 
-struct ToProcess {
+#[derive(Clone)]
+struct MarketInfo {
     market: MarketContract,
     market_id: Arc<MarketId>,
 }
@@ -71,15 +72,13 @@ async fn go(
     let markets = factory.get_markets().await?;
     let market_count = markets.len();
 
-    let mut to_process = Vec::<ToProcess>::new();
+    let mut market_info = Vec::<MarketInfo>::new();
 
     for market in markets {
         let market_id = market.market_id.into();
         let market = MarketContract::new(market.market);
-        to_process.push(ToProcess { market, market_id })
+        market_info.push(MarketInfo { market, market_id })
     }
-
-    let to_process = Arc::new(to_process);
 
     let mut set = JoinSet::new();
 
@@ -90,10 +89,8 @@ async fn go(
         let extra = if worker_id < market_remainder { 1 } else { 0 };
         let end = start + market_count_per_worker + extra;
         set.spawn(volatility_check_helper(
-            to_process.clone(),
+            market_info[start..end].to_vec(),
             liquidity_threshold,
-            start,
-            end,
         ));
         start = end;
     }
@@ -128,14 +125,12 @@ async fn go(
 }
 
 async fn volatility_check_helper(
-    to_process: Arc<Vec<ToProcess>>,
+    market_info: Vec<MarketInfo>,
     liquidity_threshold: u32,
-    start_index: usize,
-    end_index: usize,
 ) -> Result<Vec<Arc<MarketId>>> {
     let mut volatile_market_ids = Vec::new();
 
-    for target_market in &to_process[start_index..end_index] {
+    for target_market in market_info {
         let contract = target_market.market.clone();
         let market_id = target_market.market_id.clone();
 
