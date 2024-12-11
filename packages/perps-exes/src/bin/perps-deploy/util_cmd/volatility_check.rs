@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use cosmwasm_std::Decimal256;
 use perps_exes::contracts::MarketContract;
 use perps_exes::{config::MainnetFactories, contracts::Factory, PerpsNetwork};
-use perpswap::number::{NonZero, UnsignedDecimal};
+use perpswap::number::{Collateral, UnsignedDecimal};
 use perpswap::storage::MarketId;
 use reqwest::Client;
 use std::sync::Arc;
@@ -18,13 +18,20 @@ pub(super) struct VolatilityCheckOpt {
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
-    /// The percentage of counter collateral compared to the unlocked liquidity to raise alert
+    /// The threshold amount for the unlocked liquidity before sending an alert
     #[clap(
         long,
-        default_value = "70",
-        env = "LEVANA_VOLATILITY_CHECK_LIQUIDITY_THRESHOLD"
+        default_value = "10",
+        env = "LEVANA_VOLATILITY_CHECK_UNLOCKED_LIQUIDITY_THRESHOLD"
     )]
-    liquidity_threshold: u32,
+    unlocked_liquidity_threshold: Collateral,
+    /// The percentage threshold for the unlocked liquidity compared to total liquidity
+    #[clap(
+        long,
+        default_value = "10",
+        env = "LEVANA_VOLATILITY_CHECK_RATIO_THRESHOLD"
+    )]
+    ratio_threshold: Decimal256,
     /// Factory identifier
     #[clap(
         long,
@@ -49,7 +56,8 @@ struct MarketInfo {
 async fn go(
     VolatilityCheckOpt {
         slack_webhook,
-        liquidity_threshold,
+        unlocked_liquidity_threshold,
+        ratio_threshold,
         workers,
         factory,
     }: VolatilityCheckOpt,
@@ -90,7 +98,8 @@ async fn go(
         let end = start + market_count_per_worker + extra;
         set.spawn(volatility_check_helper(
             market_info[start..end].to_vec(),
-            liquidity_threshold,
+            unlocked_liquidity_threshold,
+            ratio_threshold,
         ));
         start = end;
     }
@@ -126,7 +135,8 @@ async fn go(
 
 async fn volatility_check_helper(
     market_info: Vec<MarketInfo>,
-    liquidity_threshold: u32,
+    unlocked_liquidity_threshold: Collateral,
+    ratio_threshold: Decimal256,
 ) -> Result<Vec<Arc<MarketId>>> {
     let mut volatile_market_ids = Vec::new();
 
@@ -136,28 +146,20 @@ async fn volatility_check_helper(
 
         let status = contract.status().await?;
 
-        if status.liquidity.unlocked.is_zero() {
-            volatile_market_ids.push(market_id);
-            continue;
-        }
+        let total_liquidity = status
+            .liquidity
+            .locked
+            .checked_add(status.liquidity.unlocked)?;
 
-        let net_notional =
-            (status.long_notional.into_signed() - status.short_notional.into_signed())?;
-        let price_point = contract.current_price().await?;
-        let net_notional_in_collateral =
-            price_point.notional_to_collateral(net_notional.abs_unsigned());
-        let min_unlocked_liquidity = net_notional_in_collateral.div_non_zero_dec(
-            NonZero::new(status.config.carry_leverage)
-                .context("Carry leverage of 0 configuration error")?,
-        );
-
-        if min_unlocked_liquidity
-            .checked_mul_dec(Decimal256::new(100u32.into()))?
-            .div_non_zero(
-                NonZero::new(status.liquidity.unlocked)
-                    .expect("unlocked liquidity should not be 0"),
-            )
-            > Decimal256::new(liquidity_threshold.into())
+        if total_liquidity.is_zero()
+            || status
+                .liquidity
+                .unlocked
+                .into_decimal256()
+                .checked_mul(Decimal256::from_ratio(100u32, 1u32))?
+                .checked_div(total_liquidity.into_decimal256())?
+                < ratio_threshold
+            || status.liquidity.unlocked < unlocked_liquidity_threshold
         {
             volatile_market_ids.push(market_id);
         }
