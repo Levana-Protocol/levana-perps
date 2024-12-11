@@ -41,7 +41,8 @@ jobs:
           workspaces: |
             .
       - name: Dependencies
-        run: sudo apt install musl-tools -y
+        run: |
+          sudo apt install musl-tools qemu-user-static binfmt-support -y
       - name: Build companion binary
         run: just cargo-companion-release-arm
       - name: Build image
