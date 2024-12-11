@@ -152,7 +152,7 @@ cargo-companion-release-arm:
 build-companion-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/companion/
 	cp target/aarch64-unknown-linux-musl/release/perps-companion .ci/companion
-	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}} --platform linux/arm64
+	cd .ci/companion && docker buildx build . --file Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}} --platform linux/arm64
 
 # Push bots docker image
 push-companion-image:
