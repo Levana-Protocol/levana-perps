@@ -37,6 +37,7 @@ jobs:
           targets: aarch64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
         with:
+          prefix-key: "v1-rust"
           workspaces: |
             .
       - name: Dependencies
