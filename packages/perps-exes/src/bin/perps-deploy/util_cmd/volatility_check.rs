@@ -6,6 +6,7 @@ use perpswap::number::{UnsignedDecimal, Usd};
 use perpswap::storage::MarketId;
 use reqwest::Client;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::task::JoinSet;
 
 use crate::cli::Opt;
@@ -39,6 +40,13 @@ pub(super) struct VolatilityCheckOpt {
         env = "LEVANA_VOLATILITY_CHECK_FACTORY"
     )]
     factory: String,
+    /// Run check after specified seconds
+    #[arg(
+        long,
+        env = "LEVANA_VOLATILITY_RECALC_FREQ_SECONDS",
+        default_value = "3600"
+    )]
+    pub(crate) recalculation_frequency_in_seconds: u64,
 }
 
 impl VolatilityCheckOpt {
@@ -60,6 +68,7 @@ async fn go(
         ratio_threshold,
         workers,
         factory,
+        recalculation_frequency_in_seconds,
     }: VolatilityCheckOpt,
     _opt: Opt,
 ) -> Result<()> {
@@ -75,62 +84,75 @@ async fn go(
     };
     let builder = cosmos_network.builder_with_config().await?;
     let cosmos = builder.build()?;
-
     let factory = Factory::from_contract(cosmos.make_contract(factory.address));
-    let markets = factory.get_markets().await?;
-    let market_count = markets.len();
 
-    let mut market_info = Vec::<MarketInfo>::new();
+    loop {
+        tracing::info!("Started volatility check for the markets.");
+        let markets = factory.get_markets().await?;
+        let market_count = markets.len();
+        tracing::info!(
+            "Fetched {} markets' information for volatility check.",
+            market_count
+        );
 
-    for market in markets {
-        let market_id = market.market_id.into();
-        let market = MarketContract::new(market.market);
-        market_info.push(MarketInfo { market, market_id })
-    }
+        let mut market_info = Vec::<MarketInfo>::new();
 
-    let mut set = JoinSet::new();
+        for market in markets {
+            let market_id = market.market_id.into();
+            let market = MarketContract::new(market.market);
+            market_info.push(MarketInfo { market, market_id })
+        }
 
-    let market_count_per_worker = market_count.div_euclid(workers.try_into()?);
-    let market_remainder = market_count.rem_euclid(workers.try_into()?);
-    let mut start = 0;
-    for worker_id in 0..workers.try_into()? {
-        let extra = if worker_id < market_remainder { 1 } else { 0 };
-        let end = start + market_count_per_worker + extra;
-        set.spawn(volatility_check_helper(
-            market_info[start..end].to_vec(),
-            unlocked_liquidity_threshold_usd,
-            ratio_threshold,
-        ));
-        start = end;
-    }
+        let mut set = JoinSet::new();
 
-    let mut volatile_market_ids = Vec::new();
+        let market_count_per_worker = market_count.div_euclid(workers.try_into()?);
+        let market_remainder = market_count.rem_euclid(workers.try_into()?);
+        let mut start = 0;
+        for worker_id in 0..workers.try_into()? {
+            let extra = if worker_id < market_remainder { 1 } else { 0 };
+            let end = start + market_count_per_worker + extra;
+            set.spawn(volatility_check_helper(
+                market_info[start..end].to_vec(),
+                unlocked_liquidity_threshold_usd,
+                ratio_threshold,
+            ));
+            start = end;
+        }
 
-    while let Some(res) = set.join_next().await {
-        match res {
-            Ok(Ok(ids)) => {
-                volatile_market_ids.extend(ids);
-            }
-            Ok(Err(e)) => {
-                set.abort_all();
-                return Err(e);
-            }
-            Err(e) => {
-                set.abort_all();
-                return Err(e).context("Unexpected panic");
+        let mut volatile_market_ids = Vec::new();
+
+        while let Some(res) = set.join_next().await {
+            match res {
+                Ok(Ok(ids)) => {
+                    volatile_market_ids.extend(ids);
+                }
+                Ok(Err(e)) => {
+                    set.abort_all();
+                    return Err(e);
+                }
+                Err(e) => {
+                    set.abort_all();
+                    return Err(e).context("Unexpected panic");
+                }
             }
         }
-    }
 
-    if !volatile_market_ids.is_empty() {
-        send_slack_notification(
-            slack_webhook,
-            "Volatile markets found".to_owned(),
-            format!("Markets: {:?}", volatile_market_ids),
-        )
-        .await?;
+        if !volatile_market_ids.is_empty() {
+            tracing::info!(
+                "Found {} volatile markets, sending a slack notification.",
+                volatile_market_ids.len()
+            );
+            send_slack_notification(
+                slack_webhook.clone(),
+                "Volatile markets found".to_owned(),
+                format!("Markets: {:?}", volatile_market_ids),
+            )
+            .await?;
+        }
+        let duration = Duration::from_secs(recalculation_frequency_in_seconds);
+        tracing::info!("Completed market volatility check, Going to sleep {duration:?}.");
+        tokio::time::sleep(duration).await;
     }
-    Ok(())
 }
 
 async fn volatility_check_helper(
