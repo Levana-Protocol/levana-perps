@@ -118,8 +118,8 @@ typescript-schema:
 
 # Generate the schema and copy to a webapp directory located at ../webapp
 typescript-schema-copy: typescript-schema
-	rm -rf ../webapp/src/apps/perps/sdk/types/.generated/
-	mv schema/typescript ../webapp/src/apps/perps/sdk/types/.generated/
+	rm -rf ../webapp/apps/perps/src/apps/perps/sdk/types/.generated/
+	mv schema/typescript ../webapp/apps/perps/src/apps/perps/sdk/types/.generated/
 
 # Build perps-qa binary in release mode
 cargo-release:
@@ -129,12 +129,16 @@ cargo-release:
 cargo-bots-release:
     cargo build --bin perps-bots --release --target x86_64-unknown-linux-musl
 
+# Build bots binary in release mode
+cargo-bots-release-arm:
+    cross build --bin perps-bots --release --target aarch64-unknown-linux-musl
+
 # Build bots docker image
 build-bots-image:
 	rm -rf .ci/bots/etc
 	cp -r packages/perps-exes/assets .ci/bots/etc
-	cp target/x86_64-unknown-linux-musl/release/perps-bots .ci/bots
-	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
+	cp target/aarch64-unknown-linux-musl/release/perps-bots .ci/bots
+	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}} --platform linux/arm64
 
 # Push bots docker image
 push-bots-image:
@@ -147,8 +151,8 @@ cargo-companion-release-arm:
 # Build companion docker image
 build-companion-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/companion/
-	cp target/aarch-unknown-linux-musl/release/perps-companion .ci/companion
-	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}} --platform linux/arm64
+	cp target/aarch64-unknown-linux-musl/release/perps-companion .ci/companion
+	cd .ci/companion && docker buildx build . --file Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}} --platform linux/arm64
 
 # Push bots docker image
 push-companion-image:
@@ -248,14 +252,14 @@ create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override
 
 # Build perps-market-params binary in release mode
-cargo-market-params-release:
-    cargo build --bin perps-market-params --release --target x86_64-unknown-linux-musl
+cargo-market-params-arm:
+    cross build --bin perps-market-params --release --target aarch64-unknown-linux-musl
 
 # Build perps-market-params docker image
 build-market-params-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/market-analyzer/
-	cp target/x86_64-unknown-linux-musl/release/perps-market-params .ci/market-analyzer/
-	cd .ci/market-analyzer && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
+	cp target/aarch64-unknown-linux-musl/release/perps-market-params .ci/market-analyzer/
+	cd .ci/market-analyzer && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}} --platform linux/arm64
 
 # Push perps-market-params docker image
 push-market-params-image:
