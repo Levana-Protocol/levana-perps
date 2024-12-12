@@ -183,6 +183,7 @@ fn helper_execute(
             amount,
             slippage_assert,
         } => {
+            bail!("something");
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
             execute_slippage_assert_and_liquifund(

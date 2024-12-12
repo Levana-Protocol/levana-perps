@@ -1657,3 +1657,88 @@ fn log_status(header: &str, market: &PerpsMarket) {
         None => println!("- CT Notional: 0"),
     };
 }
+
+fn print_balances(label: &str, market: &PerpsMarket) {
+    let on_chain_balance = market
+        .query_collateral_balance(&market.get_countertrade_addr())
+        .unwrap();
+    let contract_balance = market
+        .query_countertrade_market_id(market.id.clone())
+        .unwrap()
+        .collateral;
+    println!("{label} On chain balance: {on_chain_balance}");
+    println!("{label} Contract balance: {contract_balance}");
+}
+
+#[test]
+fn bug_debug_update_position() {
+    let market = make_countertrade_market().unwrap();
+    let countertrade = market.get_countertrade_addr();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Do a deposit to avoid confusing the contract. As an optimization, the contract
+    // won't check if there are open positions if there is no liquidity deposited.
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    let (pos_id1, _) = market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    let (pos_id2, _) = market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    print_balances("Before open position", &market);
+
+    // Open position
+    do_work(&market, &lp);
+
+    print_balances("After open position", &market);
+
+    market.exec_close_position(&lp, pos_id1, None).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_update_position());
+    // Update position
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    print_balances("After update position", &market);
+
+    // Nothing left to be done now
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    assert_eq!(2, 3);
+    // market.exec_countertrade_do_work();
+}
