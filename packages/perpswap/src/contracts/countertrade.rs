@@ -355,6 +355,34 @@ pub enum WorkDescription {
     },
 }
 
+impl WorkDescription {
+    /// Is it closed position ?
+    pub fn is_close_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => true,
+            WorkDescription::CollectClosedPosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+
+    /// Is it update position ?
+    pub fn is_update_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::CollectClosedPosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => true,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
+        }
+    }
+}
+
 impl std::fmt::Display for WorkDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -28,7 +28,7 @@ use perpswap::contracts::copy_trading::{
 };
 use perpswap::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
-    QueryMsg as CountertradeQueryMsg,
+    QueryMsg as CountertradeQueryMsg, WorkDescription,
 };
 use perpswap::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
@@ -2459,6 +2459,16 @@ impl PerpsMarket {
         self.query_countertrade(&CountertradeQueryMsg::HasWork {
             market: self.id.clone(),
         })
+    }
+
+    pub fn query_countertrade_work(&self) -> Result<WorkDescription> {
+        let work: HasWorkResp = self.query_countertrade(&CountertradeQueryMsg::HasWork {
+            market: self.id.clone(),
+        })?;
+        match work {
+            HasWorkResp::NoWork {  } => bail!("Expected work, but got no work"),
+            HasWorkResp::Work { desc } => Ok(desc),
+        }
     }
 
     pub fn query_countertrade_balances(
