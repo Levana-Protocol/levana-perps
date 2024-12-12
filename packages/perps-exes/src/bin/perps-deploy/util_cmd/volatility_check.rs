@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use cosmwasm_std::Decimal256;
 use perps_exes::contracts::MarketContract;
 use perps_exes::{config::MainnetFactories, contracts::Factory, PerpsNetwork};
-use perpswap::number::{Collateral, UnsignedDecimal};
+use perpswap::number::{UnsignedDecimal, Usd};
 use perpswap::storage::MarketId;
 use reqwest::Client;
 use std::sync::Arc;
@@ -24,7 +24,7 @@ pub(super) struct VolatilityCheckOpt {
         default_value = "10",
         env = "LEVANA_VOLATILITY_CHECK_UNLOCKED_LIQUIDITY_THRESHOLD"
     )]
-    unlocked_liquidity_threshold: Collateral,
+    unlocked_liquidity_threshold: Usd,
     /// The percentage threshold for the unlocked liquidity compared to total liquidity
     #[clap(
         long,
@@ -135,7 +135,7 @@ async fn go(
 
 async fn volatility_check_helper(
     market_info: Vec<MarketInfo>,
-    unlocked_liquidity_threshold: Collateral,
+    unlocked_liquidity_threshold: Usd,
     ratio_threshold: Decimal256,
 ) -> Result<Vec<Arc<MarketId>>> {
     let mut volatile_market_ids = Vec::new();
@@ -150,6 +150,7 @@ async fn volatility_check_helper(
             .liquidity
             .locked
             .checked_add(status.liquidity.unlocked)?;
+        let price_point = contract.current_price().await?;
 
         if total_liquidity.is_zero()
             || status
@@ -159,7 +160,8 @@ async fn volatility_check_helper(
                 .checked_mul(Decimal256::from_ratio(100u32, 1u32))?
                 .checked_div(total_liquidity.into_decimal256())?
                 < ratio_threshold
-            || status.liquidity.unlocked < unlocked_liquidity_threshold
+            || price_point.collateral_to_usd(status.liquidity.unlocked)
+                < unlocked_liquidity_threshold
         {
             volatile_market_ids.push(market_id);
         }
