@@ -22,9 +22,9 @@ pub(super) struct VolatilityCheckOpt {
     #[clap(
         long,
         default_value = "10",
-        env = "LEVANA_VOLATILITY_CHECK_UNLOCKED_LIQUIDITY_THRESHOLD"
+        env = "LEVANA_VOLATILITY_CHECK_UNLOCKED_LIQUIDITY_THRESHOLD_USD"
     )]
-    unlocked_liquidity_threshold: Usd,
+    unlocked_liquidity_threshold_usd: Usd,
     /// The percentage threshold for the unlocked liquidity compared to total liquidity
     #[clap(
         long,
@@ -56,7 +56,7 @@ struct MarketInfo {
 async fn go(
     VolatilityCheckOpt {
         slack_webhook,
-        unlocked_liquidity_threshold,
+        unlocked_liquidity_threshold_usd,
         ratio_threshold,
         workers,
         factory,
@@ -98,7 +98,7 @@ async fn go(
         let end = start + market_count_per_worker + extra;
         set.spawn(volatility_check_helper(
             market_info[start..end].to_vec(),
-            unlocked_liquidity_threshold,
+            unlocked_liquidity_threshold_usd,
             ratio_threshold,
         ));
         start = end;
@@ -135,7 +135,7 @@ async fn go(
 
 async fn volatility_check_helper(
     market_info: Vec<MarketInfo>,
-    unlocked_liquidity_threshold: Usd,
+    unlocked_liquidity_threshold_usd: Usd,
     ratio_threshold: Decimal256,
 ) -> Result<Vec<Arc<MarketId>>> {
     let mut volatile_market_ids = Vec::new();
@@ -161,7 +161,7 @@ async fn volatility_check_helper(
                 .checked_div(total_liquidity.into_decimal256())?
                 < ratio_threshold
             || price_point.collateral_to_usd(status.liquidity.unlocked)
-                < unlocked_liquidity_threshold
+                < unlocked_liquidity_threshold_usd
         {
             volatile_market_ids.push(market_id);
         }
