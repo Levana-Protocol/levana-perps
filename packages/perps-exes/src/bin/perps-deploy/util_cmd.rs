@@ -8,6 +8,7 @@ mod top_traders;
 mod trading_fees;
 mod trading_incentives;
 mod tvl_report;
+mod volatility_check;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -119,6 +120,11 @@ enum Sub {
         #[clap(subcommand)]
         inner: countertrade::CounterTradeSub,
     },
+    /// Market Volatility Checks
+    VolatilityCheck {
+        #[clap(flatten)]
+        inner: volatility_check::VolatilityCheckOpt,
+    },
 }
 
 impl UtilOpt {
@@ -138,6 +144,7 @@ impl UtilOpt {
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
             Sub::GovDistribute { inner } => inner.go(opt).await,
             Sub::CounterTrade { inner } => inner.go(opt).await,
+            Sub::VolatilityCheck { inner } => inner.go(opt).await,
         }
     }
 }
