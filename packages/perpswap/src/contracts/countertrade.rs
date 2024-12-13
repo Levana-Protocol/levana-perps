@@ -23,7 +23,8 @@ use super::market::{
 pub struct InstantiateMsg {
     /// Market contract we're countertrading on
     pub market: RawAddr,
-    /// Address of the administrator of the contract
+    /// Administrator of the contract, Should be the factory contract
+    /// which initializes this.
     pub admin: RawAddr,
     /// Initial configuration values
     pub config: ConfigUpdate,

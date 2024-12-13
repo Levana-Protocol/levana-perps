@@ -886,9 +886,7 @@ pub(crate) fn execute(
     state: State,
     market: MarketInfo,
 ) -> Result<Response> {
-    let mut totals = crate::state::TOTALS
-        .may_load(storage, &market.id)?
-        .unwrap_or_default();
+    let mut totals = crate::state::TOTALS.may_load(storage)?.unwrap_or_default();
 
     let work = get_work_for(storage, &state, &market, &totals)?;
 
@@ -945,7 +943,7 @@ pub(crate) fn execute(
                 collateral: collateral.raw(),
                 direction: CollateralDirection::Decrease,
             });
-            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            crate::state::TOTALS.save(storage, &totals)?;
 
             res = add_market_msg(storage, res, msg)?;
         }
@@ -968,7 +966,7 @@ pub(crate) fn execute(
                 collateral: Collateral::zero(),
                 direction: CollateralDirection::Decrease,
             });
-            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            crate::state::TOTALS.save(storage, &totals)?;
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::CollectClosedPosition {
@@ -981,7 +979,7 @@ pub(crate) fn execute(
                 position: pos_id,
             });
             totals.collateral = totals.collateral.checked_add(active_collateral)?;
-            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            crate::state::TOTALS.save(storage, &totals)?;
             res = res.add_event(
                 Event::new("collect-closed-position")
                     .add_attribute("position-id", pos_id.to_string())
@@ -990,20 +988,8 @@ pub(crate) fn execute(
             );
         }
         WorkDescription::ResetShares => {
-            let remove_keys: Vec<_> = crate::state::REVERSE_SHARES
-                .prefix(&market.id)
-                .range(storage, None, None, Order::Ascending)
-                .collect();
-
-            for key in remove_keys {
-                let (addr, _) = key?;
-                crate::state::SHARES.remove(storage, (&addr, &market.id));
-                crate::state::REVERSE_SHARES.remove(storage, (&market.id, &addr));
-            }
-            crate::state::TOTALS.remove(storage, &market.id);
-
-            res = res
-                .add_event(Event::new("reset-shares").add_attribute("market", market.id.as_str()));
+            crate::state::SHARES.clear(storage);
+            res = res.add_event(Event::new("reset-shares"));
         }
         WorkDescription::HandleDeferredExec { id, status } => {
             assert_eq!(totals.deferred_exec, Some(id));
@@ -1027,7 +1013,7 @@ pub(crate) fn execute(
             }
             totals.deferred_exec = None;
             totals.deferred_collateral = None;
-            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            crate::state::TOTALS.save(storage, &totals)?;
             res = res.add_event(
                 Event::new("clear-deferred-exec")
                     .add_attribute("deferred-exec-id", id.to_string())
@@ -1053,7 +1039,7 @@ pub(crate) fn execute(
                 collateral: amount.raw(),
                 direction: CollateralDirection::Decrease,
             });
-            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            crate::state::TOTALS.save(storage, &totals)?;
 
             res = add_market_msg(storage, res, msg)?;
         }
@@ -1085,7 +1071,7 @@ pub(crate) fn execute(
                 collateral: amount.raw(),
                 direction: CollateralDirection::Increase,
             });
-            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            crate::state::TOTALS.save(storage, &totals)?;
             res = add_market_msg(storage, res, msg)?;
         }
     }
