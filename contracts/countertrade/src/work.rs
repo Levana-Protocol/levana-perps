@@ -40,12 +40,22 @@ pub(crate) fn get_work_for(
                 }
                 perpswap::contracts::market::deferred_execution::DeferredExecStatus::Success {
                     ..
+                } => {
+                    return Ok(HasWorkResp::Work {
+                        desc: WorkDescription::HandleDeferredExec {
+                            id,
+                            status: DeferredStatus::Success,
+                        },
+                    })
                 }
-                | perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
+                perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
                     ..
                 } => {
                     return Ok(HasWorkResp::Work {
-                        desc: WorkDescription::ClearDeferredExec { id },
+                        desc: WorkDescription::HandleDeferredExec {
+                            id,
+                            status: DeferredStatus::Failure,
+                        },
                     })
                 }
             },
@@ -894,7 +904,8 @@ pub(crate) fn execute(
         |storage: &mut dyn Storage, res: Response, msg: WasmMsg| -> Result<Response> {
             assert!(!crate::state::REPLY_MARKET.exists(storage));
             crate::state::REPLY_MARKET.save(storage, &market.id)?;
-            Ok(res.add_submessage(SubMsg::reply_on_success(msg, 0)))
+            // We use reply always so that we also handle the error case
+            Ok(res.add_submessage(SubMsg::reply_always(msg, 0)))
         };
 
     match desc {
@@ -905,6 +916,8 @@ pub(crate) fn execute(
             take_profit,
             stop_loss_override,
         } => {
+            // No existing deferred exec item should be present
+            assert!(totals.deferred_exec.is_none());
             let event = Event::new("open-position")
                 .add_attribute("direction", direction.as_str())
                 .add_attribute("leverage", leverage.to_string())
@@ -928,12 +941,16 @@ pub(crate) fn execute(
                     take_profit,
                 },
             )?;
-            totals.collateral = totals.collateral.checked_sub(collateral.raw())?;
+            totals.deferred_collateral = Some(DeferredCollateral {
+                collateral: collateral.raw(),
+                direction: CollateralDirection::Decrease,
+            });
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::ClosePosition { pos_id } => {
+            assert!(totals.deferred_exec.is_none());
             res = res.add_event(
                 Event::new("close-position")
                     .add_attribute("position-id", pos_id.to_string())
@@ -947,6 +964,11 @@ pub(crate) fn execute(
                 })?,
                 funds: vec![],
             };
+            totals.deferred_collateral = Some(DeferredCollateral {
+                collateral: Collateral::zero(),
+                direction: CollateralDirection::Decrease,
+            });
+            crate::state::TOTALS.save(storage, &market.id, &totals)?;
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::CollectClosedPosition {
@@ -983,9 +1005,40 @@ pub(crate) fn execute(
             res = res
                 .add_event(Event::new("reset-shares").add_attribute("market", market.id.as_str()));
         }
-        WorkDescription::ClearDeferredExec { id } => {
+        WorkDescription::HandleDeferredExec { id, status } => {
             assert_eq!(totals.deferred_exec, Some(id));
+            let deferred_collateral = totals.deferred_collateral.clone().context(format!(
+                "Impossible: Expected collateral for deferred exec id {id}"
+            ))?;
+            match status {
+                DeferredStatus::Success => match deferred_collateral.direction {
+                    CollateralDirection::Increase => {
+                        totals.collateral = totals
+                            .collateral
+                            .checked_add(deferred_collateral.collateral)?;
+                    }
+                    CollateralDirection::Decrease => {
+                        totals.collateral = totals
+                            .collateral
+                            .checked_sub(deferred_collateral.collateral)?;
+                    }
+                },
+                DeferredStatus::Failure => match deferred_collateral.direction {
+                    // We flip the logic here because it failed
+                    CollateralDirection::Increase => {
+                        totals.collateral = totals
+                            .collateral
+                            .checked_sub(deferred_collateral.collateral)?;
+                    }
+                    CollateralDirection::Decrease => {
+                        totals.collateral = totals
+                            .collateral
+                            .checked_add(deferred_collateral.collateral)?;
+                    }
+                },
+            }
             totals.deferred_exec = None;
+            totals.deferred_collateral = None;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
             res = res.add_event(
                 Event::new("clear-deferred-exec")
@@ -994,6 +1047,7 @@ pub(crate) fn execute(
             )
         }
         WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
+            assert!(totals.deferred_exec.is_none());
             let event = Event::new("update-position-add-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
@@ -1007,7 +1061,10 @@ pub(crate) fn execute(
                     slippage_assert: None,
                 },
             )?;
-            totals.collateral = totals.collateral.checked_sub(amount.raw())?;
+            totals.deferred_collateral = Some(DeferredCollateral {
+                collateral: amount.raw(),
+                direction: CollateralDirection::Decrease,
+            });
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
             res = add_market_msg(storage, res, msg)?;
@@ -1017,6 +1074,7 @@ pub(crate) fn execute(
             amount,
             crank_fee,
         } => {
+            assert!(totals.deferred_exec.is_none());
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("crank-fee", crank_fee.to_string())
@@ -1034,9 +1092,11 @@ pub(crate) fn execute(
             let msg = market
                 .token
                 .into_market_execute_msg(&market.addr, crank_fee, market_msg)?;
-
-            totals.collateral = totals.collateral.checked_add(amount.raw())?;
             totals.collateral = totals.collateral.checked_sub(crank_fee)?;
+            totals.deferred_collateral = Some(DeferredCollateral {
+                collateral: amount.raw(),
+                direction: CollateralDirection::Increase,
+            });
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
             res = add_market_msg(storage, res, msg)?;
         }
