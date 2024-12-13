@@ -333,9 +333,11 @@ pub enum WorkDescription {
     /// All collateral exhausted, reset shares to 0
     ResetShares,
     /// Deferred execution completed, we can continue our processing
-    ClearDeferredExec {
+    HandleDeferredExec {
         /// ID to be cleared
         id: DeferredExecId,
+        /// Did the execution succeed
+        status: DeferredStatus,
     },
     /// Add collateral to a position, causing notional size to increase
     UpdatePositionAddCollateralImpactSize {
@@ -355,6 +357,16 @@ pub enum WorkDescription {
     },
 }
 
+/// Deferred Execution Status
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DeferredStatus {
+    /// Deferred execution completed successfully
+    Success,
+    /// Deferred execution failed
+    Failure,
+}
+
 impl WorkDescription {
     /// Is it closed position ?
     pub fn is_close_position(&self) -> bool {
@@ -363,7 +375,7 @@ impl WorkDescription {
             WorkDescription::ClosePosition { .. } => true,
             WorkDescription::CollectClosedPosition { .. } => false,
             WorkDescription::ResetShares => false,
-            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::HandleDeferredExec { .. } => false,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
         }
@@ -376,7 +388,7 @@ impl WorkDescription {
             WorkDescription::ClosePosition { .. } => false,
             WorkDescription::CollectClosedPosition { .. } => false,
             WorkDescription::ResetShares => false,
-            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::HandleDeferredExec { .. } => false,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => true,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
         }
@@ -400,8 +412,8 @@ impl std::fmt::Display for WorkDescription {
                 write!(f, "Collect Closed Position Id of {}", pos_id)
             }
             WorkDescription::ResetShares => write!(f, "Reset Shares"),
-            WorkDescription::ClearDeferredExec { id } => {
-                write!(f, "Clear Deferred Exec Id of {id}")
+            WorkDescription::HandleDeferredExec { id, .. } => {
+                write!(f, "Handle Deferred Exec Id of {id}")
             }
             WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
                 write!(
