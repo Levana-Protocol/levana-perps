@@ -37,20 +37,19 @@ fn deposit() {
     let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
-    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    market.query_countertrade_balances(&lp).unwrap_err();
 
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
-    let mut balances = market.query_countertrade_balances(&lp).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balance = market.query_countertrade_balances(&lp).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balance;
     assert_eq!(shares.to_string(), "100");
     assert_eq!(collateral.to_string(), "100");
     assert_eq!(pool_size.to_string(), "100");
@@ -60,15 +59,14 @@ fn deposit() {
     market
         .exec_countertrade_mint_and_deposit(&lp, "50")
         .unwrap();
-    let mut balances = market.query_countertrade_balances(&lp).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balance = market.query_countertrade_balances(&lp).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balance;
     assert_eq!(shares.to_string(), "50");
     assert_eq!(collateral.to_string(), "50");
     assert_eq!(pool_size.to_string(), "150");
@@ -97,28 +95,26 @@ fn withdraw_no_positions() {
         "Before: {balance_before}. After: {balance_after}. Expected after: {expected}"
     );
 
-    let mut balances = market.query_countertrade_balances(&lp0).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balances = market.query_countertrade_balances(&lp0).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balances;
     assert_eq!(shares.to_string(), "50");
     assert_eq!(collateral.to_string(), "50");
     assert_eq!(pool_size.to_string(), "150");
 
-    let mut balances = market.query_countertrade_balances(&lp1).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balances = market.query_countertrade_balances(&lp1).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balances;
     assert_eq!(shares.to_string(), "100");
     assert_eq!(collateral.to_string(), "100");
     assert_eq!(pool_size.to_string(), "150");
@@ -656,7 +652,7 @@ fn resets_token_balances() {
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
-    assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
 
     todo!("force a new position to get opened by the contract and then close it manually");
     assert_eq!(
@@ -665,18 +661,18 @@ fn resets_token_balances() {
             desc: perpswap::contracts::countertrade::WorkDescription::ResetShares
         }
     );
-    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
     market.exec_countertrade_do_work().unwrap();
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::NoWork {}
     );
     market.exec_countertrade_do_work().unwrap_err();
-    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
-    assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
 }
 
 #[test]
@@ -940,11 +936,8 @@ fn deduct_balance() {
         )
         .unwrap();
 
-    let balance = market
-        .query_countertrade_balances(&lp)
-        .unwrap()
-        .pop()
-        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+
     assert_eq!(
         balance.collateral,
         NonZero::new(Collateral::from_str("100").unwrap()).unwrap()
@@ -991,11 +984,8 @@ fn deduct_balance() {
 
     // Calculate before deferred execution so that DNF fee doesn't
     // influence the available total
-    let balance = market
-        .query_countertrade_balances(&lp)
-        .unwrap()
-        .pop()
-        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+
     // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
     match market_type {
         perpswap::storage::MarketType::CollateralIsQuote => assert!(balance
@@ -1998,7 +1988,9 @@ fn withdraw_before_deferred_handler() {
     assert!(work.is_handle_deferred_exec());
 
     market.exec_countertrade_withdraw(&lp, "10").unwrap_err();
-    market.exec_countertrade_mint_and_deposit(&lp, "10").unwrap_err();
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "10")
+        .unwrap_err();
 
     market.exec_countertrade_do_work().unwrap();
     assert_contract_and_on_chain_balances(&market, None);
