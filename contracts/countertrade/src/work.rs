@@ -905,7 +905,7 @@ pub(crate) fn execute(
             assert!(!crate::state::REPLY_MARKET.exists(storage));
             crate::state::REPLY_MARKET.save(storage, &market.id)?;
             // We use reply always so that we also handle the error case
-            Ok(res.add_submessage(SubMsg::reply_always(msg, 0)))
+            Ok(res.add_submessage(SubMsg::reply_on_success(msg, 0)))
         };
 
     match desc {
@@ -1023,19 +1023,7 @@ pub(crate) fn execute(
                             .checked_sub(deferred_collateral.collateral)?;
                     }
                 },
-                DeferredStatus::Failure => match deferred_collateral.direction {
-                    // We flip the logic here because it failed
-                    CollateralDirection::Increase => {
-                        totals.collateral = totals
-                            .collateral
-                            .checked_sub(deferred_collateral.collateral)?;
-                    }
-                    CollateralDirection::Decrease => {
-                        totals.collateral = totals
-                            .collateral
-                            .checked_add(deferred_collateral.collateral)?;
-                    }
-                },
+                DeferredStatus::Failure => (),
             }
             totals.deferred_exec = None;
             totals.deferred_collateral = None;
