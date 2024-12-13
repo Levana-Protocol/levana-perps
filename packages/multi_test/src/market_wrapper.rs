@@ -2466,7 +2466,7 @@ impl PerpsMarket {
             market: self.id.clone(),
         })?;
         match work {
-            HasWorkResp::NoWork {  } => bail!("Expected work, but got no work"),
+            HasWorkResp::NoWork {} => bail!("Expected work, but got no work"),
             HasWorkResp::Work { desc } => Ok(desc),
         }
     }

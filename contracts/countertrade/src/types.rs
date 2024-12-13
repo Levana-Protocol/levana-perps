@@ -29,7 +29,7 @@ pub(crate) struct DeferredCollateral {
     /// Associated collateral with this deferred exec item
     pub(crate) collateral: Collateral,
     /// Should the collateral cause increase or decrease
-    pub(crate) direction: CollateralDirection
+    pub(crate) direction: CollateralDirection,
 }
 
 /// Collateral direction
@@ -39,7 +39,7 @@ pub(crate) enum CollateralDirection {
     #[default]
     Increase,
     /// Decrease the collateral
-    Decrease
+    Decrease,
 }
 
 /// Information about positions in the market contract.
