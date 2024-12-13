@@ -34,12 +34,13 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 /// Updates to configuration values.
 pub struct Config {
-    /// Administrator of the contract, allowed to make config updates
+    /// Administrator of the contract, Should be the factory contract
+    /// which initializes this.
     pub admin: Addr,
     /// Pending administrator, ready to be accepted, if any.
     pub pending_admin: Option<Addr>,
-    /// Factory we are balancing
-    pub factory: Addr,
+    /// Market address that we are allowed to open positions on
+    pub market: Addr,
     /// Minimum funding rate for popular side
     pub min_funding: Decimal256,
     /// Target funding rate for popular side
@@ -107,22 +108,14 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Deposit funds for a given market
-    Deposit {
-        /// Market to apply funds to
-        market: MarketId,
-    },
+    Deposit {},
     /// Withdraw funds from a given market
     Withdraw {
         /// The number of LP shares to remove
         amount: NonZero<LpToken>,
-        /// Market to withdraw from
-        market: MarketId,
     },
     /// Perform a balancing operation on the given market
-    DoWork {
-        /// Which markets to balance
-        market: MarketId,
-    },
+    DoWork {},
     /// Appoint a new administrator
     AppointAdmin {
         /// Address of the new administrator
@@ -144,42 +137,21 @@ pub enum QueryMsg {
     Config {},
     /// Check the balance of an address for all markets.
     ///
-    /// Returns [BalanceResp]
+    /// Returns [MarketBalance]
     Balance {
         /// Address of the token holder
         address: RawAddr,
-        /// Value from [BalanceResp::next_start_after]
-        start_after: Option<MarketId>,
-        /// How many values to return
-        limit: Option<u32>,
     },
     /// Check the status of a single market
     ///
-    /// Returns [MarketsResp]
-    Markets {
-        /// Value from [MarketsResp::next_start_after]
-        start_after: Option<MarketId>,
-        /// How many values to return
-        limit: Option<u32>,
-    },
-    /// Check if the given market has any work to do
+    /// Returns [MarketStatus]
+    Status {},
+    /// Check if the given contract has any work to do
     ///
     /// Returns [HasWorkResp]
-    HasWork {
-        /// Which market to check
-        market: MarketId,
-    },
+    HasWork {},
 }
 
-/// Response from [QueryMsg::Balance]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct BalanceResp {
-    /// Market balances in this batch
-    pub markets: Vec<MarketBalance>,
-    /// Next start_after value, if we have more balances
-    pub next_start_after: Option<MarketId>,
-}
 /// Individual market response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -256,16 +228,6 @@ impl Display for Token {
             Token::Cw20(addr) => f.write_str(addr.as_str()),
         }
     }
-}
-
-/// Response from [QueryMsg::Markets]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct MarketsResp {
-    /// Market statuses in this batch
-    pub markets: Vec<MarketStatus>,
-    /// Next start_after value, if we have more markets
-    pub next_start_after: Option<MarketId>,
 }
 
 /// Status of a single market
