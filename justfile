@@ -267,7 +267,7 @@ push-market-params-image:
 
 # Build perps-deploy binary in release mode
 cargo-perps-deploy-release:
-    cargo build --bin perps-deploy --release --target aarch64-unknown-linux-musl
+    cross build --bin perps-deploy --release --target aarch64-unknown-linux-musl
 
 # Build perps-deploy docker image
 build-perps-deploy-image:
