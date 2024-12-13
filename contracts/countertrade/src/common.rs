@@ -36,72 +36,46 @@ impl<'a> State<'a> {
         ))
     }
 
-    pub(crate) fn load_market_info(
-        &self,
-        store: &dyn Storage,
-        market_id: &MarketId,
-    ) -> Result<MarketInfo> {
-        self.load_market_info_inner(store, market_id).map(|x| x.0)
+    pub(crate) fn load_market_info(&self, store: &dyn Storage) -> Result<MarketInfo> {
+        self.load_market_info_inner(store).map(|x| x.0)
     }
 
     /// Returns true if loaded from the cache.
-    fn load_market_info_inner(
-        &self,
-        store: &dyn Storage,
-        market_id: &MarketId,
-    ) -> Result<(MarketInfo, bool)> {
+    fn load_market_info_inner(&self, store: &dyn Storage) -> Result<(MarketInfo, bool)> {
         if let Some(info) = crate::state::MARKETS
-            .may_load(store, market_id)
+            .may_load(store)
             .context("Could not load cached market info")?
         {
             return Ok((info, true));
         }
 
-        let perpswap::contracts::factory::entry::MarketInfoResponse {
-            market_addr,
-            position_token: _,
-            liquidity_token_lp: _,
-            liquidity_token_xlp: _,
-        } = self
-            .querier
-            .query_wasm_smart(
-                &self.config.factory,
-                &perpswap::contracts::factory::entry::QueryMsg::MarketInfo {
-                    market_id: market_id.clone(),
-                },
-            )
-            .with_context(|| {
-                format!(
-                    "Unable to load market info for {market_id} from factory {}",
-                    self.config.factory
-                )
-            })?;
-
         let status: perpswap::contracts::market::entry::StatusResp = self
             .querier
             .query_wasm_smart(
-                &market_addr,
+                &self.config.market,
                 &perpswap::contracts::market::entry::QueryMsg::Status { price: None },
             )
-            .with_context(|| format!("Unable to load market status from contract {market_addr}"))?;
+            .with_context(|| {
+                format!(
+                    "Unable to load market status from contract {}",
+                    self.config.market.clone()
+                )
+            })?;
 
         let info = MarketInfo {
             id: status.market_id,
-            addr: market_addr,
+            addr: self.config.market.clone(),
             token: status.collateral,
         };
         Ok((info, false))
     }
 
-    pub(crate) fn load_cache_market_info(
-        &self,
-        storage: &mut dyn Storage,
-        market_id: &MarketId,
-    ) -> Result<MarketInfo> {
-        let (market, is_cached) = self.load_market_info_inner(storage, market_id)?;
+    // todo: Use only this
+    pub(crate) fn load_cache_market_info(&self, storage: &mut dyn Storage) -> Result<MarketInfo> {
+        let (market, is_cached) = self.load_market_info_inner(storage)?;
         if !is_cached {
             crate::state::MARKETS
-                .save(storage, &market.id, &market)
+                .save(storage, &market)
                 .context("Could not save cached markets info")?;
         }
         Ok(market)
