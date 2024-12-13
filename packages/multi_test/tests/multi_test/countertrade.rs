@@ -854,7 +854,7 @@ fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: boo
                 panic!("CollectClosedPosition in do_work")
             }
             WorkDescription::ResetShares => (false, false),
-            WorkDescription::ClearDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
+            WorkDescription::HandleDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => (true, false),
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => (true, false),
         },
@@ -871,7 +871,7 @@ fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: boo
     if has_deferred_exec {
         match market.query_countertrade_has_work().unwrap() {
             HasWorkResp::Work {
-                desc: WorkDescription::ClearDeferredExec { id: _ },
+                desc: WorkDescription::HandleDeferredExec { .. },
             } => (),
             work => panic!("Unexpected work response: {work:?}"),
         }
@@ -1658,7 +1658,7 @@ fn log_status(header: &str, market: &PerpsMarket) {
     };
 }
 
-fn print_balances(label: &str, market: &PerpsMarket) {
+fn assert_contract_and_on_chain_balances(market: &PerpsMarket) {
     let on_chain_balance = market
         .query_collateral_balance(&market.get_countertrade_addr())
         .unwrap();
@@ -1666,19 +1666,27 @@ fn print_balances(label: &str, market: &PerpsMarket) {
         .query_countertrade_market_id(market.id.clone())
         .unwrap()
         .collateral;
-    println!("{label} On chain balance: {on_chain_balance}");
-    println!("{label} Contract balance: {contract_balance}");
+    let contract_balance = market
+        .token
+        .round_down_to_precision(contract_balance)
+        .unwrap()
+        .into_signed()
+        .into_number();
+    let diff = contract_balance - on_chain_balance;
+    assert!(
+        diff.unwrap() < "0.0001".parse().unwrap(),
+        "On chain balance: {on_chain_balance} / Contract balance: {contract_balance}"
+    );
 }
 
 #[test]
-fn bug_debug_update_position() {
+fn perp_4332_balance_mismatch() {
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
+
     let market = make_countertrade_market().unwrap();
-    let countertrade = market.get_countertrade_addr();
     let lp = market.clone_lp(0).unwrap();
     let market_type = market.query_status().unwrap().market_type;
 
-    // Do a deposit to avoid confusing the contract. As an optimization, the contract
-    // won't check if there are open positions if there is no liquidity deposited.
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
@@ -1700,7 +1708,7 @@ fn bug_debug_update_position() {
         .unwrap();
 
     // And open a larger counterposition to make sure these positions are all unpopular
-    let (pos_id2, _) = market
+    market
         .exec_open_position_take_profit(
             &lp,
             "90",
@@ -1715,12 +1723,8 @@ fn bug_debug_update_position() {
         )
         .unwrap();
 
-    print_balances("Before open position", &market);
-
     // Open position
     do_work(&market, &lp);
-
-    print_balances("After open position", &market);
 
     market.exec_close_position(&lp, pos_id1, None).unwrap();
     market.exec_crank_till_finished(&lp).unwrap();
@@ -1731,14 +1735,5 @@ fn bug_debug_update_position() {
     market.exec_countertrade_do_work().unwrap();
     market.exec_crank_till_finished(&lp).unwrap();
 
-    print_balances("After update position", &market);
-
-    // Nothing left to be done now
-    assert_eq!(
-        market.query_countertrade_has_work().unwrap(),
-        HasWorkResp::NoWork {}
-    );
-
-    assert_eq!(2, 3);
-    // market.exec_countertrade_do_work();
+    assert_contract_and_on_chain_balances(&market);
 }
