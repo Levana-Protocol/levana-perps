@@ -94,19 +94,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
-        ExecuteMsg::Deposit { market } => {
-            let market = state.load_cache_market_info(storage, &market)?;
+        ExecuteMsg::Deposit {} => {
+            let market = state.load_cache_market_info(storage)?;
             let funds = funds.require_some(&market)?;
             deposit(storage, state, sender, funds, market)
         }
-        ExecuteMsg::Withdraw { amount, market } => {
+        ExecuteMsg::Withdraw { amount } => {
             funds.require_none()?;
-            let market = state.load_cache_market_info(storage, &market)?;
+            let market = state.load_cache_market_info(storage)?;
             withdraw(storage, state, sender, market, amount)
         }
-        ExecuteMsg::DoWork { market } => {
+        ExecuteMsg::DoWork {} => {
             funds.require_none()?;
-            let market = state.load_cache_market_info(storage, &market)?;
+            let market = state.load_cache_market_info(storage)?;
             crate::work::execute(storage, state, market)
         }
         ExecuteMsg::AppointAdmin { admin } => {
@@ -133,12 +133,12 @@ fn deposit(
     market: MarketInfo,
 ) -> Result<Response> {
     let sender_shares = crate::state::SHARES
-        .may_load(storage, (&sender, &market.id))
+        .may_load(storage, &sender)
         .context("Could not load old shares")?
         .map(NonZero::raw)
         .unwrap_or_default();
     let mut totals = crate::state::TOTALS
-        .may_load(storage, &market.id)
+        .may_load(storage)
         .context("Could not load old total shares")?
         .unwrap_or_default();
 
@@ -151,9 +151,8 @@ fn deposit(
     let position_info = PositionsInfo::load(&state, &market)?;
     let new_shares = totals.add_collateral(funds, &position_info)?;
     let sender_shares = new_shares.checked_add(sender_shares)?;
-    crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?;
-    crate::state::REVERSE_SHARES.save(storage, (&market.id, &sender), &())?;
-    crate::state::TOTALS.save(storage, &market.id, &totals)?;
+    crate::state::SHARES.save(storage, &sender, &sender_shares)?;
+    crate::state::TOTALS.save(storage, &totals)?;
 
     Ok(Response::new().add_event(
         Event::new("deposit")
@@ -171,7 +170,7 @@ fn withdraw(
     amount: NonZero<LpToken>,
 ) -> Result<Response> {
     let mut totals = crate::state::TOTALS
-        .may_load(storage, &market.id)
+        .may_load(storage)
         .context("Could not load old total shares")?
         .unwrap_or_default();
 
@@ -180,7 +179,7 @@ fn withdraw(
     }
 
     let sender_shares = crate::state::SHARES
-        .may_load(storage, (&sender, &market.id))
+        .may_load(storage, &sender)
         .context("Could not load old shares")?
         .map(NonZero::raw)
         .unwrap_or_default();
@@ -192,16 +191,10 @@ fn withdraw(
     let collateral = totals.remove_collateral(amount, &position_info)?;
     let sender_shares = sender_shares.checked_sub(amount.raw())?;
     match NonZero::new(sender_shares) {
-        None => {
-            crate::state::REVERSE_SHARES.remove(storage, (&market.id, &sender));
-            crate::state::SHARES.remove(storage, (&sender, &market.id))
-        }
-        Some(sender_shares) => {
-            crate::state::REVERSE_SHARES.save(storage, (&market.id, &sender), &())?;
-            crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?
-        }
+        None => crate::state::SHARES.remove(storage, &sender),
+        Some(sender_shares) => crate::state::SHARES.save(storage, &sender, &sender_shares)?,
     }
-    crate::state::TOTALS.save(storage, &market.id, &totals)?;
+    crate::state::TOTALS.save(storage, &totals)?;
 
     let collateral =
         NonZero::new(collateral).context("Action would result in 0 collateral transferred")?;
