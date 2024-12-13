@@ -381,6 +381,19 @@ impl WorkDescription {
         }
     }
 
+    /// Is it collect closed position ?
+    pub fn is_collect_closed_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::CollectClosedPosition { .. } => true,
+            WorkDescription::ResetShares => false,
+            WorkDescription::HandleDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+
     /// Is it update position ?
     pub fn is_update_position(&self) -> bool {
         match self {
