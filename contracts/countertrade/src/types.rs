@@ -19,6 +19,27 @@ pub(crate) struct Totals {
     pub(crate) last_closed: Option<ClosedPositionCursor>,
     /// The latest deferred exec item we're waiting on.
     pub(crate) deferred_exec: Option<DeferredExecId>,
+    /// Associated collateral with this deferred exec item
+    pub(crate) deferred_collateral: Option<DeferredCollateral>,
+}
+
+/// Associated deferred collateral with the Deferred Exec id
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
+pub(crate) struct DeferredCollateral {
+    /// Associated collateral with this deferred exec item
+    pub(crate) collateral: Collateral,
+    /// Should the collateral cause increase or decrease
+    pub(crate) direction: CollateralDirection
+}
+
+/// Collateral direction
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
+pub(crate) enum CollateralDirection {
+    /// Increase the collateral
+    #[default]
+    Increase,
+    /// Decrease the collateral
+    Decrease
 }
 
 /// Information about positions in the market contract.
