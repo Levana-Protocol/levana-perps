@@ -406,6 +406,32 @@ impl WorkDescription {
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
         }
     }
+
+    /// Is it open position ?
+    pub fn is_open_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => true,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::CollectClosedPosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::HandleDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+
+    /// Is it open position ?
+    pub fn is_handle_deferred_exec(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::CollectClosedPosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::HandleDeferredExec { .. } => true,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
 }
 
 impl std::fmt::Display for WorkDescription {
