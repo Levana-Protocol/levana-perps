@@ -29,21 +29,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
             deferred_exec_id
         }
         cosmwasm_std::SubMsgResult::Err(e) => {
-            let mut totals = crate::state::TOTALS
-                .may_load(storage, &market)?
-                .context("Totals missing in reply")?;
-            ensure!(
-                totals.deferred_collateral.is_some(),
-                "Associated deferred collateral is expected for for failure case"
-            );
-            totals.deferred_collateral = None;
-            crate::state::TOTALS.save(storage, &market, &totals)?;
             bail!("Submessage reply received an error: {e}")
         }
     };
 
     let mut totals = crate::state::TOTALS
-        .may_load(storage, &market)?
+        .may_load(storage)?
         .context("Totals missing in reply")?;
 
     if let Some(old_id) = totals.deferred_exec {
@@ -57,7 +48,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
         "Associated deferred collateral is expected for deferred exec id {deferred_exec_id}"
     );
     totals.deferred_exec = Some(deferred_exec_id);
-    crate::state::TOTALS.save(storage, &market, &totals)?;
+    crate::state::TOTALS.save(storage, &totals)?;
     Ok(Response::new().add_event(
         Event::new("reply")
             .add_attribute("market", market.as_str())
