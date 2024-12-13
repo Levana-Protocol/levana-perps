@@ -273,7 +273,7 @@ cargo-perps-deploy-release:
 build-perps-deploy-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/perps-deploy/
 	cp target/aarch64-unknown-linux-musl/release/perps-deploy .ci/perps-deploy/
-	cd .ci/perps-deploy && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
+	cd .ci/perps-deploy && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}} --platform linux/arm64
 
 # Push perps-deploy docker image
 push-perps-deploy-image:
