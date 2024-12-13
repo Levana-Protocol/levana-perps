@@ -242,6 +242,7 @@ mod tests {
             shares: "0.000000000000005108".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
+            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
@@ -255,6 +256,7 @@ mod tests {
             shares: "0.000000000000005108".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
+            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
@@ -267,6 +269,7 @@ mod tests {
             shares: "9999999999999999".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
+            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
@@ -279,6 +282,7 @@ mod tests {
             shares: "999999999999999999".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
+            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
