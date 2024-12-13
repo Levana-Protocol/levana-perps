@@ -83,6 +83,7 @@ fn helper_execute(
             crank_fee,
             crank_fee_usd,
         } => {
+            inject_failures_during_test()?;
             // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
             let take_profit_trader = match (take_profit, max_gains) {
                 (None, None) => {
