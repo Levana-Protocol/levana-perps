@@ -21,8 +21,8 @@ use super::market::{
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct InstantiateMsg {
-    /// Factory contract we're countertrading on
-    pub factory: RawAddr,
+    /// Market contract we're countertrading on
+    pub market: RawAddr,
     /// Address of the administrator of the contract
     pub admin: RawAddr,
     /// Initial configuration values
