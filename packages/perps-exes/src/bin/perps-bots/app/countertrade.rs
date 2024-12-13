@@ -48,9 +48,7 @@ async fn single_market(
     market_id: MarketId,
 ) -> Result<WatchedTaskOutput> {
     let cosmos = app.cosmos.clone();
-    let query = perpswap::contracts::countertrade::QueryMsg::HasWork {
-        market: market_id.clone(),
-    };
+    let query = perpswap::contracts::countertrade::QueryMsg::HasWork {};
     let contract = cosmos.make_contract(bot.contract);
     let work: HasWorkResp = contract.query(query).await?;
     match work {
@@ -64,11 +62,11 @@ async fn single_market(
 
 async fn do_countertrade_work(
     contract: &Contract,
-    market_id: MarketId,
+    _market_id: MarketId,
     wallet: &Wallet,
     work: &perpswap::contracts::countertrade::WorkDescription,
 ) -> Result<WatchedTaskOutput> {
-    let execute_msg = perpswap::contracts::countertrade::ExecuteMsg::DoWork { market: market_id };
+    let execute_msg = perpswap::contracts::countertrade::ExecuteMsg::DoWork {};
     let response = contract.execute(wallet, vec![], execute_msg).await;
     match response {
         Ok(response) => Ok(WatchedTaskOutput::new(format!(
