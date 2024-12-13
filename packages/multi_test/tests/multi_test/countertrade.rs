@@ -974,6 +974,20 @@ fn deduct_balance() {
     }
 
     market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    // Handle deferred exec id
+    market.exec_countertrade_do_work().unwrap();
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Force the countertrade position to be closed
+    market.exec_set_price("1.2".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_collect_closed_position());
+    market.exec_countertrade_do_work().unwrap();
 
     // Calculate before deferred execution so that DNF fee doesn't
     // influence the available total
