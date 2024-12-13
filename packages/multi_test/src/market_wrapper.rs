@@ -2456,15 +2456,11 @@ impl PerpsMarket {
     }
 
     pub fn query_countertrade_has_work(&self) -> Result<HasWorkResp> {
-        self.query_countertrade(&CountertradeQueryMsg::HasWork {
-            market: self.id.clone(),
-        })
+        self.query_countertrade(&CountertradeQueryMsg::HasWork {})
     }
 
     pub fn query_countertrade_work(&self) -> Result<WorkDescription> {
-        let work: HasWorkResp = self.query_countertrade(&CountertradeQueryMsg::HasWork {
-            market: self.id.clone(),
-        })?;
+        let work: HasWorkResp = self.query_countertrade(&CountertradeQueryMsg::HasWork {})?;
         match work {
             HasWorkResp::NoWork {} => bail!("Expected work, but got no work"),
             HasWorkResp::Work { desc } => Ok(desc),
@@ -2474,45 +2470,18 @@ impl PerpsMarket {
     pub fn query_countertrade_balances(
         &self,
         user_addr: &Addr,
-    ) -> Result<Vec<perpswap::contracts::countertrade::MarketBalance>> {
-        let mut start_after = None;
-        let mut res = vec![];
-        loop {
-            let perpswap::contracts::countertrade::BalanceResp {
-                mut markets,
-                next_start_after,
-            } = self.query_countertrade(&CountertradeQueryMsg::Balance {
-                address: user_addr.into(),
-                start_after: start_after.take(),
-                limit: None,
-            })?;
-            res.append(&mut markets);
-            match next_start_after {
-                Some(next_start_after) => start_after = Some(next_start_after),
-                None => break Ok(res),
-            }
-        }
+    ) -> Result<perpswap::contracts::countertrade::MarketBalance> {
+        let result = self.query_countertrade(&CountertradeQueryMsg::Balance {
+            address: user_addr.into(),
+        })?;
+        Ok(result)
     }
 
     pub fn query_countertrade_markets(
         &self,
     ) -> Result<Vec<perpswap::contracts::countertrade::MarketStatus>> {
-        let mut start_after = None;
-        let mut res = vec![];
-        loop {
-            let perpswap::contracts::countertrade::MarketsResp {
-                mut markets,
-                next_start_after,
-            } = self.query_countertrade(&CountertradeQueryMsg::Markets {
-                start_after: start_after.take(),
-                limit: None,
-            })?;
-            res.append(&mut markets);
-            match next_start_after {
-                Some(next_start_after) => start_after = Some(next_start_after),
-                None => break Ok(res),
-            }
-        }
+        let result = self.query_countertrade(&CountertradeQueryMsg::Status {})?;
+        Ok(result)
     }
 
     pub fn query_countertrade_market_id(
@@ -2629,9 +2598,7 @@ impl PerpsMarket {
         let amount: Collateral = amount.parse()?;
         self.exec_mint_tokens(user_addr, amount.into_number())?;
         let wasm_msg = self.make_msg_with_funds(
-            &CountertradeExecuteMsg::Deposit {
-                market: self.id.clone(),
-            },
+            &CountertradeExecuteMsg::Deposit {},
             amount.into_number(),
             &self.app().countertrade_addr,
         )?;
@@ -2686,7 +2653,6 @@ impl PerpsMarket {
             sender,
             &CountertradeExecuteMsg::Withdraw {
                 amount: amount.parse()?,
-                market: self.id.clone(),
             },
         )
     }
@@ -2696,9 +2662,7 @@ impl PerpsMarket {
         self.exec_countertrade(
             // Could be anyone
             &owner,
-            &CountertradeExecuteMsg::DoWork {
-                market: self.id.clone(),
-            },
+            &CountertradeExecuteMsg::DoWork {},
         )
     }
 
