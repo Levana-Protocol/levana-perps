@@ -15,6 +15,7 @@ use perpswap::contracts::market::{
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
 
+use crate::inject_failures_during_test;
 use crate::state::{
     order::{CancelLimitOrderExec, PlaceLimitOrderExec},
     position::{
@@ -183,7 +184,7 @@ fn helper_execute(
             amount,
             slippage_assert,
         } => {
-            bail!("something");
+            inject_failures_during_test()?;
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
             execute_slippage_assert_and_liquifund(
