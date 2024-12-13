@@ -1695,8 +1695,6 @@ fn assert_contract_and_on_chain_balances(market: &PerpsMarket) {
 
 #[test]
 fn perp_4332_balance_mismatch() {
-    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
-
     let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
     let market_type = market.query_status().unwrap().market_type;
@@ -1745,6 +1743,7 @@ fn perp_4332_balance_mismatch() {
 
     let work = market.query_countertrade_work().unwrap();
     assert!(work.is_update_position());
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
     // Update position
     market.exec_countertrade_do_work().unwrap();
     market.exec_crank_till_finished(&lp).unwrap();

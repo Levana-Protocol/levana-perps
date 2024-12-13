@@ -141,6 +141,13 @@ fn deposit(
         .may_load(storage, &market.id)
         .context("Could not load old total shares")?
         .unwrap_or_default();
+
+    if let Some(deferred_id) = totals.deferred_exec {
+        bail!(
+            "Undergoing Deferred execution id {deferred_id}. No deposit allowed, try again later."
+        )
+    }
+
     let position_info = PositionsInfo::load(&state, &market)?;
     let new_shares = totals.add_collateral(funds, &position_info)?;
     let sender_shares = new_shares.checked_add(sender_shares)?;
@@ -163,6 +170,15 @@ fn withdraw(
     market: MarketInfo,
     amount: NonZero<LpToken>,
 ) -> Result<Response> {
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &market.id)
+        .context("Could not load old total shares")?
+        .unwrap_or_default();
+
+    if let Some(deferred_id) = totals.deferred_exec {
+        bail!("Undergoing Deferred execution id {deferred_id}. No withdrawal allowed, try again later.")
+    }
+
     let sender_shares = crate::state::SHARES
         .may_load(storage, (&sender, &market.id))
         .context("Could not load old shares")?
@@ -172,10 +188,6 @@ fn withdraw(
         sender_shares >= amount.raw(),
         "Insufficient shares. You have {sender_shares}, but tried to withdraw {amount}"
     );
-    let mut totals = crate::state::TOTALS
-        .may_load(storage, &market.id)
-        .context("Could not load old total shares")?
-        .unwrap_or_default();
     let position_info = PositionsInfo::load(&state, &market)?;
     let collateral = totals.remove_collateral(amount, &position_info)?;
     let sender_shares = sender_shares.checked_sub(amount.raw())?;

@@ -28,7 +28,18 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 .parse()?;
             deferred_exec_id
         }
-        cosmwasm_std::SubMsgResult::Err(e) => bail!("Submessage reply received an error: {e}"),
+        cosmwasm_std::SubMsgResult::Err(e) => {
+            let mut totals = crate::state::TOTALS
+                .may_load(storage, &market)?
+                .context("Totals missing in reply")?;
+            ensure!(
+                totals.deferred_collateral.is_some(),
+                "Associated deferred collateral is expected for for failure case"
+            );
+            totals.deferred_collateral = None;
+            crate::state::TOTALS.save(storage, &market, &totals)?;
+            bail!("Submessage reply received an error: {e}")
+        }
     };
 
     let mut totals = crate::state::TOTALS
