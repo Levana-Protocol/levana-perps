@@ -1,0 +1,13 @@
+use cosmwasm_std::{StdResult, Storage, Uint64};
+use cw_storage_plus::{IntKey, Item, Key, KeyDeserialize, Map, PrimaryKey};
+use perpswap::contracts::factory::entry::{CopyTradingAddr, CounterTradeAddr, LeaderAddr};
+use perpswap::namespace;
+use perpswap::storage::MarketId;
+use perpswap::time::Timestamp;
+
+/// Code ID of the counter trade contract id
+pub(crate) const COUNTER_TRADE_CODE_ID: Item<u64> = Item::new(namespace::COUNTERTRADE_CODE_ID);
+
+/// Contains the mapping of wallet and the copy trading contract address
+pub(crate) const COUNTER_TRADE_ADDRS: Map<(MarketId, CounterTradeAddr), ()> =
+    Map::new(namespace::COUNTER_TRADE_ADDRS);
