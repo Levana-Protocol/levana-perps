@@ -33,14 +33,15 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_json_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response,
 };
+use countertrade::COUNTER_TRADE_ADDRS;
 use cw2::{get_contract_version, set_contract_version};
 use perpswap::contracts::{
     factory::{
         entry::{
             AddrIsContractResp, ContractType, CopyTradingAddr, CopyTradingInfo, CopyTradingResp,
-            ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg, LeaderAddr,
-            ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount,
-            QUERY_LIMIT_DEFAULT,
+            CounterTradeAddr, ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg,
+            LeaderAddr, ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg,
+            RefereeCount, QUERY_LIMIT_DEFAULT,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -48,7 +49,10 @@ use perpswap::contracts::{
     market::entry::{ExecuteMsg as MarketExecuteMsg, NewCopyTradingParams, NewMarketParams},
 };
 use perpswap::prelude::*;
-use reply::{InstantiateCopyTrading, INSTANTIATE_COPY_TRADING};
+use reply::{
+    InstantiateCopyTrading, InstantiateCounterTrade, INSTANTIATE_COPY_TRADING,
+    INSTANTIATE_COUNTERTRADE,
+};
 use semver::Version;
 
 // version info for migration info
@@ -168,6 +172,39 @@ fn execute_msg(
                     initial_borrow_fee_rate,
                     spot_price,
                     initial_price,
+                },
+            )?;
+        }
+
+        ExecuteMsg::AddCounterTrade { new_counter_trade } => {
+            let factory = state.env.contract.address;
+            let market_addr = crate::state::market::MARKET_ADDRS
+                .may_load(ctx.storage, &new_counter_trade.market_id)?
+                .context("No market id found")?;
+            let migration_admin: Addr = get_admin_migration(ctx.storage)?;
+            INSTANTIATE_COUNTERTRADE.save(
+                ctx.storage,
+                &InstantiateCounterTrade {
+                    migration_admin: migration_admin.clone(),
+                    market_id: new_counter_trade.market_id.clone(),
+                },
+            )?;
+            let label_suffix = get_label_suffix(ctx.storage)?;
+            let countertrade_code_id = crate::state::countertrade::COUNTER_TRADE_CODE_ID
+                .may_load(ctx.storage)?
+                .context("countertrade code id is not stored yet")?;
+            ctx.response.add_instantiate_submessage(
+                ReplyId::InstantiateCountertrade,
+                &migration_admin,
+                countertrade_code_id,
+                format!(
+                    "Levana Perps Countertrade ({}) - {label_suffix}",
+                    new_counter_trade.market_id
+                ),
+                &perpswap::contracts::countertrade::InstantiateMsg {
+                    market: market_addr.into(),
+                    admin: factory.into(),
+                    config: perpswap::contracts::countertrade::ConfigUpdate::default(),
                 },
             )?;
         }
@@ -402,6 +439,23 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     ctx.response.add_event(
                         Event::new("instantiate-copy-trading")
                             .add_attribute("leader", leader.0.to_string())
+                            .add_attribute("contract", addr.to_string()),
+                    );
+                }
+                ReplyId::InstantiateCountertrade => {
+                    let market_id = INSTANTIATE_COUNTERTRADE
+                        .may_load(ctx.storage)?
+                        .context("No data in INSTANTIATE_COPY_TRADING")?
+                        .market_id;
+                    ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CounterTrade)?;
+                    COUNTER_TRADE_ADDRS.save(
+                        ctx.storage,
+                        (market_id.clone(), CounterTradeAddr(addr.clone())),
+                        &(),
+                    )?;
+                    ctx.response.add_event(
+                        Event::new("instantiate-counter-trade")
+                            .add_attribute("market_id", market_id.to_string())
                             .add_attribute("contract", addr.to_string()),
                     );
                 }
