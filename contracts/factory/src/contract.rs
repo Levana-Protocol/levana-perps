@@ -181,6 +181,17 @@ fn execute_msg(
             let market_addr = crate::state::market::MARKET_ADDRS
                 .may_load(ctx.storage, &new_counter_trade.market_id)?
                 .context("No market id found")?;
+
+            if !crate::state::countertrade::COUNTER_TRADE_ADDRS
+                .prefix(new_counter_trade.market_id.clone())
+                .is_empty(ctx.storage)
+            {
+                bail!(
+                    "Countertrade contract already exists for {}",
+                    new_counter_trade.market_id.clone()
+                );
+            }
+
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COUNTERTRADE.save(
                 ctx.storage,
