@@ -272,6 +272,11 @@ fn execute_msg(
             COPY_TRADING_CODE_ID.save(ctx.storage, &code_id)?;
         }
 
+        ExecuteMsg::SetCounterTradeCodeId { code_id } => {
+            let code_id: u64 = code_id.parse()?;
+            crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(ctx.storage, &code_id)?;
+        }
+
         ExecuteMsg::SetOwner { owner } => {
             set_owner(ctx.storage, &owner.validate(state.api)?)?;
         }
