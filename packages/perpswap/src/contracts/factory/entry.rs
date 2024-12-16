@@ -118,7 +118,7 @@ pub enum ExecuteMsg {
     /// Add new countertrade contract
     AddCounterTrade {
         /// Parameters for the contract
-        new_counter_trade: NewCounterTradeParams
+        new_counter_trade: NewCounterTradeParams,
     },
     /// Set the copy trading code id, i.e. if it's been migrated
     SetCopyTradingCodeId {
@@ -169,6 +169,8 @@ pub enum ContractType {
     Market,
     /// Copy trading contract
     CopyTrading,
+    /// Countertrade contract
+    CounterTrade,
 }
 
 /// Default limit for [QueryMsg::Markets]
@@ -342,6 +344,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetWindDown { .. } => true,
             ExecuteMsg::TransferAllDaoFees {} => true,
             ExecuteMsg::RegisterReferrer { .. } => false,
+            ExecuteMsg::AddCounterTrade { .. } => true,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
             ExecuteMsg::AddCopyTrading { .. } => false,
@@ -433,7 +436,7 @@ pub struct ListRefereeCountStartAfter {
 pub struct LeaderAddr(pub Addr);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
-/// Leader address
+/// Copy trading address
 pub struct CopyTradingAddr(pub Addr);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
@@ -497,6 +500,36 @@ impl<'a> Prefixer<'a> for CopyTradingAddr {
 }
 
 impl<'a> PrimaryKey<'a> for CopyTradingAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
+    }
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Counter trade contract address
+pub struct CounterTradeAddr(pub Addr);
+
+impl KeyDeserialize for CounterTradeAddr {
+    type Output = CounterTradeAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(CounterTradeAddr)
+    }
+}
+impl<'a> Prefixer<'a> for CounterTradeAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for CounterTradeAddr {
     type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
     type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
     type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
