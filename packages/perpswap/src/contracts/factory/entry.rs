@@ -125,6 +125,11 @@ pub enum ExecuteMsg {
         /// Code ID to use for future copy trading contracts
         code_id: String,
     },
+    /// Set the counter trade code id, i.e. if it's been migrated
+    SetCounterTradeCodeId {
+        /// Code ID to use for future countertrade contracts
+        code_id: String,
+    },
     /// Remove the owner from factory
     RemoveOwner {},
 }
