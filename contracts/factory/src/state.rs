@@ -10,6 +10,7 @@ pub(crate) mod position_token;
 pub(crate) mod referrer;
 pub(crate) mod reply;
 pub(crate) mod shutdown;
+pub(crate) mod countertrade;
 
 use cosmwasm_std::{Addr, Api, Deps, DepsMut, Env, Storage};
 use perpswap::prelude::*;
