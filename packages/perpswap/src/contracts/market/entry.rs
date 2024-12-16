@@ -80,6 +80,13 @@ pub struct NewCopyTradingParams {
     pub description: String,
 }
 
+/// Parameters passed as part of factory contract
+#[cw_serde]
+pub struct NewCounterTradeParams {
+    /// Market ID where the trading is allowed
+    pub market_id: MarketId
+}
+
 /// There are two sources of slippage in the protocol:
 /// - Change in the oracle price from creation of the message to execution of the message.
 /// - Change in delta neutrality fee from creation of the message to execution of the message.
