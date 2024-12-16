@@ -1,4 +1,5 @@
 //! Entrypoint messages for the factory
+use crate::contracts::market::entry::NewCounterTradeParams;
 use crate::prelude::*;
 use crate::{
     contracts::market::entry::{NewCopyTradingParams, NewMarketParams},
@@ -113,6 +114,11 @@ pub enum ExecuteMsg {
     AddCopyTrading {
         /// Parameters for the contract
         new_copy_trading: NewCopyTradingParams,
+    },
+    /// Add new countertrade contract
+    AddCounterTrade {
+        /// Parameters for the contract
+        new_counter_trade: NewCounterTradeParams
     },
     /// Set the copy trading code id, i.e. if it's been migrated
     SetCopyTradingCodeId {
