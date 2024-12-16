@@ -167,4 +167,5 @@ pub const COPY_TRADING_TOTAL_CONTRACTS: &str = "fh";
 pub const COPY_TRADING_ADDRS_REVERSE: &str = "fi";
 pub const COPY_TRADING_LAST_ADDED: &str = "fj";
 pub const COUNTERTRADE_CODE_ID: &str = "fk";
-pub const REPLY_INSTANTIATE_COUNTERTRADE: &str = "fl";
+pub const REPLY_INSTANTIATE_COUNTER_TRADE: &str = "fl";
+pub const COUNTER_TRADE_ADDRS: &str = "fm";
