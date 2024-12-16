@@ -75,6 +75,7 @@ pub fn instantiate(
         wind_down,
         label_suffix,
         copy_trading_code_id,
+        counter_trade_code_id
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -91,6 +92,10 @@ pub fn instantiate(
     if let Some(copy_trading_code_id) = copy_trading_code_id {
         let code_id: u64 = copy_trading_code_id.parse()?;
         crate::state::copy_trading::COPY_TRADING_CODE_ID.save(deps.storage, &code_id)?;
+    }
+    if let Some(counter_trade_code_id) = counter_trade_code_id {
+        let code_id: u64 = counter_trade_code_id.parse()?;
+        crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(deps.storage, &code_id)?;
     }
 
     ALL_CONTRACTS.save(deps.storage, &env.contract.address, &ContractType::Factory)?;
