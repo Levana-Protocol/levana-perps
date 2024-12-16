@@ -62,48 +62,6 @@ impl State<'_> {
         }
     }
 
-    fn position_validate_counter_leverage(
-        &self,
-        counter_leverage_to_notional: SignedLeverageToNotional,
-        current_leverage: Option<SignedLeverageToNotional>,
-    ) -> Result<()> {
-        let max_allowed_leverage = self.config.max_leverage;
-
-        // Get the absolute value of the new and old leverage, since validation works on those.
-        let counter_leverage = counter_leverage_to_notional.into_number().abs();
-        let current_leverage = current_leverage.map(|x| x.into_number().abs());
-
-        let is_out_of_range = if !counter_leverage.approx_gt_relaxed(Number::ONE)? {
-            // We allow the counter leverage to be between 0 and 1 if we were already less than 1 and we're not making it any worse
-            match current_leverage {
-                // We're updating. If the leverage got closer to 0 then we're out of bounds
-                Some(current_leverage) => counter_leverage < current_leverage,
-                None => true,
-            }
-        } else {
-            match current_leverage {
-                Some(current_leverage) if current_leverage > counter_leverage => {
-                    // We're reducing the total leverage, so allow this to
-                    // happen even if the new value is out of range still
-                    false
-                }
-                _ => !(counter_leverage.approx_lt_relaxed(max_allowed_leverage))?,
-            }
-        };
-
-        if is_out_of_range {
-            Err(MarketError::CounterLeverageOutOfRange {
-                low_allowed: Decimal256::one(),
-                high_allowed: max_allowed_leverage.abs_unsigned(),
-                new_leverage: counter_leverage.abs_unsigned(),
-                current_leverage: current_leverage.map(|x| x.abs_unsigned()),
-            }
-            .into())
-        } else {
-            Ok(())
-        }
-    }
-
     pub(crate) fn position_validate_leverage_data(
         &self,
         market_type: MarketType,
@@ -123,10 +81,6 @@ impl State<'_> {
             market_type,
             new_position.active_leverage_to_notional(price_point),
             current_position.map(|p| p.active_leverage_to_notional(price_point)),
-        )?;
-        self.position_validate_counter_leverage(
-            new_position.counter_leverage_to_notional(price_point),
-            current_position.map(|p| p.counter_leverage_to_notional(price_point)),
         )?;
 
         Ok(())

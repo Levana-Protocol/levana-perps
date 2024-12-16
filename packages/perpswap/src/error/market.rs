@@ -57,13 +57,6 @@ pub enum MarketError {
         new_leverage: Decimal256,
         current_leverage: Option<Decimal256>,
     },
-    #[error("Counter leverage {new_leverage} is out of range ({low_allowed}..{high_allowed}]")]
-    CounterLeverageOutOfRange {
-        low_allowed: Decimal256,
-        high_allowed: Decimal256,
-        new_leverage: Decimal256,
-        current_leverage: Option<Decimal256>,
-    },
     #[error("Deposit collateral is too small. Deposited {deposit_collateral}, or {deposit_usd} USD. Minimum is {minimum_usd} USD")]
     MinimumDeposit {
         deposit_collateral: Collateral,
@@ -287,7 +280,6 @@ impl MarketError {
             }
             MarketError::MissingPosition { .. } => ErrorId::MissingPosition,
             MarketError::TraderLeverageOutOfRange { .. } => ErrorId::TraderLeverageOutOfRange,
-            MarketError::CounterLeverageOutOfRange { .. } => ErrorId::CounterLeverageOutOfRange,
             MarketError::MinimumDeposit { .. } => ErrorId::MinimumDeposit,
             MarketError::Congestion { .. } => ErrorId::Congestion,
             MarketError::MaxLiquidity { .. } => ErrorId::MaxLiquidity,
