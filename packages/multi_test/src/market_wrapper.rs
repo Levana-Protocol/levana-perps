@@ -47,10 +47,10 @@ use perpswap::contracts::market::deferred_execution::{
 use perpswap::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
-    LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, PositionActionHistoryResp,
-    PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp, QueryMsg, ReferralStatsResp,
-    SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary,
-    TraderActionHistoryResp,
+    LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, NewCounterTradeParams,
+    PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp,
+    QueryMsg, ReferralStatsResp, SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss,
+    TradeHistorySummary, TraderActionHistoryResp,
 };
 use perpswap::contracts::market::position::{ClosedPosition, PositionsResp};
 use perpswap::contracts::market::spot_price::{
@@ -95,6 +95,7 @@ pub struct PerpsMarket {
     pub id: MarketId,
     pub addr: Addr,
     pub copy_trading_addr: Addr,
+    pub countertrade_addr: Addr,
     /// When enabled, time will jump by one block on every exec
     pub automatic_time_jump_enabled: bool,
 
@@ -207,6 +208,12 @@ impl PerpsMarket {
         let factory_addr = app.borrow().factory_addr.clone();
         let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
 
+        let countertrade_msg = perpswap::contracts::factory::entry::ExecuteMsg::AddCounterTrade {
+            new_counter_trade: NewCounterTradeParams {
+                market_id: id.clone(),
+            },
+        };
+
         let copy_trading_msg = perpswap::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams {
                 name: "Multi test copy trading pool #1".to_owned(),
@@ -312,6 +319,27 @@ impl PerpsMarket {
 
         let market_addr = Addr::unchecked(market_addr);
 
+        let countertrade_addr = app
+            .borrow_mut()
+            .execute_contract(
+                protocol_owner.clone(),
+                factory_addr.clone(),
+                &countertrade_msg,
+                &[],
+            )?
+            .events
+            .iter()
+            .find(|e| e.ty == "instantiate")
+            .context("could not instantiate")?
+            .attributes
+            .iter()
+            .find(|a| a.key == "_contract_address")
+            .context("could not find contract_address")?
+            .value
+            .clone();
+
+        let countertrade_addr = Addr::unchecked(countertrade_addr);
+
         let token = app
             .borrow()
             .wrap()
@@ -329,6 +357,7 @@ impl PerpsMarket {
             automatic_time_jump_enabled: true,
             debug_001: false,
             copy_trading_addr,
+            countertrade_addr,
         };
 
         if bootstap_lp {
@@ -2387,14 +2416,14 @@ impl PerpsMarket {
     }
 
     pub fn get_countertrade_addr(&self) -> Addr {
-        self.app().countertrade_addr.clone()
+        self.countertrade_addr.clone()
     }
 
     pub(crate) fn query_countertrade<T: DeserializeOwned>(
         &self,
         msg: &CountertradeQueryMsg,
     ) -> Result<T> {
-        let contract_addr = self.app().countertrade_addr.clone();
+        let contract_addr = self.countertrade_addr.clone();
         self.app()
             .wrap()
             .query_wasm_smart(contract_addr, &msg)
@@ -2600,7 +2629,7 @@ impl PerpsMarket {
         let wasm_msg = self.make_msg_with_funds(
             &CountertradeExecuteMsg::Deposit {},
             amount.into_number(),
-            &self.app().countertrade_addr,
+            &self.countertrade_addr,
         )?;
         self.exec_wasm_msg(user_addr, wasm_msg)
     }
@@ -2610,7 +2639,7 @@ impl PerpsMarket {
         sender: &Addr,
         msg: &CountertradeExecuteMsg,
     ) -> Result<AppResponse> {
-        let contract_addr = self.app().countertrade_addr.clone();
+        let contract_addr = self.countertrade_addr.clone();
         let res = self
             .app()
             .execute_contract(sender.clone(), contract_addr, msg, &[])?;

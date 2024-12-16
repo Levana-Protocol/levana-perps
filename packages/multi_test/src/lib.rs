@@ -47,7 +47,6 @@ pub struct PerpsApp {
     pub log_block_time_changes: bool,
     pub simple_oracle_addr: Addr,
     pub simple_oracle_usd_addr: Addr,
-    pub countertrade_addr: Addr,
 }
 
 impl Deref for PerpsApp {
@@ -110,6 +109,7 @@ impl PerpsApp {
                 wind_down: TEST_CONFIG.wind_down.clone().into(),
                 label_suffix: Some(" - MULTITEST".to_owned()),
                 copy_trading_code_id: Some(copy_trading_code_id.to_string()),
+                counter_trade_code_id: Some(countertrade_code_id.to_string()),
             },
             &[],
             "factory",
@@ -137,19 +137,6 @@ impl PerpsApp {
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
-        let countertrade_addr = app.instantiate_contract(
-            countertrade_code_id,
-            Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &perpswap::contracts::countertrade::InstantiateMsg {
-                factory: factory_addr.as_ref().into(),
-                admin: TEST_CONFIG.protocol_owner.clone().into(),
-                config: perpswap::contracts::countertrade::ConfigUpdate::default(),
-            },
-            &[],
-            "countertrade",
-            Some(TEST_CONFIG.migration_admin.clone()),
-        )?;
-
         let mut _self = PerpsApp {
             code_ids: [
                 (PerpsContract::Factory, factory_code_id),
@@ -170,7 +157,6 @@ impl PerpsApp {
             log_block_time_changes: false,
             simple_oracle_addr,
             simple_oracle_usd_addr,
-            countertrade_addr,
         };
 
         Ok(_self)
