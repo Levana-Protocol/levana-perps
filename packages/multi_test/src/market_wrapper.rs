@@ -2508,18 +2508,16 @@ impl PerpsMarket {
 
     pub fn query_countertrade_markets(
         &self,
-    ) -> Result<Vec<perpswap::contracts::countertrade::MarketStatus>> {
+    ) -> Result<perpswap::contracts::countertrade::MarketStatus> {
         let result = self.query_countertrade(&CountertradeQueryMsg::Status {})?;
         Ok(result)
     }
 
     pub fn query_countertrade_market_id(
         &self,
-        market_id: MarketId,
     ) -> Result<perpswap::contracts::countertrade::MarketStatus> {
         let result = self.query_countertrade_markets()?;
-        let res = result.into_iter().find(|item| item.id == market_id);
-        res.context("Market id {market_id} not found")
+        Ok(result)
     }
 
     pub fn get_copytrading_token(&self) -> Result<perpswap::contracts::copy_trading::Token> {
@@ -2687,7 +2685,7 @@ impl PerpsMarket {
     }
 
     pub fn exec_countertrade_do_work(&self) -> Result<AppResponse> {
-        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let owner = self.app().factory_addr.clone();
         self.exec_countertrade(
             // Could be anyone
             &owner,
@@ -2696,7 +2694,7 @@ impl PerpsMarket {
     }
 
     pub fn exec_countertrade_appoint_admin(&self, new_admin: &Addr) -> Result<AppResponse> {
-        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let owner = self.app().factory_addr.clone();
         self.exec_countertrade(
             &owner,
             &CountertradeExecuteMsg::AppointAdmin {
@@ -2713,7 +2711,7 @@ impl PerpsMarket {
         &self,
         update: perpswap::contracts::countertrade::ConfigUpdate,
     ) -> Result<AppResponse> {
-        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let owner = self.app().factory_addr.clone();
         self.exec_countertrade(&owner, &CountertradeExecuteMsg::UpdateConfig(update))
     }
 }

@@ -481,7 +481,7 @@ fn closes_extra_positions() {
 
     for pos_id in pos_ids.into_iter().take(4) {
         // Get the status before we close the position, for comparison below
-        let market_before = market.query_countertrade_markets().unwrap().pop().unwrap();
+        let market_before = market.query_countertrade_markets().unwrap();
         let balance_before = market.query_collateral_balance(&countertrade).unwrap();
 
         // We should be forced to close the first open position
@@ -517,14 +517,14 @@ fn closes_extra_positions() {
         );
 
         // Without collecting, our balances remain the same
-        let market_before_work = market.query_countertrade_markets().unwrap().pop().unwrap();
+        let market_before_work = market.query_countertrade_markets().unwrap();
         assert_eq!(market_before_work.collateral, market_before.collateral);
 
         // Now collect the balances
         market.exec_countertrade_do_work().unwrap();
 
         // And confirm the countertrade contract saw the update
-        let market_after = market.query_countertrade_markets().unwrap().pop().unwrap();
+        let market_after = market.query_countertrade_markets().unwrap();
         assert_eq!(
             Ok(market_after.collateral),
             market_before.collateral + active_collateral
@@ -634,8 +634,6 @@ fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) 
     assert_eq!(
         market
             .query_countertrade_markets()
-            .unwrap()
-            .pop()
             .unwrap()
             .position,
         None
@@ -1044,7 +1042,7 @@ fn update_position_scenario_add_collateral() {
     do_work(&market, &lp);
     let status = market.query_status().unwrap();
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1089,7 +1087,7 @@ fn update_position_scenario_add_collateral() {
 
     do_work(&market, &lp);
     let updated_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1159,7 +1157,7 @@ fn update_position_scenario_remove_collateral() {
     let status = market.query_status().unwrap();
 
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1207,7 +1205,7 @@ fn update_position_scenario_remove_collateral() {
     do_work(&market, &lp);
     let status = market.query_status().unwrap();
     let updated_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1267,7 +1265,7 @@ fn do_not_mutate_countertrade_position() {
     let status = market.query_status().unwrap();
 
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1380,7 +1378,7 @@ fn update_position_funding_rate_less_than_target_rate() {
     let config = market.query_countertrade_config().unwrap();
 
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1430,7 +1428,7 @@ fn update_position_funding_rate_less_than_target_rate() {
     do_work(&market, &lp);
     let status = market.query_status().unwrap();
     let updated_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1521,7 +1519,7 @@ fn smart_search_bug_perp_4098() {
 
         let status = market.query_status().unwrap();
         let ct_trade = market
-            .query_countertrade_market_id(status.market_id)
+            .query_countertrade_market_id()
             .unwrap();
         assert!(ct_trade.position.is_none());
     }
@@ -1646,7 +1644,7 @@ fn log_status(header: &str, market: &PerpsMarket) {
     println!("= Short Notional: {}", status.short_notional);
 
     let ct_trade = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap();
 
     match ct_trade.position {
@@ -1670,7 +1668,7 @@ fn assert_contract_and_on_chain_balances(
         .query_collateral_balance(&market.get_countertrade_addr())
         .unwrap();
     let contract_balance = market
-        .query_countertrade_market_id(market.id.clone())
+        .query_countertrade_market_id()
         .unwrap()
         .collateral;
     let contract_balance = market
