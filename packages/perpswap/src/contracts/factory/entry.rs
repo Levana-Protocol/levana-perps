@@ -21,6 +21,8 @@ pub struct InstantiateMsg {
     pub liquidity_token_code_id: String,
     /// The code id for the copy trading contract
     pub copy_trading_code_id: Option<String>,
+    /// The code id for the countertrade contract
+    pub counter_trade_code_id: Option<String>,
     /// Migration admin, needed for instantiating/migrating sub-contracts
     pub migration_admin: RawAddr,
     /// Perpetual swap admin address
@@ -342,6 +344,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetMarketCodeId { .. } => true,
             ExecuteMsg::SetPositionTokenCodeId { .. } => true,
             ExecuteMsg::SetLiquidityTokenCodeId { .. } => true,
+            ExecuteMsg::SetCounterTradeCodeId { .. } => true,
             ExecuteMsg::SetOwner { .. } => true,
             ExecuteMsg::SetMigrationAdmin { .. } => true,
             ExecuteMsg::SetDao { .. } => true,
