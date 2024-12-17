@@ -8,7 +8,6 @@ use crate::{
         Collateral, DirectionToBase, LeverageToBase, LpToken, MarketId, NonZero, RawAddr,
         TakeProfitTrader,
     },
-    time::Timestamp,
 };
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 
@@ -21,9 +20,10 @@ use super::market::{
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct InstantiateMsg {
-    /// Factory contract we're countertrading on
-    pub factory: RawAddr,
-    /// Address of the administrator of the contract
+    /// Market contract we're countertrading on
+    pub market: RawAddr,
+    /// Administrator of the contract, Should be the factory contract
+    /// which initializes this.
     pub admin: RawAddr,
     /// Initial configuration values
     pub config: ConfigUpdate,
@@ -34,12 +34,13 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 /// Updates to configuration values.
 pub struct Config {
-    /// Administrator of the contract, allowed to make config updates
+    /// Administrator of the contract, Should be the factory contract
+    /// which initializes this.
     pub admin: Addr,
     /// Pending administrator, ready to be accepted, if any.
     pub pending_admin: Option<Addr>,
-    /// Factory we are balancing
-    pub factory: Addr,
+    /// Market address that we are allowed to open positions on
+    pub market: Addr,
     /// Minimum funding rate for popular side
     pub min_funding: Decimal256,
     /// Target funding rate for popular side
@@ -107,22 +108,14 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Deposit funds for a given market
-    Deposit {
-        /// Market to apply funds to
-        market: MarketId,
-    },
+    Deposit {},
     /// Withdraw funds from a given market
     Withdraw {
         /// The number of LP shares to remove
         amount: NonZero<LpToken>,
-        /// Market to withdraw from
-        market: MarketId,
     },
     /// Perform a balancing operation on the given market
-    DoWork {
-        /// Which markets to balance
-        market: MarketId,
-    },
+    DoWork {},
     /// Appoint a new administrator
     AppointAdmin {
         /// Address of the new administrator
@@ -144,42 +137,21 @@ pub enum QueryMsg {
     Config {},
     /// Check the balance of an address for all markets.
     ///
-    /// Returns [BalanceResp]
+    /// Returns [MarketBalance]
     Balance {
         /// Address of the token holder
         address: RawAddr,
-        /// Value from [BalanceResp::next_start_after]
-        start_after: Option<MarketId>,
-        /// How many values to return
-        limit: Option<u32>,
     },
     /// Check the status of a single market
     ///
-    /// Returns [MarketsResp]
-    Markets {
-        /// Value from [MarketsResp::next_start_after]
-        start_after: Option<MarketId>,
-        /// How many values to return
-        limit: Option<u32>,
-    },
-    /// Check if the given market has any work to do
+    /// Returns [MarketStatus]
+    Status {},
+    /// Check if the given contract has any work to do
     ///
     /// Returns [HasWorkResp]
-    HasWork {
-        /// Which market to check
-        market: MarketId,
-    },
+    HasWork {},
 }
 
-/// Response from [QueryMsg::Balance]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct BalanceResp {
-    /// Market balances in this batch
-    pub markets: Vec<MarketBalance>,
-    /// Next start_after value, if we have more balances
-    pub next_start_after: Option<MarketId>,
-}
 /// Individual market response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -258,16 +230,6 @@ impl Display for Token {
     }
 }
 
-/// Response from [QueryMsg::Markets]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct MarketsResp {
-    /// Market statuses in this batch
-    pub markets: Vec<MarketStatus>,
-    /// Next start_after value, if we have more markets
-    pub next_start_after: Option<MarketId>,
-}
-
 /// Status of a single market
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -321,15 +283,6 @@ pub enum WorkDescription {
         /// Position to be closed
         pos_id: PositionId,
     },
-    /// Update collateral balance based on an already closed position
-    CollectClosedPosition {
-        /// Position that has already been closed
-        pos_id: PositionId,
-        /// Close time, used for constructing future cursors
-        close_time: Timestamp,
-        /// Active collateral that was sent back to our contract
-        active_collateral: Collateral,
-    },
     /// All collateral exhausted, reset shares to 0
     ResetShares,
     /// Deferred execution completed, we can continue our processing
@@ -355,6 +308,68 @@ pub enum WorkDescription {
     },
 }
 
+impl WorkDescription {
+    /// Is it closed position ?
+    pub fn is_close_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => true,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+
+    /// Is it collect closed position ?
+    pub fn is_collect_closed_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+
+    /// Is it update position ?
+    pub fn is_update_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => true,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
+        }
+    }
+
+    /// Is it open position ?
+    pub fn is_open_position(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => true,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+
+    /// Is it open position ?
+    pub fn is_handle_deferred_exec(&self) -> bool {
+        match self {
+            WorkDescription::OpenPosition { .. } => false,
+            WorkDescription::ClosePosition { .. } => false,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => true,
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
+        }
+    }
+}
+
 impl std::fmt::Display for WorkDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -368,12 +383,9 @@ impl std::fmt::Display for WorkDescription {
                 "Open {direction:?} position with leverage {leverage} and collateral {collateral}"
             ),
             WorkDescription::ClosePosition { pos_id } => write!(f, "Close Position {pos_id}"),
-            WorkDescription::CollectClosedPosition { pos_id, .. } => {
-                write!(f, "Collect Closed Position Id of {}", pos_id)
-            }
             WorkDescription::ResetShares => write!(f, "Reset Shares"),
-            WorkDescription::ClearDeferredExec { id } => {
-                write!(f, "Clear Deferred Exec Id of {id}")
+            WorkDescription::ClearDeferredExec { id, .. } => {
+                write!(f, "Handle Deferred Exec Id of {id}")
             }
             WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
                 write!(

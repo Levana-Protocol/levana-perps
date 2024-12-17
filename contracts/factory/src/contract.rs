@@ -33,14 +33,15 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_json_binary, Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response,
 };
+use countertrade::COUNTER_TRADE_ADDRS;
 use cw2::{get_contract_version, set_contract_version};
 use perpswap::contracts::{
     factory::{
         entry::{
             AddrIsContractResp, ContractType, CopyTradingAddr, CopyTradingInfo, CopyTradingResp,
-            ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg, LeaderAddr,
-            ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount,
-            QUERY_LIMIT_DEFAULT,
+            CounterTradeAddr, CounterTradeInfo, CounterTradeResp, ExecuteMsg, FactoryOwnerResp,
+            GetReferrerResp, InstantiateMsg, LeaderAddr, ListRefereeCountStartAfter,
+            MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -48,7 +49,10 @@ use perpswap::contracts::{
     market::entry::{ExecuteMsg as MarketExecuteMsg, NewCopyTradingParams, NewMarketParams},
 };
 use perpswap::prelude::*;
-use reply::{InstantiateCopyTrading, INSTANTIATE_COPY_TRADING};
+use reply::{
+    InstantiateCopyTrading, InstantiateCounterTrade, INSTANTIATE_COPY_TRADING,
+    INSTANTIATE_COUNTERTRADE,
+};
 use semver::Version;
 
 // version info for migration info
@@ -71,6 +75,7 @@ pub fn instantiate(
         wind_down,
         label_suffix,
         copy_trading_code_id,
+        counter_trade_code_id,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -87,6 +92,10 @@ pub fn instantiate(
     if let Some(copy_trading_code_id) = copy_trading_code_id {
         let code_id: u64 = copy_trading_code_id.parse()?;
         crate::state::copy_trading::COPY_TRADING_CODE_ID.save(deps.storage, &code_id)?;
+    }
+    if let Some(counter_trade_code_id) = counter_trade_code_id {
+        let code_id: u64 = counter_trade_code_id.parse()?;
+        crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(deps.storage, &code_id)?;
     }
 
     ALL_CONTRACTS.save(deps.storage, &env.contract.address, &ContractType::Factory)?;
@@ -172,6 +181,50 @@ fn execute_msg(
             )?;
         }
 
+        ExecuteMsg::AddCounterTrade { new_counter_trade } => {
+            let factory = state.env.contract.address;
+            let market_addr = crate::state::market::MARKET_ADDRS
+                .may_load(ctx.storage, &new_counter_trade.market_id)?
+                .context("No market id found")?;
+
+            if crate::state::countertrade::COUNTER_TRADE_ADDRS
+                .key(new_counter_trade.market_id.clone())
+                .has(ctx.storage)
+            {
+                bail!(
+                    "Countertrade contract already exists for {}",
+                    new_counter_trade.market_id.clone()
+                );
+            }
+
+            let migration_admin: Addr = get_admin_migration(ctx.storage)?;
+            INSTANTIATE_COUNTERTRADE.save(
+                ctx.storage,
+                &InstantiateCounterTrade {
+                    migration_admin: migration_admin.clone(),
+                    market_id: new_counter_trade.market_id.clone(),
+                },
+            )?;
+            let label_suffix = get_label_suffix(ctx.storage)?;
+            let countertrade_code_id = crate::state::countertrade::COUNTER_TRADE_CODE_ID
+                .may_load(ctx.storage)?
+                .context("countertrade code id is not stored yet")?;
+            ctx.response.add_instantiate_submessage(
+                ReplyId::InstantiateCountertrade,
+                &migration_admin,
+                countertrade_code_id,
+                format!(
+                    "Levana Perps Countertrade ({}) - {label_suffix}",
+                    new_counter_trade.market_id
+                ),
+                &perpswap::contracts::countertrade::InstantiateMsg {
+                    market: market_addr.into(),
+                    admin: factory.into(),
+                    config: perpswap::contracts::countertrade::ConfigUpdate::default(),
+                },
+            )?;
+        }
+
         ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams { name, description },
         } => {
@@ -222,6 +275,11 @@ fn execute_msg(
         ExecuteMsg::SetCopyTradingCodeId { code_id } => {
             let code_id: u64 = code_id.parse()?;
             COPY_TRADING_CODE_ID.save(ctx.storage, &code_id)?;
+        }
+
+        ExecuteMsg::SetCounterTradeCodeId { code_id } => {
+            let code_id: u64 = code_id.parse()?;
+            crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(ctx.storage, &code_id)?;
         }
 
         ExecuteMsg::SetOwner { owner } => {
@@ -405,6 +463,23 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                             .add_attribute("contract", addr.to_string()),
                     );
                 }
+                ReplyId::InstantiateCountertrade => {
+                    let market_id = INSTANTIATE_COUNTERTRADE
+                        .may_load(ctx.storage)?
+                        .context("No data in INSTANTIATE_COPY_TRADING")?
+                        .market_id;
+                    ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CounterTrade)?;
+                    COUNTER_TRADE_ADDRS.save(
+                        ctx.storage,
+                        market_id.clone(),
+                        &CounterTradeAddr(addr.clone()),
+                    )?;
+                    ctx.response.add_event(
+                        Event::new("instantiate-counter-trade")
+                            .add_attribute("market_id", market_id.to_string())
+                            .add_attribute("contract", addr.to_string()),
+                    );
+                }
             }
         }
         _ => {
@@ -511,6 +586,28 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 .transpose()?;
             list_referee_count(store, limit, start_after)?.query_result()
         }
+        QueryMsg::CounterTrade { start_after, limit } => {
+            let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
+            let result = crate::state::countertrade::COUNTER_TRADE_ADDRS
+                .range(
+                    store,
+                    start_after.map(Bound::exclusive),
+                    None,
+                    cosmwasm_std::Order::Ascending,
+                )
+                .take(limit.try_into()?)
+                .map(|res| {
+                    res.map(|(market_id, contract)| CounterTradeInfo {
+                        contract,
+                        market_id,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let response = CounterTradeResp { addresses: result };
+            let response = to_json_binary(&response)?;
+            Ok(response)
+        }
+
         QueryMsg::CopyTrading { start_after, limit } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {

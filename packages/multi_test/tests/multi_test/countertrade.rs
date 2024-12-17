@@ -10,7 +10,7 @@ use perpswap::{
         countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
         market::position::PositionId,
     },
-    number::{Collateral, NonZero},
+    number::{Collateral, NonZero, Signed},
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
 };
 
@@ -37,20 +37,19 @@ fn deposit() {
     let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
-    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    market.query_countertrade_balances(&lp).unwrap_err();
 
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
-    let mut balances = market.query_countertrade_balances(&lp).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balance = market.query_countertrade_balances(&lp).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balance;
     assert_eq!(shares.to_string(), "100");
     assert_eq!(collateral.to_string(), "100");
     assert_eq!(pool_size.to_string(), "100");
@@ -60,18 +59,17 @@ fn deposit() {
     market
         .exec_countertrade_mint_and_deposit(&lp, "50")
         .unwrap();
-    let mut balances = market.query_countertrade_balances(&lp).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balance = market.query_countertrade_balances(&lp).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
-    assert_eq!(shares.to_string(), "50");
+    } = balance;
     assert_eq!(collateral.to_string(), "50");
     assert_eq!(pool_size.to_string(), "150");
+    assert_eq!(shares.to_string(), "50");
 }
 
 #[test]
@@ -97,28 +95,26 @@ fn withdraw_no_positions() {
         "Before: {balance_before}. After: {balance_after}. Expected after: {expected}"
     );
 
-    let mut balances = market.query_countertrade_balances(&lp0).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balances = market.query_countertrade_balances(&lp0).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balances;
     assert_eq!(shares.to_string(), "50");
     assert_eq!(collateral.to_string(), "50");
     assert_eq!(pool_size.to_string(), "150");
 
-    let mut balances = market.query_countertrade_balances(&lp1).unwrap();
-    assert_eq!(balances.len(), 1);
+    let balances = market.query_countertrade_balances(&lp1).unwrap();
     let MarketBalance {
         market: _,
         token: _,
         shares,
         collateral,
         pool_size,
-    } = balances.pop().unwrap();
+    } = balances;
     assert_eq!(shares.to_string(), "100");
     assert_eq!(collateral.to_string(), "100");
     assert_eq!(pool_size.to_string(), "150");
@@ -485,7 +481,7 @@ fn closes_extra_positions() {
 
     for pos_id in pos_ids.into_iter().take(4) {
         // Get the status before we close the position, for comparison below
-        let market_before = market.query_countertrade_markets().unwrap().pop().unwrap();
+        let market_before = market.query_countertrade_markets().unwrap();
         let balance_before = market.query_collateral_balance(&countertrade).unwrap();
 
         // We should be forced to close the first open position
@@ -496,8 +492,7 @@ fn closes_extra_positions() {
             }
         );
 
-        // Don't collect so that we can test the intermediate states
-        do_work_optional_collect(&market, &lp, false);
+        do_work_optional_collect(&market, &lp);
 
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
@@ -508,27 +503,8 @@ fn closes_extra_positions() {
             .round_down_to_precision(pos.active_collateral)
             .unwrap();
 
-        // Ensure that now we want to collect the information from that closed position
-        assert_eq!(
-            market.query_countertrade_has_work().unwrap(),
-            HasWorkResp::Work {
-                desc: perpswap::contracts::countertrade::WorkDescription::CollectClosedPosition {
-                    pos_id,
-                    close_time: pos.close_time,
-                    active_collateral
-                }
-            }
-        );
-
-        // Without collecting, our balances remain the same
-        let market_before_work = market.query_countertrade_markets().unwrap().pop().unwrap();
-        assert_eq!(market_before_work.collateral, market_before.collateral);
-
-        // Now collect the balances
-        market.exec_countertrade_do_work().unwrap();
-
         // And confirm the countertrade contract saw the update
-        let market_after = market.query_countertrade_markets().unwrap().pop().unwrap();
+        let market_after = market.query_countertrade_markets().unwrap();
         assert_eq!(
             Ok(market_after.collateral),
             market_before.collateral + active_collateral
@@ -635,15 +611,7 @@ fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) 
     // Position must be closed
     market.query_closed_position(&countertrade, pos_id).unwrap();
 
-    assert_eq!(
-        market
-            .query_countertrade_markets()
-            .unwrap()
-            .pop()
-            .unwrap()
-            .position,
-        None
-    );
+    assert_eq!(market.query_countertrade_markets().unwrap().position, None);
 }
 
 #[test]
@@ -656,7 +624,7 @@ fn resets_token_balances() {
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
-    assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
 
     todo!("force a new position to get opened by the contract and then close it manually");
     assert_eq!(
@@ -665,18 +633,18 @@ fn resets_token_balances() {
             desc: perpswap::contracts::countertrade::WorkDescription::ResetShares
         }
     );
-    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
     market.exec_countertrade_do_work().unwrap();
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::NoWork {}
     );
     market.exec_countertrade_do_work().unwrap_err();
-    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
         .unwrap();
-    assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    // assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
 }
 
 #[test]
@@ -840,23 +808,20 @@ fn balance_one_sided_market() {
 }
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
-    do_work_optional_collect(market, lp, true)
+    do_work_optional_collect(market, lp)
 }
 
-fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
+fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr) {
     let work = market.query_countertrade_has_work().unwrap();
-    let (has_deferred_exec, is_close) = match work {
+    let has_deferred_exec = match work {
         HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
         HasWorkResp::Work { desc } => match desc {
-            WorkDescription::OpenPosition { .. } => (true, false),
-            WorkDescription::ClosePosition { .. } => (true, true),
-            WorkDescription::CollectClosedPosition { .. } => {
-                panic!("CollectClosedPosition in do_work")
-            }
-            WorkDescription::ResetShares => (false, false),
+            WorkDescription::OpenPosition { .. } => true,
+            WorkDescription::ClosePosition { .. } => true,
+            WorkDescription::ResetShares => false,
             WorkDescription::ClearDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
-            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => (true, false),
-            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => (true, false),
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => true,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
         },
     };
     market.exec_countertrade_do_work().unwrap();
@@ -871,23 +836,11 @@ fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: boo
     if has_deferred_exec {
         match market.query_countertrade_has_work().unwrap() {
             HasWorkResp::Work {
-                desc: WorkDescription::ClearDeferredExec { id: _ },
+                desc: WorkDescription::ClearDeferredExec { .. },
             } => (),
             work => panic!("Unexpected work response: {work:?}"),
         }
         market.exec_countertrade_do_work().unwrap();
-    }
-
-    if is_close {
-        match market.query_countertrade_has_work().unwrap() {
-            HasWorkResp::Work {
-                desc: WorkDescription::CollectClosedPosition { .. },
-            } => (),
-            work => panic!("Unexpected work response: {work:?}"),
-        }
-        if collect_closed {
-            market.exec_countertrade_do_work().unwrap();
-        }
     }
 }
 
@@ -940,11 +893,8 @@ fn deduct_balance() {
         )
         .unwrap();
 
-    let balance = market
-        .query_countertrade_balances(&lp)
-        .unwrap()
-        .pop()
-        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+
     assert_eq!(
         balance.collateral,
         NonZero::new(Collateral::from_str("100").unwrap()).unwrap()
@@ -974,24 +924,31 @@ fn deduct_balance() {
     }
 
     market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    // Handle deferred exec id
+    market.exec_countertrade_do_work().unwrap();
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Force the countertrade position to be closed
+    market.exec_set_price("1.2".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
 
     // Calculate before deferred execution so that DNF fee doesn't
     // influence the available total
-    let balance = market
-        .query_countertrade_balances(&lp)
-        .unwrap()
-        .pop()
-        .unwrap();
-    // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+
     match market_type {
         perpswap::storage::MarketType::CollateralIsQuote => assert!(balance
             .collateral
             .raw()
-            .approx_eq(Collateral::from_str("98.384623849").unwrap())),
+            .approx_eq(Collateral::from_str("98.384624").unwrap())),
         perpswap::storage::MarketType::CollateralIsBase => assert!(balance
             .collateral
             .raw()
-            .approx_eq(Collateral::from_str("98.531476226").unwrap())),
+            .approx_eq(Collateral::from_str("98.531477").unwrap())),
     }
 }
 
@@ -1038,9 +995,8 @@ fn update_position_scenario_add_collateral() {
     let status = market.query_status().unwrap();
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
-    let status = market.query_status().unwrap();
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1085,7 +1041,7 @@ fn update_position_scenario_add_collateral() {
 
     do_work(&market, &lp);
     let updated_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1152,10 +1108,8 @@ fn update_position_scenario_remove_collateral() {
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
 
-    let status = market.query_status().unwrap();
-
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1201,9 +1155,8 @@ fn update_position_scenario_remove_collateral() {
         },
     };
     do_work(&market, &lp);
-    let status = market.query_status().unwrap();
     let updated_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1260,10 +1213,8 @@ fn do_not_mutate_countertrade_position() {
 
     do_work(&market, &lp);
 
-    let status = market.query_status().unwrap();
-
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1372,11 +1323,10 @@ fn update_position_funding_rate_less_than_target_rate() {
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
 
-    let status = market.query_status().unwrap();
     let config = market.query_countertrade_config().unwrap();
 
     let countertrade_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1426,7 +1376,7 @@ fn update_position_funding_rate_less_than_target_rate() {
     do_work(&market, &lp);
     let status = market.query_status().unwrap();
     let updated_position = market
-        .query_countertrade_market_id(status.market_id)
+        .query_countertrade_market_id()
         .unwrap()
         .position
         .unwrap();
@@ -1438,7 +1388,7 @@ fn update_position_funding_rate_less_than_target_rate() {
 }
 
 fn do_work_ct(market: &PerpsMarket, lp: &Addr) {
-    do_work_optional_collect(market, lp, true);
+    do_work_optional_collect(market, lp);
     log_status("=== Ran a CT update", market);
 }
 
@@ -1515,10 +1465,7 @@ fn smart_search_bug_perp_4098() {
         // This is where the bug was occuring
         do_work_ct(&market, &lp);
 
-        let status = market.query_status().unwrap();
-        let ct_trade = market
-            .query_countertrade_market_id(status.market_id)
-            .unwrap();
+        let ct_trade = market.query_countertrade_market_id().unwrap();
         assert!(ct_trade.position.is_none());
     }
 }
@@ -1641,9 +1588,7 @@ fn log_status(header: &str, market: &PerpsMarket) {
     println!("= Long Notional: {}", status.long_notional);
     println!("= Short Notional: {}", status.short_notional);
 
-    let ct_trade = market
-        .query_countertrade_market_id(status.market_id)
-        .unwrap();
+    let ct_trade = market.query_countertrade_market_id().unwrap();
 
     match ct_trade.position {
         Some(_) => {
@@ -1656,4 +1601,444 @@ fn log_status(header: &str, market: &PerpsMarket) {
         }
         None => println!("- CT Notional: 0"),
     };
+}
+
+fn assert_contract_and_on_chain_balances(
+    market: &PerpsMarket,
+    chain_balance: Option<Signed<Decimal256>>,
+) {
+    let on_chain_balance = market
+        .query_collateral_balance(&market.get_countertrade_addr())
+        .unwrap();
+    let contract_balance = market.query_countertrade_market_id().unwrap().collateral;
+    let contract_balance = market
+        .token
+        .round_down_to_precision(contract_balance)
+        .unwrap()
+        .into_signed()
+        .into_number();
+    let diff = contract_balance - on_chain_balance;
+    assert!(
+        diff.unwrap() < "0.0001".parse().unwrap(),
+        "On chain balance: {on_chain_balance} / Contract balance: {contract_balance}"
+    );
+    if let Some(chain_balance) = chain_balance {
+        assert_eq!(chain_balance, on_chain_balance);
+    }
+}
+
+#[test]
+fn perp_4332_balance_mismatch() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    let (pos_id1, _) = market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // Open position
+    do_work(&market, &lp);
+
+    market.exec_close_position(&lp, pos_id1, None).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_update_position());
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
+    // Update position
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    std::env::remove_var("LEVANA_CONTRACTS_INJECT_FAILURE");
+
+    assert_contract_and_on_chain_balances(&market, None);
+}
+
+#[test]
+fn open_position_no_balance_mismatch_success_case() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    let initial_balance = market
+        .query_collateral_balance(&market.get_countertrade_addr())
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // Open position
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_handle_deferred_exec());
+    market.exec_countertrade_do_work().unwrap();
+
+    assert_contract_and_on_chain_balances(&market, None);
+
+    let on_chain_balance = market
+        .query_collateral_balance(&market.get_countertrade_addr())
+        .unwrap();
+    assert_ne!(initial_balance, on_chain_balance);
+}
+
+#[test]
+fn open_position_no_balance_mismatch_on_failure() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
+
+    // Open position
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap_err();
+
+    assert_contract_and_on_chain_balances(&market, None);
+}
+
+#[test]
+fn reply_entrypoint_failure_check() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
+
+    // Open position
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap_err();
+
+    std::env::remove_var("LEVANA_CONTRACTS_INJECT_FAILURE");
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_handle_deferred_exec());
+    market.exec_countertrade_do_work().unwrap();
+
+    assert_contract_and_on_chain_balances(&market, None);
+}
+
+#[test]
+fn withdraw_before_deferred_handler() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
+
+    let initial_balance = market
+        .query_collateral_balance(&market.get_countertrade_addr())
+        .unwrap();
+
+    // Open position
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap_err();
+    assert_contract_and_on_chain_balances(&market, Some(initial_balance));
+
+    std::env::remove_var("LEVANA_CONTRACTS_INJECT_FAILURE");
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_handle_deferred_exec());
+
+    market.exec_countertrade_withdraw(&lp, "10").unwrap_err();
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "10")
+        .unwrap_err();
+
+    market.exec_countertrade_do_work().unwrap();
+    assert_contract_and_on_chain_balances(&market, None);
+
+    market.exec_countertrade_withdraw(&lp, "10").unwrap();
+    assert_contract_and_on_chain_balances(&market, None);
+}
+
+#[test]
+fn deferred_exec_failure_balance_issue() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "9",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "90",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "6",
+                perpswap::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    let initial_balance = market
+        .query_collateral_balance(&market.get_countertrade_addr())
+        .unwrap();
+
+    // Open position
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_open_position());
+    market.exec_countertrade_do_work().unwrap();
+
+    // To force the deferred execution fail so that open order is not successful
+    std::env::set_var("LEVANA_CONTRACTS_INJECT_FAILURE", "true");
+    market.exec_crank_till_finished(&lp).unwrap();
+    assert_contract_and_on_chain_balances(&market, None);
+
+    std::env::remove_var("LEVANA_CONTRACTS_INJECT_FAILURE");
+    let work = market.query_countertrade_work().unwrap();
+    assert!(work.is_handle_deferred_exec());
+    market.exec_countertrade_do_work().unwrap();
+    assert_contract_and_on_chain_balances(&market, Some(initial_balance));
+}
+
+#[test]
+fn deposit_extra_money() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.query_countertrade_balances(&lp).unwrap_err();
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    let MarketBalance {
+        market: _,
+        token: _,
+        shares,
+        collateral,
+        pool_size,
+    } = balance;
+    assert_eq!(shares.to_string(), "100");
+    assert_eq!(collateral.to_string(), "100");
+    assert_eq!(pool_size.to_string(), "100");
+
+    let lp = market.clone_lp(1).unwrap();
+
+    let contract = market.get_countertrade_addr();
+    market.exec_mint_and_deposit(&lp, "100", &contract).unwrap();
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "50")
+        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    let MarketBalance {
+        market: _,
+        token: _,
+        shares,
+        collateral,
+        pool_size,
+    } = balance;
+    assert_eq!(collateral.to_string(), "50");
+    assert_eq!(pool_size.to_string(), "125");
+    assert_eq!(shares.to_string(), "25");
 }

@@ -28,7 +28,7 @@ pub fn instantiate(
     _env: Env,
     _info: MessageInfo,
     InstantiateMsg {
-        factory,
+        market,
         admin,
         config:
             ConfigUpdate {
@@ -45,9 +45,9 @@ pub fn instantiate(
     let config = Config {
         admin: admin.validate(deps.api).context("Invalid admin provided")?,
         pending_admin: None,
-        factory: factory
+        market: market
             .validate(deps.api)
-            .context("Invalid factory provided")?,
+            .context("Invalid market provided")?,
         min_funding: min_funding.unwrap_or_else(|| Decimal256::from_ratio(10u32, 100u32)),
         target_funding: target_funding.unwrap_or_else(|| Decimal256::from_ratio(40u32, 100u32)),
         max_funding: max_funding.unwrap_or_else(|| Decimal256::from_ratio(60u32, 100u32)),

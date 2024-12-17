@@ -1,4 +1,5 @@
 //! Entrypoint messages for the factory
+use crate::contracts::market::entry::NewCounterTradeParams;
 use crate::prelude::*;
 use crate::{
     contracts::market::entry::{NewCopyTradingParams, NewMarketParams},
@@ -20,6 +21,8 @@ pub struct InstantiateMsg {
     pub liquidity_token_code_id: String,
     /// The code id for the copy trading contract
     pub copy_trading_code_id: Option<String>,
+    /// The code id for the countertrade contract
+    pub counter_trade_code_id: Option<String>,
     /// Migration admin, needed for instantiating/migrating sub-contracts
     pub migration_admin: RawAddr,
     /// Perpetual swap admin address
@@ -114,9 +117,19 @@ pub enum ExecuteMsg {
         /// Parameters for the contract
         new_copy_trading: NewCopyTradingParams,
     },
+    /// Add new countertrade contract
+    AddCounterTrade {
+        /// Parameters for the contract
+        new_counter_trade: NewCounterTradeParams,
+    },
     /// Set the copy trading code id, i.e. if it's been migrated
     SetCopyTradingCodeId {
         /// Code ID to use for future copy trading contracts
+        code_id: String,
+    },
+    /// Set the counter trade code id, i.e. if it's been migrated
+    SetCounterTradeCodeId {
+        /// Code ID to use for future countertrade contracts
         code_id: String,
     },
     /// Remove the owner from factory
@@ -141,6 +154,15 @@ pub struct CopyTradingResp {
     pub addresses: Vec<CopyTradingInfo>,
 }
 
+/// Response from [QueryMsg::Markets]
+///
+/// Use [QueryMsg::CopyTrading] for details on copy trading contract.
+#[cw_serde]
+pub struct CounterTradeResp {
+    /// Copy trading contracts maintained by this factory
+    pub addresses: Vec<CounterTradeInfo>,
+}
+
 /// Response from [QueryMsg::AddrIsContract]
 #[cw_serde]
 pub struct AddrIsContractResp {
@@ -163,6 +185,8 @@ pub enum ContractType {
     Market,
     /// Copy trading contract
     CopyTrading,
+    /// Countertrade contract
+    CounterTrade,
 }
 
 /// Default limit for [QueryMsg::Markets]
@@ -280,6 +304,14 @@ pub enum QueryMsg {
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
+    /// Fetch counter trade contracts
+    #[returns(CounterTradeResp)]
+    CounterTrade {
+        /// Last seen [MarketId] in a [CounterTradeResp] for enumeration
+        start_after: Option<MarketId>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -329,6 +361,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetMarketCodeId { .. } => true,
             ExecuteMsg::SetPositionTokenCodeId { .. } => true,
             ExecuteMsg::SetLiquidityTokenCodeId { .. } => true,
+            ExecuteMsg::SetCounterTradeCodeId { .. } => true,
             ExecuteMsg::SetOwner { .. } => true,
             ExecuteMsg::SetMigrationAdmin { .. } => true,
             ExecuteMsg::SetDao { .. } => true,
@@ -336,6 +369,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetWindDown { .. } => true,
             ExecuteMsg::TransferAllDaoFees {} => true,
             ExecuteMsg::RegisterReferrer { .. } => false,
+            ExecuteMsg::AddCounterTrade { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
             ExecuteMsg::AddCopyTrading { .. } => false,
@@ -427,7 +461,7 @@ pub struct ListRefereeCountStartAfter {
 pub struct LeaderAddr(pub Addr);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
-/// Leader address
+/// Copy trading address
 pub struct CopyTradingAddr(pub Addr);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
@@ -437,6 +471,15 @@ pub struct CopyTradingInfo {
     pub leader: LeaderAddr,
     /// Address of the copy trading contract
     pub contract: CopyTradingAddr,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Copy trading contract information
+pub struct CounterTradeInfo {
+    /// Address of the counter trade contract
+    pub contract: CounterTradeAddr,
+    /// Associated market id of the counter trade contract
+    pub market_id: MarketId,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
@@ -491,6 +534,36 @@ impl<'a> Prefixer<'a> for CopyTradingAddr {
 }
 
 impl<'a> PrimaryKey<'a> for CopyTradingAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
+    }
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Counter trade contract address
+pub struct CounterTradeAddr(pub Addr);
+
+impl KeyDeserialize for CounterTradeAddr {
+    type Output = CounterTradeAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(CounterTradeAddr)
+    }
+}
+impl<'a> Prefixer<'a> for CounterTradeAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for CounterTradeAddr {
     type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
     type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
     type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
