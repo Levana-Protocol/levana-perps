@@ -70,7 +70,6 @@ impl<'a> State<'a> {
         Ok((info, false))
     }
 
-    // todo: Use only this
     pub(crate) fn load_cache_market_info(&self, storage: &mut dyn Storage) -> Result<MarketInfo> {
         let (market, is_cached) = self.load_market_info_inner(storage)?;
         if !is_cached {
