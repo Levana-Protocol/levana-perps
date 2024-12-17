@@ -43,10 +43,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
         );
     }
 
-    ensure!(
-        totals.deferred_collateral.is_some(),
-        "Associated deferred collateral is expected for deferred exec id {deferred_exec_id}"
-    );
     totals.deferred_exec = Some(deferred_exec_id);
     crate::state::TOTALS.save(storage, &totals)?;
     Ok(Response::new().add_event(
