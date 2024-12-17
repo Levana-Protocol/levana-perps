@@ -902,7 +902,6 @@ pub(crate) fn execute(
         |storage: &mut dyn Storage, res: Response, msg: WasmMsg| -> Result<Response> {
             assert!(!crate::state::REPLY_MARKET.exists(storage));
             crate::state::REPLY_MARKET.save(storage, &market.id)?;
-            // We use reply always so that we also handle the error case
             Ok(res.add_submessage(SubMsg::reply_on_success(msg, 0)))
         };
 
