@@ -154,6 +154,15 @@ pub struct CopyTradingResp {
     pub addresses: Vec<CopyTradingInfo>,
 }
 
+/// Response from [QueryMsg::Markets]
+///
+/// Use [QueryMsg::CopyTrading] for details on copy trading contract.
+#[cw_serde]
+pub struct CounterTradeResp {
+    /// Copy trading contracts maintained by this factory
+    pub addresses: Vec<CounterTradeInfo>,
+}
+
 /// Response from [QueryMsg::AddrIsContract]
 #[cw_serde]
 pub struct AddrIsContractResp {
@@ -292,6 +301,14 @@ pub enum QueryMsg {
         leader: RawAddr,
         /// Last seen copy trading contract address for enumeration
         start_after: Option<RawAddr>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
+    /// Fetch counter trade contracts
+    #[returns(CounterTradeResp)]
+    CounterTrade {
+        /// Last seen [MarketId] in a [CounterTradeResp] for enumeration
+        start_after: Option<MarketId>,
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
@@ -454,6 +471,15 @@ pub struct CopyTradingInfo {
     pub leader: LeaderAddr,
     /// Address of the copy trading contract
     pub contract: CopyTradingAddr,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Copy trading contract information
+pub struct CounterTradeInfo {
+    /// Address of the counter trade contract
+    pub contract: CounterTradeAddr,
+    /// Associated market id of the counter trade contract
+    pub market_id: MarketId
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
