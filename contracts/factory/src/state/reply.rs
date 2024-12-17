@@ -9,6 +9,9 @@ const INSTANTIATE_MARKET: Item<InstantiateMarket> = Item::new(namespace::REPLY_I
 pub(crate) const INSTANTIATE_COPY_TRADING: Item<InstantiateCopyTrading> =
     Item::new(namespace::REPLY_INSTANTIATE_COPY_TRADING);
 
+pub(crate) const INSTANTIATE_COUNTERTRADE: Item<InstantiateCounterTrade> =
+    Item::new(namespace::REPLY_INSTANTIATE_COUNTER_TRADE);
+
 #[derive(Serialize, Deserialize)]
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
@@ -19,6 +22,12 @@ pub(crate) struct InstantiateMarket {
 pub(crate) struct InstantiateCopyTrading {
     pub(crate) migration_admin: Addr,
     pub(crate) leader: Addr,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct InstantiateCounterTrade {
+    pub(crate) migration_admin: Addr,
+    pub(crate) market_id: MarketId,
 }
 
 pub(crate) fn reply_get_instantiate_market(store: &dyn Storage) -> Result<InstantiateMarket> {
@@ -43,6 +52,7 @@ pub(crate) enum ReplyId {
     InstantiateLiquidityTokenLp = 2,
     InstantiateLiquidityTokenXlp = 3,
     InstantiateCopyTrading = 4,
+    InstantiateCountertrade = 5,
 }
 
 impl TryFrom<u64> for ReplyId {
@@ -55,6 +65,7 @@ impl TryFrom<u64> for ReplyId {
             2 => Ok(ReplyId::InstantiateLiquidityTokenLp),
             3 => Ok(ReplyId::InstantiateLiquidityTokenXlp),
             4 => Ok(ReplyId::InstantiateCopyTrading),
+            5 => Ok(ReplyId::InstantiateCountertrade),
             _ => Err(PerpError {
                 id: ErrorId::InternalReply,
                 domain: ErrorDomain::Factory,
@@ -73,6 +84,7 @@ impl From<ReplyId> for u64 {
             ReplyId::InstantiateLiquidityTokenLp => 2,
             ReplyId::InstantiateLiquidityTokenXlp => 3,
             ReplyId::InstantiateCopyTrading => 4,
+            ReplyId::InstantiateCountertrade => 5,
         }
     }
 }

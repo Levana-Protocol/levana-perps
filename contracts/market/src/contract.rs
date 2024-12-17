@@ -1,16 +1,19 @@
 mod perps_info;
 
-use crate::state::{
-    config::{config_init, update_config},
-    crank::crank_init,
-    delta_neutrality_fee::DELTA_NEUTRALITY_FUND,
-    fees::fees_init,
-    liquidity::{liquidity_init, yield_init},
-    meta::meta_init,
-    order::backwards_compat_limit_order_take_profit,
-    position::{get_position, positions_init},
-    set_factory_addr,
-    token::token_init,
+use crate::{
+    inject_failures_during_test,
+    state::{
+        config::{config_init, update_config},
+        crank::crank_init,
+        delta_neutrality_fee::DELTA_NEUTRALITY_FUND,
+        fees::fees_init,
+        liquidity::{liquidity_init, yield_init},
+        meta::meta_init,
+        order::backwards_compat_limit_order_take_profit,
+        position::{get_position, positions_init},
+        set_factory_addr,
+        token::token_init,
+    },
 };
 
 use crate::prelude::*;
@@ -172,6 +175,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit,
         } => {
+            inject_failures_during_test()?;
             state.defer_execution(
                 &mut ctx,
                 info.sender,

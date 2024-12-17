@@ -28,7 +28,7 @@ use perpswap::contracts::copy_trading::{
 };
 use perpswap::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
-    QueryMsg as CountertradeQueryMsg,
+    QueryMsg as CountertradeQueryMsg, WorkDescription,
 };
 use perpswap::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
@@ -47,10 +47,10 @@ use perpswap::contracts::market::deferred_execution::{
 use perpswap::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
-    LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, PositionActionHistoryResp,
-    PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp, QueryMsg, ReferralStatsResp,
-    SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary,
-    TraderActionHistoryResp,
+    LpActionHistoryResp, LpInfoResp, NewCopyTradingParams, NewCounterTradeParams,
+    PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp,
+    QueryMsg, ReferralStatsResp, SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss,
+    TradeHistorySummary, TraderActionHistoryResp,
 };
 use perpswap::contracts::market::position::{ClosedPosition, PositionsResp};
 use perpswap::contracts::market::spot_price::{
@@ -95,6 +95,7 @@ pub struct PerpsMarket {
     pub id: MarketId,
     pub addr: Addr,
     pub copy_trading_addr: Addr,
+    pub countertrade_addr: Addr,
     /// When enabled, time will jump by one block on every exec
     pub automatic_time_jump_enabled: bool,
 
@@ -207,6 +208,12 @@ impl PerpsMarket {
         let factory_addr = app.borrow().factory_addr.clone();
         let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
 
+        let countertrade_msg = perpswap::contracts::factory::entry::ExecuteMsg::AddCounterTrade {
+            new_counter_trade: NewCounterTradeParams {
+                market_id: id.clone(),
+            },
+        };
+
         let copy_trading_msg = perpswap::contracts::factory::entry::ExecuteMsg::AddCopyTrading {
             new_copy_trading: NewCopyTradingParams {
                 name: "Multi test copy trading pool #1".to_owned(),
@@ -312,6 +319,27 @@ impl PerpsMarket {
 
         let market_addr = Addr::unchecked(market_addr);
 
+        let countertrade_addr = app
+            .borrow_mut()
+            .execute_contract(
+                protocol_owner.clone(),
+                factory_addr.clone(),
+                &countertrade_msg,
+                &[],
+            )?
+            .events
+            .iter()
+            .find(|e| e.ty == "instantiate")
+            .context("could not instantiate")?
+            .attributes
+            .iter()
+            .find(|a| a.key == "_contract_address")
+            .context("could not find contract_address")?
+            .value
+            .clone();
+
+        let countertrade_addr = Addr::unchecked(countertrade_addr);
+
         let token = app
             .borrow()
             .wrap()
@@ -329,6 +357,7 @@ impl PerpsMarket {
             automatic_time_jump_enabled: true,
             debug_001: false,
             copy_trading_addr,
+            countertrade_addr,
         };
 
         if bootstap_lp {
@@ -2387,14 +2416,14 @@ impl PerpsMarket {
     }
 
     pub fn get_countertrade_addr(&self) -> Addr {
-        self.app().countertrade_addr.clone()
+        self.countertrade_addr.clone()
     }
 
     pub(crate) fn query_countertrade<T: DeserializeOwned>(
         &self,
         msg: &CountertradeQueryMsg,
     ) -> Result<T> {
-        let contract_addr = self.app().countertrade_addr.clone();
+        let contract_addr = self.countertrade_addr.clone();
         self.app()
             .wrap()
             .query_wasm_smart(contract_addr, &msg)
@@ -2456,62 +2485,39 @@ impl PerpsMarket {
     }
 
     pub fn query_countertrade_has_work(&self) -> Result<HasWorkResp> {
-        self.query_countertrade(&CountertradeQueryMsg::HasWork {
-            market: self.id.clone(),
-        })
+        self.query_countertrade(&CountertradeQueryMsg::HasWork {})
+    }
+
+    pub fn query_countertrade_work(&self) -> Result<WorkDescription> {
+        let work: HasWorkResp = self.query_countertrade(&CountertradeQueryMsg::HasWork {})?;
+        match work {
+            HasWorkResp::NoWork {} => bail!("Expected work, but got no work"),
+            HasWorkResp::Work { desc } => Ok(desc),
+        }
     }
 
     pub fn query_countertrade_balances(
         &self,
         user_addr: &Addr,
-    ) -> Result<Vec<perpswap::contracts::countertrade::MarketBalance>> {
-        let mut start_after = None;
-        let mut res = vec![];
-        loop {
-            let perpswap::contracts::countertrade::BalanceResp {
-                mut markets,
-                next_start_after,
-            } = self.query_countertrade(&CountertradeQueryMsg::Balance {
-                address: user_addr.into(),
-                start_after: start_after.take(),
-                limit: None,
-            })?;
-            res.append(&mut markets);
-            match next_start_after {
-                Some(next_start_after) => start_after = Some(next_start_after),
-                None => break Ok(res),
-            }
-        }
+    ) -> Result<perpswap::contracts::countertrade::MarketBalance> {
+        let result = self.query_countertrade(&CountertradeQueryMsg::Balance {
+            address: user_addr.into(),
+        })?;
+        Ok(result)
     }
 
     pub fn query_countertrade_markets(
         &self,
-    ) -> Result<Vec<perpswap::contracts::countertrade::MarketStatus>> {
-        let mut start_after = None;
-        let mut res = vec![];
-        loop {
-            let perpswap::contracts::countertrade::MarketsResp {
-                mut markets,
-                next_start_after,
-            } = self.query_countertrade(&CountertradeQueryMsg::Markets {
-                start_after: start_after.take(),
-                limit: None,
-            })?;
-            res.append(&mut markets);
-            match next_start_after {
-                Some(next_start_after) => start_after = Some(next_start_after),
-                None => break Ok(res),
-            }
-        }
+    ) -> Result<perpswap::contracts::countertrade::MarketStatus> {
+        let result = self.query_countertrade(&CountertradeQueryMsg::Status {})?;
+        Ok(result)
     }
 
     pub fn query_countertrade_market_id(
         &self,
-        market_id: MarketId,
     ) -> Result<perpswap::contracts::countertrade::MarketStatus> {
         let result = self.query_countertrade_markets()?;
-        let res = result.into_iter().find(|item| item.id == market_id);
-        res.context("Market id {market_id} not found")
+        Ok(result)
     }
 
     pub fn get_copytrading_token(&self) -> Result<perpswap::contracts::copy_trading::Token> {
@@ -2611,6 +2617,24 @@ impl PerpsMarket {
         self.exec_wasm_msg(sender, wasm_msg)
     }
 
+    pub fn exec_mint_and_deposit(
+        &self,
+        user_addr: &Addr,
+        amount: &str,
+        contract: &Addr,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(user_addr, amount.into_number())?;
+        let token = self.token.clone();
+        let amount = NonZero::new(amount).context("amount should not be zero")?;
+        let message = token
+            .into_transfer_msg(contract, amount)
+            .unwrap()
+            .context("Invalid message")?;
+        let result = self.app().execute(user_addr.clone(), message)?;
+        Ok(result)
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,
@@ -2619,11 +2643,9 @@ impl PerpsMarket {
         let amount: Collateral = amount.parse()?;
         self.exec_mint_tokens(user_addr, amount.into_number())?;
         let wasm_msg = self.make_msg_with_funds(
-            &CountertradeExecuteMsg::Deposit {
-                market: self.id.clone(),
-            },
+            &CountertradeExecuteMsg::Deposit {},
             amount.into_number(),
-            &self.app().countertrade_addr,
+            &self.countertrade_addr,
         )?;
         self.exec_wasm_msg(user_addr, wasm_msg)
     }
@@ -2633,7 +2655,7 @@ impl PerpsMarket {
         sender: &Addr,
         msg: &CountertradeExecuteMsg,
     ) -> Result<AppResponse> {
-        let contract_addr = self.app().countertrade_addr.clone();
+        let contract_addr = self.countertrade_addr.clone();
         let res = self
             .app()
             .execute_contract(sender.clone(), contract_addr, msg, &[])?;
@@ -2676,24 +2698,21 @@ impl PerpsMarket {
             sender,
             &CountertradeExecuteMsg::Withdraw {
                 amount: amount.parse()?,
-                market: self.id.clone(),
             },
         )
     }
 
     pub fn exec_countertrade_do_work(&self) -> Result<AppResponse> {
-        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let owner = self.app().factory_addr.clone();
         self.exec_countertrade(
             // Could be anyone
             &owner,
-            &CountertradeExecuteMsg::DoWork {
-                market: self.id.clone(),
-            },
+            &CountertradeExecuteMsg::DoWork {},
         )
     }
 
     pub fn exec_countertrade_appoint_admin(&self, new_admin: &Addr) -> Result<AppResponse> {
-        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let owner = self.app().factory_addr.clone();
         self.exec_countertrade(
             &owner,
             &CountertradeExecuteMsg::AppointAdmin {
@@ -2710,7 +2729,7 @@ impl PerpsMarket {
         &self,
         update: perpswap::contracts::countertrade::ConfigUpdate,
     ) -> Result<AppResponse> {
-        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let owner = self.app().factory_addr.clone();
         self.exec_countertrade(&owner, &CountertradeExecuteMsg::UpdateConfig(update))
     }
 }
