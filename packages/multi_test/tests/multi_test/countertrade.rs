@@ -2001,4 +2001,44 @@ fn deferred_exec_failure_balance_issue() {
     assert_contract_and_on_chain_balances(&market, Some(initial_balance));
 }
 
-// todo: Test that deposit/withdrawaal are not possible when someone has deposited extra money.
+#[test]
+fn deposit_extra_money() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.query_countertrade_balances(&lp).unwrap_err();
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    let MarketBalance {
+        market: _,
+        token: _,
+        shares,
+        collateral,
+        pool_size,
+    } = balance;
+    assert_eq!(shares.to_string(), "100");
+    assert_eq!(collateral.to_string(), "100");
+    assert_eq!(pool_size.to_string(), "100");
+
+    let lp = market.clone_lp(1).unwrap();
+
+    let contract = market.get_countertrade_addr();
+    market.exec_mint_and_deposit(&lp, "100", &contract).unwrap();
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "50")
+        .unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    let MarketBalance {
+        market: _,
+        token: _,
+        shares,
+        collateral,
+        pool_size,
+    } = balance;
+    assert_eq!(collateral.to_string(), "50");
+    assert_eq!(pool_size.to_string(), "125");
+    assert_eq!(shares.to_string(), "25");
+}

@@ -2617,6 +2617,24 @@ impl PerpsMarket {
         self.exec_wasm_msg(sender, wasm_msg)
     }
 
+    pub fn exec_mint_and_deposit(
+        &self,
+        user_addr: &Addr,
+        amount: &str,
+        contract: &Addr,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(user_addr, amount.into_number())?;
+        let token = self.token.clone();
+        let amount = NonZero::new(amount).context("amount should not be zero")?;
+        let message = token
+            .into_transfer_msg(contract, amount)
+            .unwrap()
+            .context("Invalid message")?;
+        let result = self.app().execute(user_addr.clone(), message)?;
+        Ok(result)
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,
