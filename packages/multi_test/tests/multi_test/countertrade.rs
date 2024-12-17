@@ -67,9 +67,9 @@ fn deposit() {
         collateral,
         pool_size,
     } = balance;
-    assert_eq!(shares.to_string(), "50");
     assert_eq!(collateral.to_string(), "50");
     assert_eq!(pool_size.to_string(), "150");
+    assert_eq!(shares.to_string(), "50");
 }
 
 #[test]
@@ -492,8 +492,7 @@ fn closes_extra_positions() {
             }
         );
 
-        // Don't collect so that we can test the intermediate states
-        do_work_optional_collect(&market, &lp, false);
+        do_work_optional_collect(&market, &lp);
 
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
@@ -503,25 +502,6 @@ fn closes_extra_positions() {
             .token
             .round_down_to_precision(pos.active_collateral)
             .unwrap();
-
-        // Ensure that now we want to collect the information from that closed position
-        assert_eq!(
-            market.query_countertrade_has_work().unwrap(),
-            HasWorkResp::Work {
-                desc: perpswap::contracts::countertrade::WorkDescription::CollectClosedPosition {
-                    pos_id,
-                    close_time: pos.close_time,
-                    active_collateral
-                }
-            }
-        );
-
-        // Without collecting, our balances remain the same
-        let market_before_work = market.query_countertrade_markets().unwrap();
-        assert_eq!(market_before_work.collateral, market_before.collateral);
-
-        // Now collect the balances
-        market.exec_countertrade_do_work().unwrap();
 
         // And confirm the countertrade contract saw the update
         let market_after = market.query_countertrade_markets().unwrap();
@@ -828,23 +808,20 @@ fn balance_one_sided_market() {
 }
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
-    do_work_optional_collect(market, lp, true)
+    do_work_optional_collect(market, lp)
 }
 
-fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
+fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr) {
     let work = market.query_countertrade_has_work().unwrap();
-    let (has_deferred_exec, is_close) = match work {
+    let has_deferred_exec = match work {
         HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
         HasWorkResp::Work { desc } => match desc {
-            WorkDescription::OpenPosition { .. } => (true, false),
-            WorkDescription::ClosePosition { .. } => (true, true),
-            WorkDescription::CollectClosedPosition { .. } => {
-                panic!("CollectClosedPosition in do_work")
-            }
-            WorkDescription::ResetShares => (false, false),
-            WorkDescription::HandleDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
-            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => (true, false),
-            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => (true, false),
+            WorkDescription::OpenPosition { .. } => true,
+            WorkDescription::ClosePosition { .. } => true,
+            WorkDescription::ResetShares => false,
+            WorkDescription::ClearDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
+            WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => true,
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
         },
     };
     market.exec_countertrade_do_work().unwrap();
@@ -859,23 +836,11 @@ fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: boo
     if has_deferred_exec {
         match market.query_countertrade_has_work().unwrap() {
             HasWorkResp::Work {
-                desc: WorkDescription::HandleDeferredExec { .. },
+                desc: WorkDescription::ClearDeferredExec { .. },
             } => (),
             work => panic!("Unexpected work response: {work:?}"),
         }
         market.exec_countertrade_do_work().unwrap();
-    }
-
-    if is_close {
-        match market.query_countertrade_has_work().unwrap() {
-            HasWorkResp::Work {
-                desc: WorkDescription::CollectClosedPosition { .. },
-            } => (),
-            work => panic!("Unexpected work response: {work:?}"),
-        }
-        if collect_closed {
-            market.exec_countertrade_do_work().unwrap();
-        }
     }
 }
 
@@ -970,24 +935,20 @@ fn deduct_balance() {
     // Force the countertrade position to be closed
     market.exec_set_price("1.2".parse().unwrap()).unwrap();
     market.exec_crank_till_finished(&lp).unwrap();
-    let work = market.query_countertrade_work().unwrap();
-    assert!(work.is_collect_closed_position());
-    market.exec_countertrade_do_work().unwrap();
 
     // Calculate before deferred execution so that DNF fee doesn't
     // influence the available total
     let balance = market.query_countertrade_balances(&lp).unwrap();
 
-    // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
     match market_type {
         perpswap::storage::MarketType::CollateralIsQuote => assert!(balance
             .collateral
             .raw()
-            .approx_eq(Collateral::from_str("98.384623849").unwrap())),
+            .approx_eq(Collateral::from_str("98.384624").unwrap())),
         perpswap::storage::MarketType::CollateralIsBase => assert!(balance
             .collateral
             .raw()
-            .approx_eq(Collateral::from_str("98.531476226").unwrap())),
+            .approx_eq(Collateral::from_str("98.531477").unwrap())),
     }
 }
 
@@ -1427,7 +1388,7 @@ fn update_position_funding_rate_less_than_target_rate() {
 }
 
 fn do_work_ct(market: &PerpsMarket, lp: &Addr) {
-    do_work_optional_collect(market, lp, true);
+    do_work_optional_collect(market, lp);
     log_status("=== Ran a CT update", market);
 }
 
@@ -1720,6 +1681,7 @@ fn perp_4332_balance_mismatch() {
     // Update position
     market.exec_countertrade_do_work().unwrap();
     market.exec_crank_till_finished(&lp).unwrap();
+    std::env::remove_var("LEVANA_CONTRACTS_INJECT_FAILURE");
 
     assert_contract_and_on_chain_balances(&market, None);
 }
@@ -2038,3 +2000,5 @@ fn deferred_exec_failure_balance_issue() {
     market.exec_countertrade_do_work().unwrap();
     assert_contract_and_on_chain_balances(&market, Some(initial_balance));
 }
+
+// todo: Test that deposit/withdrawaal are not possible when someone has deposited extra money.
