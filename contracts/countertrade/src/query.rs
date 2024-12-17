@@ -31,11 +31,16 @@ fn balance(state: State, storage: &dyn Storage, address: RawAddr) -> Result<Mark
         .with_context(|| format!("No totals found for market with shares: {}", market_info.id))?;
     let pos = PositionsInfo::load(&state, &market_info)?;
 
+    let contract_balance = state.contract_balance(storage)?;
     let result = MarketBalance {
         token: market_info.token,
         shares,
-        collateral: NonZero::new(totals.shares_to_collateral(shares.raw(), &pos)?)
-            .with_context(|| format!("Ended up with 0 collateral for market {}", market_info.id))?,
+        collateral: NonZero::new(totals.shares_to_collateral(
+            contract_balance,
+            shares.raw(),
+            &pos,
+        )?)
+        .with_context(|| format!("Ended up with 0 collateral for market {}", market_info.id))?,
         pool_size: NonZero::new(totals.shares).with_context(|| {
             format!(
                 "No shares found for pool with share entries: {}",
@@ -58,9 +63,10 @@ fn markets(state: State, storage: &dyn Storage) -> Result<MarketStatus> {
         PositionsInfo::NoPositions => (None, false),
         PositionsInfo::OnePosition { pos } => (Some(*pos), false),
     };
+    let contract_balance = state.contract_balance(storage)?;
     let result = MarketStatus {
         id: market_info.id,
-        collateral: totals.collateral,
+        collateral: contract_balance,
         shares: totals.shares,
         position: pos,
         too_many_positions,
