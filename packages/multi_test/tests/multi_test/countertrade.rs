@@ -1040,7 +1040,6 @@ fn update_position_scenario_add_collateral() {
     let status = market.query_status().unwrap();
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
-    let status = market.query_status().unwrap();
     let countertrade_position = market
         .query_countertrade_market_id()
         .unwrap()
@@ -1154,8 +1153,6 @@ fn update_position_scenario_remove_collateral() {
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
 
-    let status = market.query_status().unwrap();
-
     let countertrade_position = market
         .query_countertrade_market_id()
         .unwrap()
@@ -1203,7 +1200,6 @@ fn update_position_scenario_remove_collateral() {
         },
     };
     do_work(&market, &lp);
-    let status = market.query_status().unwrap();
     let updated_position = market
         .query_countertrade_market_id()
         .unwrap()
@@ -1261,8 +1257,6 @@ fn do_not_mutate_countertrade_position() {
     market.exec_crank_till_finished(&lp).unwrap();
 
     do_work(&market, &lp);
-
-    let status = market.query_status().unwrap();
 
     let countertrade_position = market
         .query_countertrade_market_id()
@@ -1374,7 +1368,6 @@ fn update_position_funding_rate_less_than_target_rate() {
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
 
-    let status = market.query_status().unwrap();
     let config = market.query_countertrade_config().unwrap();
 
     let countertrade_position = market
@@ -1517,7 +1510,6 @@ fn smart_search_bug_perp_4098() {
         // This is where the bug was occuring
         do_work_ct(&market, &lp);
 
-        let status = market.query_status().unwrap();
         let ct_trade = market
             .query_countertrade_market_id()
             .unwrap();
