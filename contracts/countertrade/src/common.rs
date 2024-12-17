@@ -79,16 +79,24 @@ impl<'a> State<'a> {
         }
         Ok(market)
     }
+
+    pub(crate) fn contract_balance(&self, storage: &dyn Storage) -> Result<Collateral> {
+        let market_info = self.load_market_info(storage)?;
+        let token = market_info.token;
+        let balance = token.query_balance(&self.querier, &self.my_addr)?;
+        Ok(balance)
+    }
 }
 
 impl Totals {
     /// Convert an amount of shares into collateral.
     pub(crate) fn shares_to_collateral(
         &self,
+        contract_balance: Collateral,
         shares: LpToken,
         pos: &PositionsInfo,
     ) -> Result<Collateral> {
-        let total_collateral = self.collateral.checked_add(pos.active_collateral()?)?;
+        let total_collateral = contract_balance.checked_add(pos.active_collateral()?)?;
         let one_share_value = total_collateral
             .into_decimal256()
             .checked_div(self.shares.into_decimal256())?;
@@ -99,12 +107,14 @@ impl Totals {
     /// Returns the newly minted share amount
     pub(crate) fn add_collateral(
         &mut self,
+        contract_balance: Collateral,
         funds: NonZero<Collateral>,
         pos: &PositionsInfo,
     ) -> Result<NonZero<LpToken>> {
-        let collateral = self.collateral.checked_add(pos.active_collateral()?)?;
+        let collateral = contract_balance.checked_add(pos.active_collateral()?)?;
+        let collateral = collateral.checked_sub(funds.raw())?;
         let new_shares =
-            if (collateral.is_zero() && self.shares.is_zero()) || self.collateral.is_zero() {
+            if (collateral.is_zero() && self.shares.is_zero()) || contract_balance.is_zero() {
                 NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
                     .expect("Impossible: NonZero to NonZero produced a 0")
             } else if collateral.is_zero() || self.shares.is_zero() {
@@ -114,11 +124,10 @@ impl Totals {
                     funds
                         .into_decimal256()
                         .checked_mul(self.shares.into_decimal256())?
-                        .checked_div(self.collateral.into_decimal256())?,
+                        .checked_div(collateral.into_decimal256())?,
                 );
                 NonZero::new(new_shares).context("new_shares ended up 0")?
             };
-        self.collateral = self.collateral.checked_add(funds.raw())?;
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
     }
@@ -126,21 +135,21 @@ impl Totals {
     /// Returns the collateral removed from the pool
     pub(crate) fn remove_collateral(
         &mut self,
+        contract_balance: Collateral,
         amount: NonZero<LpToken>,
         pos: &PositionsInfo,
     ) -> Result<Collateral> {
-        let collateral = self.shares_to_collateral(amount.raw(), pos)?;
+        let collateral = self.shares_to_collateral(contract_balance, amount.raw(), pos)?;
         ensure!(
-            collateral <= self.collateral,
+            collateral <= contract_balance,
             "Insufficient collateral for withdrawal. Requested: {collateral}. Available: {}",
-            self.collateral
+            contract_balance
         );
         ensure!(
             amount.raw() <= self.shares,
             "Insufficient shares for withdrawal. Requested: {amount}. Available: {}",
             self.shares
         );
-        self.collateral = self.collateral.checked_sub(collateral)?;
         self.shares = self.shares.checked_sub(amount.raw())?;
         Ok(collateral)
     }
@@ -211,56 +220,52 @@ mod tests {
     #[test]
     fn regression_perp_4062() {
         let totals = Totals {
-            collateral: "0.000000000000005108".parse().unwrap(),
             shares: "0.000000000000005108".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
-            deferred_collateral: None,
         };
+        let contract_balance = "0.000000000000005108".parse().unwrap();
         let my_shares = totals.shares;
         let my_collateral = totals
-            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .shares_to_collateral(contract_balance, my_shares, &PositionsInfo::NoPositions)
             .unwrap();
         assert_ne!(my_collateral, Collateral::zero());
-        assert!(my_collateral.approx_eq(totals.collateral));
+        assert!(my_collateral.approx_eq(contract_balance));
 
+        let contract_balance = "9999999999999999".parse().unwrap();
         let totals = Totals {
-            collateral: "9999999999999999".parse().unwrap(),
             shares: "0.000000000000005108".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
-            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
-            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .shares_to_collateral(contract_balance, my_shares, &PositionsInfo::NoPositions)
             .unwrap();
-        assert!(totals.collateral.approx_eq(my_collateral));
+        assert!(contract_balance.approx_eq(my_collateral));
 
+        let contract_balance = "0.000000000000005108".parse().unwrap();
         let totals = Totals {
-            collateral: "0.000000000000005108".parse().unwrap(),
             shares: "9999999999999999".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
-            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
-            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .shares_to_collateral(contract_balance, my_shares, &PositionsInfo::NoPositions)
             .unwrap();
-        assert!(totals.collateral.approx_eq(my_collateral));
+        assert!(contract_balance.approx_eq(my_collateral));
 
+        let contract_balance = "999999999999999999".parse().unwrap();
         let totals = Totals {
-            collateral: "999999999999999999".parse().unwrap(),
             shares: "999999999999999999".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
-            deferred_collateral: None,
         };
         let my_shares = totals.shares;
         let my_collateral = totals
-            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .shares_to_collateral(contract_balance, my_shares, &PositionsInfo::NoPositions)
             .unwrap();
-        assert!(totals.collateral.approx_eq(my_collateral));
+        assert!(contract_balance.approx_eq(my_collateral));
     }
 }
