@@ -7,5 +7,5 @@ use perpswap::storage::MarketId;
 pub(crate) const COUNTER_TRADE_CODE_ID: Item<u64> = Item::new(namespace::COUNTERTRADE_CODE_ID);
 
 /// Contains the mapping of wallet and the copy trading contract address
-pub(crate) const COUNTER_TRADE_ADDRS: Map<(MarketId, CounterTradeAddr), ()> =
+pub(crate) const COUNTER_TRADE_ADDRS: Map<MarketId, CounterTradeAddr> =
     Map::new(namespace::COUNTER_TRADE_ADDRS);
