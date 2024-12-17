@@ -307,8 +307,8 @@ pub enum QueryMsg {
     /// Fetch counter trade contracts
     #[returns(CounterTradeResp)]
     CounterTrade {
-        /// Last seen [MarketId] in a [CounterTradeResp] for enumeration
-        start_after: Option<MarketId>,
+        /// Last seen [CounterTradeInfo] in a [CounterTradeResp] for enumeration
+        start_after: Option<CounterTradeInfo>,
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
@@ -369,7 +369,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetWindDown { .. } => true,
             ExecuteMsg::TransferAllDaoFees {} => true,
             ExecuteMsg::RegisterReferrer { .. } => false,
-            ExecuteMsg::AddCounterTrade { .. } => true,
+            ExecuteMsg::AddCounterTrade { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
             ExecuteMsg::AddCopyTrading { .. } => false,
