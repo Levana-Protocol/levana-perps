@@ -479,7 +479,7 @@ pub struct CounterTradeInfo {
     /// Address of the counter trade contract
     pub contract: CounterTradeAddr,
     /// Associated market id of the counter trade contract
-    pub market_id: MarketId
+    pub market_id: MarketId,
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]

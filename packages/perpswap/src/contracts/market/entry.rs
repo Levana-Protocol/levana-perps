@@ -84,7 +84,7 @@ pub struct NewCopyTradingParams {
 #[cw_serde]
 pub struct NewCounterTradeParams {
     /// Market ID where the trading is allowed
-    pub market_id: MarketId
+    pub market_id: MarketId,
 }
 
 /// There are two sources of slippage in the protocol:
