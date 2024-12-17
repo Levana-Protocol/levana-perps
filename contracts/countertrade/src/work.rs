@@ -40,12 +40,8 @@ pub(crate) fn get_work_for(
                 }
                 perpswap::contracts::market::deferred_execution::DeferredExecStatus::Success {
                     ..
-                } => {
-                    return Ok(HasWorkResp::Work {
-                        desc: WorkDescription::ClearDeferredExec { id },
-                    })
                 }
-                perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
+                | perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
                     ..
                 } => {
                     return Ok(HasWorkResp::Work {
@@ -875,7 +871,7 @@ pub(crate) fn execute(
             stop_loss_override,
         } => {
             // No existing deferred exec item should be present
-            assert!(totals.deferred_exec.is_none());
+            assert_eq!(totals.deferred_exec, None);
             let event = Event::new("open-position")
                 .add_attribute("direction", direction.as_str())
                 .add_attribute("leverage", leverage.to_string())
@@ -902,7 +898,7 @@ pub(crate) fn execute(
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::ClosePosition { pos_id } => {
-            assert!(totals.deferred_exec.is_none());
+            assert_eq!(totals.deferred_exec, None);
             res = res.add_event(
                 Event::new("close-position")
                     .add_attribute("position-id", pos_id.to_string())
@@ -933,7 +929,7 @@ pub(crate) fn execute(
             )
         }
         WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
-            assert!(totals.deferred_exec.is_none());
+            assert_eq!(totals.deferred_exec, None);
             let event = Event::new("update-position-add-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
@@ -954,7 +950,7 @@ pub(crate) fn execute(
             amount,
             crank_fee,
         } => {
-            assert!(totals.deferred_exec.is_none());
+            assert_eq!(totals.deferred_exec, None);
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("crank-fee", crank_fee.to_string())

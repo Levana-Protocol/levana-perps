@@ -42,7 +42,7 @@ impl<'a> State<'a> {
 
     /// Returns true if loaded from the cache.
     fn load_market_info_inner(&self, store: &dyn Storage) -> Result<(MarketInfo, bool)> {
-        if let Some(info) = crate::state::MARKETS
+        if let Some(info) = crate::state::MARKET_INFO
             .may_load(store)
             .context("Could not load cached market info")?
         {
@@ -73,7 +73,7 @@ impl<'a> State<'a> {
     pub(crate) fn load_cache_market_info(&self, storage: &mut dyn Storage) -> Result<MarketInfo> {
         let (market, is_cached) = self.load_market_info_inner(storage)?;
         if !is_cached {
-            crate::state::MARKETS
+            crate::state::MARKET_INFO
                 .save(storage, &market)
                 .context("Could not save cached markets info")?;
         }

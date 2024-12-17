@@ -10,7 +10,7 @@ pub(crate) const SHARES: Map<&Addr, NonZero<LpToken>> = Map::new("shares");
 pub(crate) const TOTALS: Item<Totals> = Item::new("totals");
 
 /// Local cache of markets information
-pub(crate) const MARKETS: Item<MarketInfo> = Item::new("markets");
+pub(crate) const MARKET_INFO: Item<MarketInfo> = Item::new("market-info");
 
 /// Which market is waiting for a reply
 pub(crate) const REPLY_MARKET: Item<MarketId> = Item::new("reply-market");
