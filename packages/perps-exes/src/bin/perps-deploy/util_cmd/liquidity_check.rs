@@ -12,9 +12,9 @@ use tokio::task::JoinSet;
 use crate::cli::Opt;
 
 #[derive(clap::Parser)]
-pub(super) struct VolatilityCheckOpt {
+pub(super) struct LiquidityCheckOpt {
     /// Slack webhook to publish the notification
-    #[clap(long, env = "LEVANA_VOLATILITY_CHECK_SLACK_WEBHOOK")]
+    #[clap(long, env = "LEVANA_LIQUIDITY_CHECK_SLACK_WEBHOOK")]
     pub(crate) slack_webhook: reqwest::Url,
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
@@ -23,33 +23,33 @@ pub(super) struct VolatilityCheckOpt {
     #[clap(
         long,
         default_value = "10",
-        env = "LEVANA_VOLATILITY_CHECK_UNLOCKED_LIQUIDITY_THRESHOLD_USD"
+        env = "LEVANA_LIQUIDITY_CHECK_UNLOCKED_LIQUIDITY_THRESHOLD_USD"
     )]
     unlocked_liquidity_threshold_usd: Usd,
     /// The percentage threshold for the unlocked liquidity compared to total liquidity
     #[clap(
         long,
         default_value = "10",
-        env = "LEVANA_VOLATILITY_CHECK_RATIO_THRESHOLD"
+        env = "LEVANA_LIQUIDITY_CHECK_RATIO_THRESHOLD"
     )]
     ratio_threshold: Decimal256,
     /// Factory identifier
     #[clap(
         long,
         default_value = "osmomainnet1",
-        env = "LEVANA_VOLATILITY_CHECK_FACTORY"
+        env = "LEVANA_LIQUIDITY_CHECK_FACTORY"
     )]
     factory: String,
     /// Run check after specified seconds
     #[arg(
         long,
-        env = "LEVANA_VOLATILITY_RECALC_FREQ_SECONDS",
+        env = "LEVANA_LIQUIDITY_RECALC_FREQ_SECONDS",
         default_value = "3600"
     )]
     pub(crate) recalculation_frequency_in_seconds: u64,
 }
 
-impl VolatilityCheckOpt {
+impl LiquidityCheckOpt {
     pub(super) async fn go(self, opt: Opt) -> Result<()> {
         go(self, opt).await
     }
@@ -62,14 +62,14 @@ struct MarketInfo {
 }
 
 async fn go(
-    VolatilityCheckOpt {
+    LiquidityCheckOpt {
         slack_webhook,
         unlocked_liquidity_threshold_usd,
         ratio_threshold,
         workers,
         factory,
         recalculation_frequency_in_seconds,
-    }: VolatilityCheckOpt,
+    }: LiquidityCheckOpt,
     _opt: Opt,
 ) -> Result<()> {
     let mainnet_factories = MainnetFactories::load()?;
@@ -87,11 +87,11 @@ async fn go(
     let factory = Factory::from_contract(cosmos.make_contract(factory.address));
 
     loop {
-        tracing::info!("Started volatility check for the markets.");
+        tracing::info!("Started Liquidity check for the markets.");
         let markets = factory.get_markets().await?;
         let market_count = markets.len();
         tracing::info!(
-            "Fetched {} markets' information for volatility check.",
+            "Fetched {} markets' information for Liquidity check.",
             market_count
         );
 
@@ -111,7 +111,7 @@ async fn go(
         for worker_id in 0..workers.try_into()? {
             let extra = if worker_id < market_remainder { 1 } else { 0 };
             let end = start + market_count_per_worker + extra;
-            set.spawn(volatility_check_helper(
+            set.spawn(liquidity_check_helper(
                 market_info[start..end].to_vec(),
                 unlocked_liquidity_threshold_usd,
                 ratio_threshold,
@@ -150,12 +150,12 @@ async fn go(
             .await?;
         }
         let duration = Duration::from_secs(recalculation_frequency_in_seconds);
-        tracing::info!("Completed market volatility check, Going to sleep {duration:?}.");
+        tracing::info!("Completed market Liquidity check, Going to sleep {duration:?}.");
         tokio::time::sleep(duration).await;
     }
 }
 
-async fn volatility_check_helper(
+async fn liquidity_check_helper(
     market_info: Vec<MarketInfo>,
     unlocked_liquidity_threshold_usd: Usd,
     ratio_threshold: Decimal256,

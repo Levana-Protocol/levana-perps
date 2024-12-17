@@ -1,6 +1,7 @@
 mod countertrade;
 mod deferred_exec;
 mod gov_distribute;
+mod liquidity_check;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
@@ -8,7 +9,6 @@ mod top_traders;
 mod trading_fees;
 mod trading_incentives;
 mod tvl_report;
-mod volatility_check;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -120,10 +120,10 @@ enum Sub {
         #[clap(subcommand)]
         inner: countertrade::CounterTradeSub,
     },
-    /// Market Volatility Checks
-    VolatilityCheck {
+    /// Market Liquidity Checks
+    LiquidityCheck {
         #[clap(flatten)]
-        inner: volatility_check::VolatilityCheckOpt,
+        inner: liquidity_check::LiquidityCheckOpt,
     },
 }
 
@@ -144,7 +144,7 @@ impl UtilOpt {
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
             Sub::GovDistribute { inner } => inner.go(opt).await,
             Sub::CounterTrade { inner } => inner.go(opt).await,
-            Sub::VolatilityCheck { inner } => inner.go(opt).await,
+            Sub::LiquidityCheck { inner } => inner.go(opt).await,
         }
     }
 }
