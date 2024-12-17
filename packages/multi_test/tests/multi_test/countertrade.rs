@@ -631,13 +631,7 @@ fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) 
     // Position must be closed
     market.query_closed_position(&countertrade, pos_id).unwrap();
 
-    assert_eq!(
-        market
-            .query_countertrade_markets()
-            .unwrap()
-            .position,
-        None
-    );
+    assert_eq!(market.query_countertrade_markets().unwrap().position, None);
 }
 
 #[test]
@@ -1510,9 +1504,7 @@ fn smart_search_bug_perp_4098() {
         // This is where the bug was occuring
         do_work_ct(&market, &lp);
 
-        let ct_trade = market
-            .query_countertrade_market_id()
-            .unwrap();
+        let ct_trade = market.query_countertrade_market_id().unwrap();
         assert!(ct_trade.position.is_none());
     }
 }
@@ -1635,9 +1627,7 @@ fn log_status(header: &str, market: &PerpsMarket) {
     println!("= Long Notional: {}", status.long_notional);
     println!("= Short Notional: {}", status.short_notional);
 
-    let ct_trade = market
-        .query_countertrade_market_id()
-        .unwrap();
+    let ct_trade = market.query_countertrade_market_id().unwrap();
 
     match ct_trade.position {
         Some(_) => {
@@ -1659,10 +1649,7 @@ fn assert_contract_and_on_chain_balances(
     let on_chain_balance = market
         .query_collateral_balance(&market.get_countertrade_addr())
         .unwrap();
-    let contract_balance = market
-        .query_countertrade_market_id()
-        .unwrap()
-        .collateral;
+    let contract_balance = market.query_countertrade_market_id().unwrap().collateral;
     let contract_balance = market
         .token
         .round_down_to_precision(contract_balance)
