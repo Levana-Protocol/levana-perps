@@ -137,6 +137,7 @@ fn deposit(
         .context("Could not load old shares")?
         .map(NonZero::raw)
         .unwrap_or_default();
+
     let mut totals = crate::state::TOTALS
         .may_load(storage)
         .context("Could not load old total shares")?
@@ -148,8 +149,9 @@ fn deposit(
         )
     }
 
+    let contract_balance = state.contract_balance(storage)?;
     let position_info = PositionsInfo::load(&state, &market)?;
-    let new_shares = totals.add_collateral(funds, &position_info)?;
+    let new_shares = totals.add_collateral(contract_balance, funds, &position_info)?;
     let sender_shares = new_shares.checked_add(sender_shares)?;
     crate::state::SHARES.save(storage, &sender, &sender_shares)?;
     crate::state::TOTALS.save(storage, &totals)?;
@@ -188,7 +190,8 @@ fn withdraw(
         "Insufficient shares. You have {sender_shares}, but tried to withdraw {amount}"
     );
     let position_info = PositionsInfo::load(&state, &market)?;
-    let collateral = totals.remove_collateral(amount, &position_info)?;
+    let contract_balance = state.contract_balance(storage)?;
+    let collateral = totals.remove_collateral(contract_balance, amount, &position_info)?;
     let sender_shares = sender_shares.checked_sub(amount.raw())?;
     match NonZero::new(sender_shares) {
         None => crate::state::SHARES.remove(storage, &sender),
