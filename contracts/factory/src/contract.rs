@@ -39,9 +39,9 @@ use perpswap::contracts::{
     factory::{
         entry::{
             AddrIsContractResp, ContractType, CopyTradingAddr, CopyTradingInfo, CopyTradingResp,
-            CounterTradeAddr, ExecuteMsg, FactoryOwnerResp, GetReferrerResp, InstantiateMsg,
-            LeaderAddr, ListRefereeCountStartAfter, MarketInfoResponse, MigrateMsg, QueryMsg,
-            RefereeCount, QUERY_LIMIT_DEFAULT,
+            CounterTradeAddr, CounterTradeInfo, CounterTradeResp, ExecuteMsg, FactoryOwnerResp,
+            GetReferrerResp, InstantiateMsg, LeaderAddr, ListRefereeCountStartAfter,
+            MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -75,7 +75,7 @@ pub fn instantiate(
         wind_down,
         label_suffix,
         copy_trading_code_id,
-        counter_trade_code_id
+        counter_trade_code_id,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -187,9 +187,9 @@ fn execute_msg(
                 .may_load(ctx.storage, &new_counter_trade.market_id)?
                 .context("No market id found")?;
 
-            if !crate::state::countertrade::COUNTER_TRADE_ADDRS
-                .prefix(new_counter_trade.market_id.clone())
-                .is_empty(ctx.storage)
+            if crate::state::countertrade::COUNTER_TRADE_ADDRS
+                .key(new_counter_trade.market_id.clone())
+                .has(ctx.storage)
             {
                 bail!(
                     "Countertrade contract already exists for {}",
@@ -471,8 +471,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CounterTrade)?;
                     COUNTER_TRADE_ADDRS.save(
                         ctx.storage,
-                        (market_id.clone(), CounterTradeAddr(addr.clone())),
-                        &(),
+                        market_id.clone(),
+                        &CounterTradeAddr(addr.clone()),
                     )?;
                     ctx.response.add_event(
                         Event::new("instantiate-counter-trade")
@@ -586,6 +586,28 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 .transpose()?;
             list_referee_count(store, limit, start_after)?.query_result()
         }
+        QueryMsg::CounterTrade { start_after, limit } => {
+            let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
+            let result = crate::state::countertrade::COUNTER_TRADE_ADDRS
+                .range(
+                    store,
+                    start_after.map(Bound::exclusive),
+                    None,
+                    cosmwasm_std::Order::Ascending,
+                )
+                .take(limit.try_into()?)
+                .map(|res| {
+                    res.map(|(market_id, contract)| CounterTradeInfo {
+                        contract,
+                        market_id,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let response = CounterTradeResp { addresses: result };
+            let response = to_json_binary(&response)?;
+            Ok(response)
+        }
+
         QueryMsg::CopyTrading { start_after, limit } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {
