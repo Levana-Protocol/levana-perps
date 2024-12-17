@@ -3,7 +3,7 @@ use std::str::FromStr;
 use cosmwasm_std::{SubMsg, WasmMsg};
 use perpswap::contracts::market::{
     deferred_execution::GetDeferredExecResp,
-    entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
+    entry::StatusResp,
     position::{PositionId, PositionQueryResponse},
 };
 use perpswap::{
@@ -18,7 +18,7 @@ use perpswap::{
 use crate::prelude::*;
 
 pub(crate) fn get_work_for(
-    _storage: &dyn Storage,
+    storage: &dyn Storage,
     state: &State,
     market: &MarketInfo,
     totals: &Totals,
@@ -42,20 +42,14 @@ pub(crate) fn get_work_for(
                     ..
                 } => {
                     return Ok(HasWorkResp::Work {
-                        desc: WorkDescription::HandleDeferredExec {
-                            id,
-                            status: DeferredStatus::Success,
-                        },
+                        desc: WorkDescription::ClearDeferredExec { id },
                     })
                 }
                 perpswap::contracts::market::deferred_execution::DeferredExecStatus::Failure {
                     ..
                 } => {
                     return Ok(HasWorkResp::Work {
-                        desc: WorkDescription::HandleDeferredExec {
-                            id,
-                            status: DeferredStatus::Failure,
-                        },
+                        desc: WorkDescription::ClearDeferredExec { id },
                     })
                 }
             },
@@ -64,41 +58,6 @@ pub(crate) fn get_work_for(
                 market.id
             ),
         }
-    }
-
-    // Check for newly closed positions to update collateral
-    let ClosedPositionsResp {
-        mut positions,
-        // We ignore the cursor here and generated our own.
-        // This cursor will be None if there are no more closed positions.
-        // However, we want to always have a value to catch future closed positions.
-        cursor: _,
-    } = state.querier.query_wasm_smart(
-        &market.addr,
-        &MarketQueryMsg::ClosedPositionHistory {
-            owner: state.my_addr.as_ref().into(),
-            cursor: totals.last_closed.clone().map(|mut cursor| {
-                // This is probably a misdesign in the cursor API in the market contract.
-                // All other bounds in cw-storage-plus are exclusive. However, this one
-                // is inclusive. So adapt to it by using the next position ID.
-                cursor.position = cursor.position.next();
-                cursor
-            }),
-            limit: Some(1),
-            order: Some(perpswap::storage::OrderInMessage::Ascending),
-        },
-    )?;
-    assert!(positions.len() <= 1);
-    if let Some(closed) = positions.pop() {
-        return Ok(HasWorkResp::Work {
-            desc: WorkDescription::CollectClosedPosition {
-                pos_id: closed.id,
-                close_time: closed.close_time,
-                active_collateral: market
-                    .token
-                    .round_down_to_precision(closed.active_collateral)?,
-            },
-        });
     }
 
     let pos = PositionsInfo::load(state, market)?;
@@ -113,7 +72,9 @@ pub(crate) fn get_work_for(
         PositionsInfo::OnePosition { pos } => Some(pos),
     };
 
-    if totals.collateral.is_zero() && pos.is_none() {
+    let contract_balance = state.contract_balance(storage)?;
+
+    if contract_balance.is_zero() && pos.is_none() {
         return Ok(HasWorkResp::Work {
             desc: WorkDescription::ResetShares,
         });
@@ -121,7 +82,7 @@ pub(crate) fn get_work_for(
 
     // If we have zero collateral available, we have no work to
     // perform.
-    if totals.collateral.is_zero() && pos.is_some() {
+    if contract_balance.is_zero() && pos.is_some() {
         return Ok(HasWorkResp::NoWork {});
     }
 
@@ -139,7 +100,7 @@ pub(crate) fn get_work_for(
         MarketType::CollateralIsBase => (status.short_notional, status.long_notional),
     };
 
-    let available_collateral = NonZero::new(totals.collateral)
+    let available_collateral = NonZero::new(contract_balance)
         .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
     let minimum_position_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
 
@@ -208,7 +169,7 @@ pub(crate) fn get_work_for(
         }
     }
 
-    let collateral_in_usd = price.collateral_to_usd(totals.collateral);
+    let collateral_in_usd = price.collateral_to_usd(contract_balance);
     if collateral_in_usd < status.config.minimum_deposit_usd {
         return Ok(HasWorkResp::NoWork {});
     }
@@ -914,7 +875,7 @@ pub(crate) fn execute(
             stop_loss_override,
         } => {
             // No existing deferred exec item should be present
-            assert!(totals.deferred_exec.is_none() && totals.deferred_collateral.is_none());
+            assert!(totals.deferred_exec.is_none());
             let event = Event::new("open-position")
                 .add_attribute("direction", direction.as_str())
                 .add_attribute("leverage", leverage.to_string())
@@ -938,16 +899,10 @@ pub(crate) fn execute(
                     take_profit,
                 },
             )?;
-            totals.deferred_collateral = Some(DeferredCollateral {
-                collateral: collateral.raw(),
-                direction: CollateralDirection::Decrease,
-            });
-            crate::state::TOTALS.save(storage, &totals)?;
-
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::ClosePosition { pos_id } => {
-            assert!(totals.deferred_exec.is_none() && totals.deferred_collateral.is_none());
+            assert!(totals.deferred_exec.is_none());
             res = res.add_event(
                 Event::new("close-position")
                     .add_attribute("position-id", pos_id.to_string())
@@ -961,57 +916,15 @@ pub(crate) fn execute(
                 })?,
                 funds: vec![],
             };
-            totals.deferred_collateral = Some(DeferredCollateral {
-                collateral: Collateral::zero(),
-                direction: CollateralDirection::Decrease,
-            });
-            crate::state::TOTALS.save(storage, &totals)?;
             res = add_market_msg(storage, res, msg)?;
-        }
-        WorkDescription::CollectClosedPosition {
-            pos_id,
-            close_time,
-            active_collateral,
-        } => {
-            totals.last_closed = Some(ClosedPositionCursor {
-                time: close_time,
-                position: pos_id,
-            });
-            totals.collateral = totals.collateral.checked_add(active_collateral)?;
-            crate::state::TOTALS.save(storage, &totals)?;
-            res = res.add_event(
-                Event::new("collect-closed-position")
-                    .add_attribute("position-id", pos_id.to_string())
-                    .add_attribute("active-collateral", active_collateral.to_string())
-                    .add_attribute("market", market.id.as_str()),
-            );
         }
         WorkDescription::ResetShares => {
             crate::state::SHARES.clear(storage);
             res = res.add_event(Event::new("reset-shares"));
         }
-        WorkDescription::HandleDeferredExec { id, status } => {
+        WorkDescription::ClearDeferredExec { id } => {
             assert_eq!(totals.deferred_exec, Some(id));
-            let deferred_collateral = totals.deferred_collateral.clone().context(format!(
-                "Impossible: Expected collateral for deferred exec id {id}"
-            ))?;
-            match status {
-                DeferredStatus::Success => match deferred_collateral.direction {
-                    CollateralDirection::Increase => {
-                        totals.collateral = totals
-                            .collateral
-                            .checked_add(deferred_collateral.collateral)?;
-                    }
-                    CollateralDirection::Decrease => {
-                        totals.collateral = totals
-                            .collateral
-                            .checked_sub(deferred_collateral.collateral)?;
-                    }
-                },
-                DeferredStatus::Failure => (),
-            }
             totals.deferred_exec = None;
-            totals.deferred_collateral = None;
             crate::state::TOTALS.save(storage, &totals)?;
             res = res.add_event(
                 Event::new("clear-deferred-exec")
@@ -1020,7 +933,7 @@ pub(crate) fn execute(
             )
         }
         WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
-            assert!(totals.deferred_exec.is_none() && totals.deferred_collateral.is_none());
+            assert!(totals.deferred_exec.is_none());
             let event = Event::new("update-position-add-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
@@ -1034,12 +947,6 @@ pub(crate) fn execute(
                     slippage_assert: None,
                 },
             )?;
-            totals.deferred_collateral = Some(DeferredCollateral {
-                collateral: amount.raw(),
-                direction: CollateralDirection::Decrease,
-            });
-            crate::state::TOTALS.save(storage, &totals)?;
-
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::UpdatePositionRemoveCollateralImpactSize {
@@ -1047,7 +954,7 @@ pub(crate) fn execute(
             amount,
             crank_fee,
         } => {
-            assert!(totals.deferred_exec.is_none() && totals.deferred_collateral.is_none());
+            assert!(totals.deferred_exec.is_none());
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("crank-fee", crank_fee.to_string())
@@ -1065,12 +972,6 @@ pub(crate) fn execute(
             let msg = market
                 .token
                 .into_market_execute_msg(&market.addr, crank_fee, market_msg)?;
-            totals.collateral = totals.collateral.checked_sub(crank_fee)?;
-            totals.deferred_collateral = Some(DeferredCollateral {
-                collateral: amount.raw(),
-                direction: CollateralDirection::Increase,
-            });
-            crate::state::TOTALS.save(storage, &totals)?;
             res = add_market_msg(storage, res, msg)?;
         }
     }
