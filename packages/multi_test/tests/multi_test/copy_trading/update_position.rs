@@ -664,7 +664,7 @@ fn update_position_remove_collateral_impact_size_failure() {
     let leader_queue = market
         .query_copy_trading_queue_status(leader.clone().into())
         .unwrap();
-    // The processed quite item is failed
+    // The processed queue item has failed
     assert!(leader_queue.items.iter().any(|item| item.status.failed()));
 
     let crank_fee = market.query_crank_fee().unwrap();
