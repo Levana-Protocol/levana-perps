@@ -8,7 +8,6 @@ use crate::{
         Collateral, DirectionToBase, LeverageToBase, LpToken, MarketId, NonZero, RawAddr,
         TakeProfitTrader,
     },
-    time::Timestamp,
 };
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 
@@ -284,23 +283,12 @@ pub enum WorkDescription {
         /// Position to be closed
         pos_id: PositionId,
     },
-    /// Update collateral balance based on an already closed position
-    CollectClosedPosition {
-        /// Position that has already been closed
-        pos_id: PositionId,
-        /// Close time, used for constructing future cursors
-        close_time: Timestamp,
-        /// Active collateral that was sent back to our contract
-        active_collateral: Collateral,
-    },
     /// All collateral exhausted, reset shares to 0
     ResetShares,
     /// Deferred execution completed, we can continue our processing
-    HandleDeferredExec {
+    ClearDeferredExec {
         /// ID to be cleared
         id: DeferredExecId,
-        /// Did the execution succeed
-        status: DeferredStatus,
     },
     /// Add collateral to a position, causing notional size to increase
     UpdatePositionAddCollateralImpactSize {
@@ -320,25 +308,14 @@ pub enum WorkDescription {
     },
 }
 
-/// Deferred Execution Status
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum DeferredStatus {
-    /// Deferred execution completed successfully
-    Success,
-    /// Deferred execution failed
-    Failure,
-}
-
 impl WorkDescription {
     /// Is it closed position ?
     pub fn is_close_position(&self) -> bool {
         match self {
             WorkDescription::OpenPosition { .. } => false,
             WorkDescription::ClosePosition { .. } => true,
-            WorkDescription::CollectClosedPosition { .. } => false,
             WorkDescription::ResetShares => false,
-            WorkDescription::HandleDeferredExec { .. } => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
         }
@@ -349,9 +326,8 @@ impl WorkDescription {
         match self {
             WorkDescription::OpenPosition { .. } => false,
             WorkDescription::ClosePosition { .. } => false,
-            WorkDescription::CollectClosedPosition { .. } => true,
             WorkDescription::ResetShares => false,
-            WorkDescription::HandleDeferredExec { .. } => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
         }
@@ -362,9 +338,8 @@ impl WorkDescription {
         match self {
             WorkDescription::OpenPosition { .. } => false,
             WorkDescription::ClosePosition { .. } => false,
-            WorkDescription::CollectClosedPosition { .. } => false,
             WorkDescription::ResetShares => false,
-            WorkDescription::HandleDeferredExec { .. } => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => true,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => true,
         }
@@ -375,9 +350,8 @@ impl WorkDescription {
         match self {
             WorkDescription::OpenPosition { .. } => true,
             WorkDescription::ClosePosition { .. } => false,
-            WorkDescription::CollectClosedPosition { .. } => false,
             WorkDescription::ResetShares => false,
-            WorkDescription::HandleDeferredExec { .. } => false,
+            WorkDescription::ClearDeferredExec { .. } => false,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
         }
@@ -388,9 +362,8 @@ impl WorkDescription {
         match self {
             WorkDescription::OpenPosition { .. } => false,
             WorkDescription::ClosePosition { .. } => false,
-            WorkDescription::CollectClosedPosition { .. } => false,
             WorkDescription::ResetShares => false,
-            WorkDescription::HandleDeferredExec { .. } => true,
+            WorkDescription::ClearDeferredExec { .. } => true,
             WorkDescription::UpdatePositionAddCollateralImpactSize { .. } => false,
             WorkDescription::UpdatePositionRemoveCollateralImpactSize { .. } => false,
         }
@@ -410,11 +383,8 @@ impl std::fmt::Display for WorkDescription {
                 "Open {direction:?} position with leverage {leverage} and collateral {collateral}"
             ),
             WorkDescription::ClosePosition { pos_id } => write!(f, "Close Position {pos_id}"),
-            WorkDescription::CollectClosedPosition { pos_id, .. } => {
-                write!(f, "Collect Closed Position Id of {}", pos_id)
-            }
             WorkDescription::ResetShares => write!(f, "Reset Shares"),
-            WorkDescription::HandleDeferredExec { id, .. } => {
+            WorkDescription::ClearDeferredExec { id, .. } => {
                 write!(f, "Handle Deferred Exec Id of {id}")
             }
             WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
