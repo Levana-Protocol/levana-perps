@@ -67,7 +67,6 @@ pub enum ErrorId {
     InsufficientLiquidityForWithdrawal,
     MissingPosition,
     TraderLeverageOutOfRange,
-    CounterLeverageOutOfRange,
     MinimumDeposit,
     Congestion,
     MaxLiquidity,
