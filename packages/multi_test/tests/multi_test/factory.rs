@@ -4,7 +4,7 @@ use levana_perpswap_multi_test::{
 };
 use perpswap::{
     contracts::{
-        factory::entry::{CopyTradingInfoRaw, CopyTradingResp},
+        factory::entry::{CopyTradingInfoRaw, CopyTradingResp, CounterTradeResp},
         market::entry::{
             InitialPrice, NewCopyTradingParams, NewCounterTradeParams, NewMarketParams,
         },
@@ -437,5 +437,70 @@ fn non_admin_add_counter_trade_contract() {
                 new_counter_trade: NewCounterTradeParams { market_id: btc_usd },
             },
         )
+        .unwrap_err();
+}
+
+#[test]
+fn admin_add_counter_trade_contract() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let query: CounterTradeResp = market
+        .query_factory(&FactoryQueryMsg::CounterTrade {
+            start_after: None,
+            limit: None,
+        })
         .unwrap();
+    assert_eq!(query.addresses.len(), 1);
+
+    let btc_usd = MarketId::new(
+        "BTC",
+        "USD",
+        perpswap::storage::MarketType::CollateralIsQuote,
+    );
+
+    market
+        .exec_factory(&FactoryExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                market_id: btc_usd.clone(),
+                token: market.token.clone().into(),
+                config: None,
+                spot_price: perpswap::contracts::market::spot_price::SpotPriceConfigInit::Manual {
+                    admin: Addr::unchecked(TEST_CONFIG.protocol_owner.clone()).into(),
+                },
+                initial_borrow_fee_rate: "0.01".parse().unwrap(),
+                initial_price: Some(InitialPrice {
+                    price: "1".parse().unwrap(),
+                    price_usd: "1".parse().unwrap(),
+                }),
+            },
+        })
+        .unwrap();
+
+    market
+        .exec_factory(&FactoryExecuteMsg::AddCounterTrade {
+            new_counter_trade: NewCounterTradeParams { market_id: btc_usd },
+        })
+        .unwrap();
+
+    let query: CounterTradeResp = market
+        .query_factory(&FactoryQueryMsg::CounterTrade {
+            start_after: None,
+            limit: None,
+        })
+        .unwrap();
+    assert_eq!(query.addresses.len(), 2);
+    assert_ne!(query.addresses[0].contract, query.addresses[1].contract);
+}
+
+#[test]
+fn multiple_same_counter_trade_contract() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let market_id = market.id.clone();
+
+    market
+        .exec_factory(&FactoryExecuteMsg::AddCounterTrade {
+            new_counter_trade: NewCounterTradeParams { market_id },
+        })
+        .unwrap_err();
 }
