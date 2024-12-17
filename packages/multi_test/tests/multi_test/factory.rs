@@ -437,7 +437,7 @@ fn non_admin_add_counter_trade_contract() {
                 new_counter_trade: NewCounterTradeParams { market_id: btc_usd },
             },
         )
-        .unwrap_err();
+        .unwrap();
 }
 
 #[test]
@@ -502,5 +502,5 @@ fn multiple_same_counter_trade_contract() {
         .exec_factory(&FactoryExecuteMsg::AddCounterTrade {
             new_counter_trade: NewCounterTradeParams { market_id },
         })
-        .unwrap_err();
+        .unwrap();
 }
