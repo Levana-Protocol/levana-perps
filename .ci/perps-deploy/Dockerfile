@@ -8,6 +8,6 @@ COPY --chmod=755 --chown=1000 perps-deploy /usr/bin/perps-deploy
 
 WORKDIR /app
 
-ENTRYPOINT [ "/usr/bin/health-check", "--task-output-timeout", "90000", "--app-description", "Perps Deploy (Github cron job)", "--can-exit", "perps-deploy" ]
+ENTRYPOINT [ "/usr/bin/health-check", "--task-output-timeout", "90000", "--app-description", "Perps Deploy", "--can-exit", "perps-deploy" ]
 
 CMD [ "util", "top-traders" ]
