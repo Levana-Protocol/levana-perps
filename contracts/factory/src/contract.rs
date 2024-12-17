@@ -187,6 +187,16 @@ fn execute_msg(
                 .may_load(ctx.storage, &new_counter_trade.market_id)?
                 .context("No market id found")?;
 
+            if crate::state::countertrade::COUNTER_TRADE_ADDRS
+                .key(new_counter_trade.market_id.clone())
+                .has(ctx.storage)
+            {
+                bail!(
+                    "Countertrade contract already exists for {}",
+                    new_counter_trade.market_id.clone()
+                );
+            }
+
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
             INSTANTIATE_COUNTERTRADE.save(
                 ctx.storage,
@@ -461,8 +471,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     ALL_CONTRACTS.save(ctx.storage, &addr, &ContractType::CounterTrade)?;
                     COUNTER_TRADE_ADDRS.save(
                         ctx.storage,
-                        (market_id.clone(), CounterTradeAddr(addr.clone())),
-                        &(),
+                        market_id.clone(),
+                        &CounterTradeAddr(addr.clone()),
                     )?;
                     ctx.response.add_event(
                         Event::new("instantiate-counter-trade")
@@ -581,13 +591,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let result = crate::state::countertrade::COUNTER_TRADE_ADDRS
                 .range(
                     store,
-                    start_after.map(|item| Bound::exclusive((item.market_id, item.contract))),
+                    start_after.map(Bound::exclusive),
                     None,
                     cosmwasm_std::Order::Ascending,
                 )
                 .take(limit.try_into()?)
                 .map(|res| {
-                    res.map(|((market_id, contract), _)| CounterTradeInfo {
+                    res.map(|(market_id, contract)| CounterTradeInfo {
                         contract,
                         market_id,
                     })
