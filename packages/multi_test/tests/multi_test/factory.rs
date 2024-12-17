@@ -493,7 +493,7 @@ fn admin_add_counter_trade_contract() {
 }
 
 #[test]
-fn multiple_same_counter_trade_contract() {
+fn multiple_same_market_id_counter_trade_contract() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     let market_id = market.id.clone();
@@ -502,5 +502,5 @@ fn multiple_same_counter_trade_contract() {
         .exec_factory(&FactoryExecuteMsg::AddCounterTrade {
             new_counter_trade: NewCounterTradeParams { market_id },
         })
-        .unwrap();
+        .unwrap_err();
 }

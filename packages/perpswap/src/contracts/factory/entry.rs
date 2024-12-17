@@ -307,8 +307,8 @@ pub enum QueryMsg {
     /// Fetch counter trade contracts
     #[returns(CounterTradeResp)]
     CounterTrade {
-        /// Last seen [CounterTradeInfo] in a [CounterTradeResp] for enumeration
-        start_after: Option<CounterTradeInfo>,
+        /// Last seen [MarketId] in a [CounterTradeResp] for enumeration
+        start_after: Option<MarketId>,
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
