@@ -19,7 +19,6 @@ It's also an updated dev environment, with multichain support and a native SDK i
 2. Docker, used by default for building and optimizing the smart contracts
 3. [just](https://github.com/casey/just), optional, but a recommended way to perform common tasks
 4. (optional, for typescript) [Node](https://nodejs.org/en/download/)
-5. (optional, for manual building) [wasm-opt](https://github.com/WebAssembly/binaryen/releases) (extract anywhere and edit .env)
 
 # Testing
 
@@ -35,19 +34,11 @@ It's also an updated dev environment, with multichain support and a native SDK i
 * `just local-deploy` deploys a copy of the contracts to your Local Osmosis
 * `just contracts-test` will launch Local Osmosis, deploy contracts to it, and then run on-chain tests
 
-## On-chain w/ wasmd
-
-* [Spin up an instance of wasmd](#basic-wasmd-setup)
-* `COSMOS_WALLET` env var should be set to the correct seed phrase
-* `just local-deploy-wasmd` deploys a copy of the contracts to your wasmd instance
-* `just contracts-test-wasmd` will test those deployed contracts on wasmd
-
 ## Proptests and Fuzz testing
 
 * `cargo test --features proptest` runs prop tests
 * `cargo install cargo-fuzz` to install the fuzz testing tool
 * `just fuzz`
-
 
 # Getting started with various chains
 
@@ -72,41 +63,6 @@ When you deploy, you'll need to have the deployer seed phrase. This is available
 4. Store the WASM code on the blockchain: `cargo run --bin perps-deploy testnet store-code`
 5. To deploy a fresh set of contracts: `cargo run --bin perps-deploy testnet instantiate`
 6. To migrate an existing set of contracts: `cargo run --bin perps-deploy testnet migrate`
-
-# Basic wasmd setup
-
-Not a requirement, but if you are targetting vanilla wasmd it assumes certain configuration setup, and as of right now there isn't good general information about getting it up and running
-
-First, build and install: `make install` (or on apple silicon: `LEDGER_ENABLED=false make install`)
-
-Next, configuration...
-
-our chain-id is going to be `localwasmd`
-our gas denomination is going to be configured to `uwasm`
-staking denomination is the default `ustake`
-
-the following sortof mimics the explicit steps in https://github.com/CosmWasm/wasmd/blob/main/contrib/local/setup_wasmd.sh
-
-adding two users: tester1 and validator1
-
-* wipe `~/.wasmd` if it exists
-* `wasmd init localwasmd --chain-id localwasmd --overwrite`
-* edit `~/.wasmd/config/app.toml`
-  * set `minimum-gas-prices` to `0.025uwasm`
-* edit `~/.wasmd/config/client.toml`
-  * set `chain-id` to `localwasmd`
-* edit `~/.wasmd/config/genesis.json`
-  * change `stake` to `ustake`
-* edit `~/.wasmd/config/config.toml`
-  * under Consensus Configuration: change all the `timeout_` stuff to `200ms`
-* `wasmd keys add tester1`
-* wasmd add-genesis-account $(wasmd keys show -a tester1) 10000000000uwasm,10000000000ustake
-* `wasmd keys add validator1`
-* wasmd add-genesis-account $(wasmd keys show -a validator1) 10000000000uwasm,10000000000ustake
-* wasmd gentx validator1 "250000000ustake" --chain-id="localwasmd" --amount="250000000ustake"
-* wasmd collect-gentxs
-
-now `wasmd start` should just work
 
 # Coverage
 
