@@ -2051,4 +2051,5 @@ fn query_countertrade_status_no_crash() {
         .query_countertrade(&perpswap::contracts::countertrade::QueryMsg::Status {})
         .unwrap();
     assert_eq!(result.shares, LpToken::zero());
+    assert_eq!(result.collateral, Collateral::zero());
 }
