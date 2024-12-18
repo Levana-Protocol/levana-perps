@@ -22,6 +22,8 @@ pub(super) struct MigrateOpts {
     #[clap(long)]
     position_token_code_id: Option<u64>,
     #[clap(long)]
+    counter_trade_code_id: Option<u64>,
+    #[clap(long)]
     markets: Vec<MarketId>,
     #[clap(long)]
     wrapped: bool,
@@ -49,6 +51,7 @@ async fn go(
         wrapped,
         title,
         desc,
+        counter_trade_code_id,
     }: MigrateOpts,
 ) -> Result<()> {
     let factories = MainnetFactories::load()?;
@@ -63,6 +66,7 @@ async fn go(
         market: current_market_code_id,
         position_token: current_position_token_code_id,
         liquidity_token: current_liquidity_token_code_id,
+        counter_trade: current_counter_trade_code_id,
     } = factory.query_code_ids().await?;
 
     let mut factory_msgs = vec![];
@@ -97,6 +101,38 @@ async fn go(
                 })?,
                 funds: vec![],
             }));
+        }
+    }
+
+    if let Some(counter_trade_code_id) = counter_trade_code_id {
+        let mut should_set_countertrade = false;
+        if let Some(cur_counter_trade_code_id) = &current_counter_trade_code_id {
+            if cur_counter_trade_code_id.get_code_id() != counter_trade_code_id {
+                should_set_countertrade = true;
+            }
+        } else {
+            should_set_countertrade = true;
+        }
+        if should_set_countertrade {
+            factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
+                contract_addr: factory.get_address_string(),
+                msg: to_json_binary(&FactoryExecuteMsg::SetCounterTradeCodeId {
+                    code_id: counter_trade_code_id.to_string(),
+                })?,
+                funds: vec![],
+            }));
+            if current_counter_trade_code_id.is_some() {
+                // We should only migrate when current countertrade
+                // code id is already set. No need to migration if
+                // this is the first time we deployed it.
+                for (_, counter_trade) in factory.get_countertrade_address().await? {
+                    factory_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                        contract_addr: counter_trade.into_string(),
+                        new_code_id: counter_trade_code_id,
+                        msg: to_json_binary(&perpswap::contracts::countertrade::MigrateMsg {})?,
+                    }));
+                }
+            }
         }
     }
 
