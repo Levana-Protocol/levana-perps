@@ -84,10 +84,6 @@ build-contracts-native:
 local-deploy:
 	COSMOS_WALLET=osmosis-local cargo run --bin perps-deploy local-deploy --network osmosis-local
 
-# Deploy contracts to a local instance of wasmd (see levana-contracts-rs for expected wasmd config)
-local-deploy-wasmd:
-	cargo run --bin perps-deploy local-deploy --network wasmd-local
-
 # Run on chain tests
 contracts-test:
 	COSMOS_WALLET=osmosis-local cargo run --bin perps-deploy on-chain-tests --network osmosis-local
@@ -95,10 +91,6 @@ contracts-test:
 # Run on chain tests without running local osmosis
 contracts-test-skip-osmosis:
 	COSMOS_WALLET=osmosis-local cargo run --bin perps-deploy on-chain-tests --skip-init --network osmosis-local
-
-# Run on chain tests against wasmd (without spinning it up, see levana-contracts-rs for expected wasmd config)
-contracts-test-wasmd:
-	cargo run --bin perps-deploy on-chain-tests --skip-init --network wasmd-local
 
 # Cache docker images by saving it under wasm
 cache-docker-images:
