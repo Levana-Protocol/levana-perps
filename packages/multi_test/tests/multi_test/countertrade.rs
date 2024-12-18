@@ -10,7 +10,7 @@ use perpswap::{
         countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, MarketStatus, WorkDescription},
         market::position::PositionId,
     },
-    number::{Collateral, NonZero, Signed},
+    number::{Collateral, LpToken, NonZero, Signed},
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
 };
 
@@ -2047,7 +2047,8 @@ fn deposit_extra_money() {
 fn query_countertrade_status_no_crash() {
     let market = make_countertrade_market().unwrap();
 
-    let _result: MarketStatus = market
+    let result: MarketStatus = market
         .query_countertrade(&perpswap::contracts::countertrade::QueryMsg::Status {})
         .unwrap();
+    assert_eq!(result.shares, LpToken::zero());
 }
