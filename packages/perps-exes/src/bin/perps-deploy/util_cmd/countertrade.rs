@@ -14,18 +14,15 @@ use perpswap::{
 #[derive(clap::Subcommand)]
 pub(crate) enum CounterTradeSub {
     DepositCollateral {
-        /// Countertrade contract Address
-        #[clap(long, env = "COUNTERTRADE_CONTRACT_ADDRESS")]
-        contract: Address,
         /// Family name for these contracts
         #[clap(long, env = "PERPS_FAMILY")]
         family: String,
-        /// Which market to deposit collateral for
-        #[clap(long)]
-        market_id: MarketId,
         /// How much amount to deposit
         #[clap(long)]
         amount: Option<Uint128>,
+        /// Skip market ids
+        #[clap(long, env = "COUNTERTRADE_SKIP_MARKET_IDS", value_delimiter = ',')]
+        skip_market_ids: Vec<MarketId>,
         /// Flag to actually execute
         #[clap(long)]
         do_it: bool,
@@ -59,12 +56,11 @@ impl CounterTradeSub {
 async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
     match sub {
         CounterTradeSub::DepositCollateral {
-            contract,
             family,
-            market_id,
             do_it,
             amount,
-        } => deposit_collateral(opt, contract, family, market_id, do_it, amount).await?,
+            skip_market_ids,
+        } => deposit_collateral(opt, family, do_it, amount, skip_market_ids).await?,
         CounterTradeSub::Stats {
             factory,
             cosmos_network,
@@ -161,11 +157,10 @@ fn basic_market_analysis(status: &StatusResp) -> anyhow::Result<Number> {
 
 async fn deposit_collateral(
     opt: crate::cli::Opt,
-    contract: Address,
     family: String,
-    market_id: MarketId,
     do_it: bool,
     amount: Option<Uint128>,
+    skip_market_ids: Vec<MarketId>,
 ) -> anyhow::Result<()> {
     let app = opt.load_app(&family).await?;
     let factory = app.tracker.get_factory(&family).await?.into_contract();
@@ -174,62 +169,71 @@ async fn deposit_collateral(
 
     let factory = Factory::from_contract(factory);
     let markets = factory.get_markets().await?;
-    let market = markets
-        .into_iter()
-        .find(|item| item.market_id == market_id)
-        .context(format!("Market {market_id} not found in factory"))?;
-
-    let market = market.market;
-
-    let market_status = perpswap::contracts::market::entry::QueryMsg::Status { price: None };
-    let response: StatusResp = market.query(market_status).await?;
+    let contracts = factory.get_countertrade_address().await?;
 
     let amount = match amount {
         Some(amount) => amount,
         None => Uint128::from(1000000000u128),
     };
-
-    match response.collateral {
-        perpswap::token::Token::Cw20 { addr, .. } => {
-            println!("Cw20 Contract: {addr}");
-            let deposit_msg = perpswap::contracts::countertrade::ExecuteMsg::Deposit {};
-            let deposit_msg = Binary::new(serde_json::to_vec(&deposit_msg)?);
-            let cw20_execute_msg = perpswap::contracts::cw20::entry::ExecuteMsg::Send {
-                contract: RawAddr::from(contract.to_string()),
-                amount,
-                msg: deposit_msg,
-            };
-            let cw20_execute_msg_str = serde_json::to_string(&cw20_execute_msg)?;
-            println!("Cw20 Message: {cw20_execute_msg_str:?}");
-
-            if do_it {
-                tracing::info!("Executing");
-                let cw20_contract = cosmos.make_contract(Address::from_str(addr.as_str())?);
-                let response = cw20_contract
-                    .execute(wallet, vec![], cw20_execute_msg)
-                    .await?;
-                println!("Txhash: {}", response.txhash);
-            }
+    for (market_id, counter_trade) in contracts {
+        if skip_market_ids.contains(&market_id) {
+            println!("Skipping Market {market_id}");
+            continue;
+        } else {
+            println!("Processing Market {market_id}");
         }
-        perpswap::token::Token::Native { denom, .. } => {
-            println!("Countertrade contract: {contract}");
-            let deposit_msg = perpswap::contracts::countertrade::ExecuteMsg::Deposit {};
-            let deposit_msg = serde_json::to_string(&deposit_msg)?;
-            println!("Message: {deposit_msg}");
-            if do_it {
-                tracing::info!("Executing");
-                let countertrade = cosmos.make_contract(contract);
-                let response = countertrade
-                    .execute(
-                        wallet,
-                        vec![cosmos::Coin {
-                            denom,
-                            amount: amount.to_string(),
-                        }],
-                        deposit_msg,
-                    )
-                    .await?;
-                println!("Txhash: {}", response.txhash);
+
+        let market = markets
+            .iter()
+            .find(|item| item.market_id == market_id)
+            .context(format!("Market {market_id} not found in factory"))?;
+        let market = market.market.clone();
+        let market_status = perpswap::contracts::market::entry::QueryMsg::Status { price: None };
+        let response: StatusResp = market.query(market_status).await?;
+        let contract = Address::from_str(counter_trade.as_str())?;
+
+        match response.collateral {
+            perpswap::token::Token::Cw20 { addr, .. } => {
+                println!("Cw20 Contract: {addr}");
+                let deposit_msg = perpswap::contracts::countertrade::ExecuteMsg::Deposit {};
+                let deposit_msg = Binary::new(serde_json::to_vec(&deposit_msg)?);
+                let cw20_execute_msg = perpswap::contracts::cw20::entry::ExecuteMsg::Send {
+                    contract: RawAddr::from(contract.to_string()),
+                    amount,
+                    msg: deposit_msg,
+                };
+                let cw20_execute_msg_str = serde_json::to_string(&cw20_execute_msg)?;
+                println!("Cw20 Message: {cw20_execute_msg_str:?}");
+
+                if do_it {
+                    tracing::info!("Executing");
+                    let cw20_contract = cosmos.make_contract(Address::from_str(addr.as_str())?);
+                    let response = cw20_contract
+                        .execute(wallet, vec![], cw20_execute_msg)
+                        .await?;
+                    println!("Txhash: {}", response.txhash);
+                }
+            }
+            perpswap::token::Token::Native { denom, .. } => {
+                println!("Countertrade contract: {contract}");
+                let deposit_msg = perpswap::contracts::countertrade::ExecuteMsg::Deposit {};
+                let deposit_msg = serde_json::to_string(&deposit_msg)?;
+                println!("Message: {deposit_msg}");
+                if do_it {
+                    tracing::info!("Executing");
+                    let countertrade = cosmos.make_contract(contract);
+                    let response = countertrade
+                        .execute(
+                            wallet,
+                            vec![cosmos::Coin {
+                                denom,
+                                amount: amount.to_string(),
+                            }],
+                            deposit_msg,
+                        )
+                        .await?;
+                    println!("Txhash: {}", response.txhash);
+                }
             }
         }
     }
