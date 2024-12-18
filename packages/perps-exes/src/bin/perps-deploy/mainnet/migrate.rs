@@ -114,6 +114,13 @@ async fn go(
             should_set_countertrade = true;
         }
         if should_set_countertrade {
+            factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
+                contract_addr: factory.get_address_string(),
+                msg: to_json_binary(&FactoryExecuteMsg::SetCounterTradeCodeId {
+                    code_id: counter_trade_code_id.to_string(),
+                })?,
+                funds: vec![],
+            }));
             if current_counter_trade_code_id.is_some() {
                 // We should only migrate when current countertrade
                 // code id is already set. No need to migration if
