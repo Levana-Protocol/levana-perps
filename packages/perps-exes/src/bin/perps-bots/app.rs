@@ -68,8 +68,8 @@ impl AppBuilder {
             self.app.config.min_gas_in_gas_wallet,
         )?;
 
-        if let Some(ref countertrade_wallet) = self.app.config.countertrade {
-            self.start_countertrade_bot(countertrade_wallet.clone())?;
+        if self.app.config.run_countertrade {
+            self.start_countertrade_bot()?;
         }
 
         match &self.app.config.by_type {
