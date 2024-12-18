@@ -232,9 +232,9 @@ enum ContractType {
 }
 
 impl ContractType {
-    fn all_required() -> [ContractType; 4] {
+    fn all_required() -> [ContractType; 5] {
         use ContractType::*;
-        [Factory, Market, LiquidityToken, PositionToken]
+        [Factory, Market, LiquidityToken, PositionToken, Countertrade]
     }
 
     fn as_str(self) -> &'static str {
