@@ -7,7 +7,7 @@ use levana_perpswap_multi_test::{
 };
 use perpswap::{
     contracts::{
-        countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
+        countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, MarketStatus, WorkDescription},
         market::position::PositionId,
     },
     number::{Collateral, NonZero, Signed},
@@ -2041,4 +2041,13 @@ fn deposit_extra_money() {
     assert_eq!(collateral.to_string(), "50");
     assert_eq!(pool_size.to_string(), "125");
     assert_eq!(shares.to_string(), "25");
+}
+
+#[test]
+fn query_countertrade_status_no_crash() {
+    let market = make_countertrade_market().unwrap();
+
+    let _result: MarketStatus = market
+        .query_countertrade(&perpswap::contracts::countertrade::QueryMsg::Status {})
+        .unwrap();
 }

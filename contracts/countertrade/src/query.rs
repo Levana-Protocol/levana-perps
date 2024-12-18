@@ -53,9 +53,7 @@ fn balance(state: State, storage: &dyn Storage, address: RawAddr) -> Result<Mark
 }
 
 fn markets(state: State, storage: &dyn Storage) -> Result<MarketStatus> {
-    let totals = crate::state::TOTALS
-        .may_load(storage)?
-        .context("TOTALS store is empty")?;
+    let totals = crate::state::TOTALS.may_load(storage)?.unwrap_or_default();
     let market_info = state.load_market_info(storage)?;
     let pos = PositionsInfo::load(&state, &market_info)?;
     let (pos, too_many_positions) = match pos {
