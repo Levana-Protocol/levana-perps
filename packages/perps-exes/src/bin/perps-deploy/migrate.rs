@@ -1,11 +1,13 @@
+use std::str::FromStr;
+
 use anyhow::Result;
-use cosmos::HasAddress;
+use cosmos::{Address, HasAddress};
 use perps_exes::contracts::{Factory, MarketInfo};
 use perpswap::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
 
 use crate::{
     cli::Opt,
-    store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
+    store_code::{COUNTER_TRADE, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };
 
 #[derive(clap::Parser)]
@@ -32,6 +34,10 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         .require_code_by_type(&opt, LIQUIDITY_TOKEN)
         .await?;
     let market_code_id = app.tracker.require_code_by_type(&opt, MARKET).await?;
+    let countertrade_code_id = app
+        .tracker
+        .require_code_by_type(&opt, COUNTER_TRADE)
+        .await?;
 
     let factory = match app
         .tracker
@@ -130,6 +136,42 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         tracing::info!("Update position token ID in factory: {}", res.txhash);
     }
 
+    if code_ids.counter_trade.map(|code_id| code_id.u64())
+        == Some(countertrade_code_id.get_code_id())
+    {
+        tracing::info!(
+            "Countertrade code ID in factory is already {countertrade_code_id}, skipping"
+        )
+    } else {
+        let res = factory
+            .execute(
+                wallet,
+                vec![],
+                perpswap::contracts::factory::entry::ExecuteMsg::SetCounterTradeCodeId {
+                    code_id: countertrade_code_id.get_code_id().to_string(),
+                },
+            )
+            .await?;
+        tracing::info!("Updated countertrade code ID in factory: {}", res.txhash);
+
+        if code_ids.counter_trade.is_some() {
+            // No need for migration if this was the first version
+            let factory = Factory::from_contract(factory.clone());
+            for (market_id, counter_trade) in factory.get_countertrade_address().await? {
+                tracing::info!("Performing migration for countertrade ({market_id})");
+                let counter_trade = Address::from_str(counter_trade.as_str())?;
+                let contract = app.basic.cosmos.make_contract(counter_trade);
+                contract
+                    .migrate(
+                        wallet,
+                        countertrade_code_id.get_code_id(),
+                        perpswap::contracts::countertrade::MigrateMsg {},
+                    )
+                    .await?;
+                tracing::info!("Countertrade contract for {market_id} migrated");
+            }
+        }
+    }
     let factory = Factory::from_contract(factory);
 
     for MarketInfo {
