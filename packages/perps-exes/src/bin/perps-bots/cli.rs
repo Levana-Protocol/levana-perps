@@ -89,8 +89,8 @@ pub(crate) struct Opt {
     #[clap(long, env = "LEVANA_BOTS_LOG_REQUESTS")]
     pub(crate) log_requests: bool,
     /// Countertrade bot
-    #[clap(long, env = "LEVANA_BOTS_COUNTERTRADE_CONTRACT", global = true)]
-    pub(crate) countertrade: Option<Address>,
+    #[clap(long, env = "LEVANA_BOTS_ENABLE_COUNTERTRADE_BOT", global = true)]
+    pub(crate) enable_countertrade: bool,
     /// Enable copy trading bot
     #[clap(long, env = "LEVANA_BOTS_ENABLE_COPY_TRADE")]
     pub(crate) enable_copy_trade: bool,
