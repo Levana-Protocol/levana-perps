@@ -2419,10 +2419,7 @@ impl PerpsMarket {
         self.countertrade_addr.clone()
     }
 
-    pub(crate) fn query_countertrade<T: DeserializeOwned>(
-        &self,
-        msg: &CountertradeQueryMsg,
-    ) -> Result<T> {
+    pub fn query_countertrade<T: DeserializeOwned>(&self, msg: &CountertradeQueryMsg) -> Result<T> {
         let contract_addr = self.countertrade_addr.clone();
         self.app()
             .wrap()
