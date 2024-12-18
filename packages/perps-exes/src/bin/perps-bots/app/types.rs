@@ -14,8 +14,10 @@ use cosmos::error::WalletError;
 use cosmos::{Address, AddressHrp, HasAddress, SeedPhrase};
 use cosmos::{Coin, Cosmos};
 use cosmos::{DynamicGasMultiplier, Wallet};
+use cosmwasm_std::Addr;
 use parking_lot::Mutex;
 use perps_exes::config::GasAmount;
+use perpswap::storage::MarketId;
 use reqwest::Client;
 use serde::Serialize;
 use tokio::sync::RwLock;
@@ -28,6 +30,7 @@ use crate::wallet_manager::ManagedWallet;
 use crate::watcher::Watcher;
 
 use super::copy_trade::get_copy_trading_addresses;
+use super::countertrade::get_countertrade_addresses;
 use super::factory::{CopyTrading, FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 use super::price::pyth_market_hours::PythMarketHours;
@@ -149,6 +152,7 @@ pub(crate) struct App {
     pub(crate) wallet_pool: WalletPool,
     pub(crate) pyth_stats: PythPriceStats,
     pub(crate) copy_trading: RwLock<Option<CopyTrading>>,
+    pub(crate) counter_trade: RwLock<HashMap<MarketId, Addr>>,
 }
 
 /// Helper data structure for building up an application.
@@ -270,12 +274,18 @@ impl Opt {
                 .with_max_gas_price(inner.higher_very_high_max_gas_price),
         };
 
+        let factory_contract = cosmos.make_contract(factory.factory);
         let copy_trading = if config.run_copy_trade {
-            let factory_contract = cosmos.make_contract(factory.factory);
             let copy_trading = get_copy_trading_addresses(&factory_contract, None).await?;
             RwLock::new(copy_trading)
         } else {
             RwLock::new(None)
+        };
+
+        let counter_trade = if self.enable_countertrade {
+            get_countertrade_addresses(&factory_contract).await?
+        } else {
+            HashMap::new()
         };
 
         let app = App {
@@ -298,6 +308,7 @@ impl Opt {
             wallet_pool,
             pyth_stats: PythPriceStats::default(),
             copy_trading,
+            counter_trade: RwLock::new(counter_trade),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
@@ -393,6 +404,20 @@ impl App {
     /// Borrow a wallet from the shared pool of wallets.
     pub(crate) async fn get_pool_wallet(&self) -> WalletGuard {
         self.wallet_pool.get().await
+    }
+
+    pub(crate) async fn get_countertrade_contract(&self, market_id: &MarketId) -> Option<Addr> {
+        let contracts = self.counter_trade.read().await;
+        contracts.get(market_id).cloned()
+    }
+
+    pub(crate) async fn set_countertrade_contract(
+        &self,
+        market_id: MarketId,
+        contract: Addr,
+    ) -> Option<Addr> {
+        let mut contracts = self.counter_trade.write().await;
+        contracts.insert(market_id, contract)
     }
 }
 

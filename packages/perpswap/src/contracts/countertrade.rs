@@ -22,8 +22,7 @@ use super::market::{
 pub struct InstantiateMsg {
     /// Market contract we're countertrading on
     pub market: RawAddr,
-    /// Administrator of the contract, Should be the factory contract
-    /// which initializes this.
+    /// Administrator of the contract
     pub admin: RawAddr,
     /// Initial configuration values
     pub config: ConfigUpdate,
@@ -34,8 +33,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 /// Updates to configuration values.
 pub struct Config {
-    /// Administrator of the contract, Should be the factory contract
-    /// which initializes this.
+    /// Administrator of the contract
     pub admin: Addr,
     /// Pending administrator, ready to be accepted, if any.
     pub pending_admin: Option<Addr>,

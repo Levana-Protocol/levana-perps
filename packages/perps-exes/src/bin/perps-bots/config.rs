@@ -64,12 +64,6 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) higher_very_high_max_gas_price: f64,
 }
 
-#[derive(Clone)]
-pub(crate) struct CounterTradeBotConfig {
-    /// Contract address
-    pub(crate) contract: Address,
-}
-
 pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
     pub(crate) network: PerpsNetwork,
@@ -78,7 +72,7 @@ pub(crate) struct BotConfig {
     /// How many tasks to run cranking wallets
     pub(crate) crank_tasks: usize,
     /// Countertrade Config
-    pub(crate) countertrade: Option<CounterTradeBotConfig>,
+    pub(crate) run_countertrade: bool,
     /// Wallet used for very high gas situations, derived from price wallet seed
     pub(crate) high_gas_wallet: Option<Arc<Wallet>>,
     pub(crate) watcher: WatcherConfig,
@@ -174,14 +168,6 @@ impl Opt {
         )?;
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(testnet.hcaptcha_secret.clone(), faucet, wallet_pool.clone());
-        let countertrade = if let Some(countertrade_contract) = self.countertrade {
-            let config = CounterTradeBotConfig {
-                contract: countertrade_contract,
-            };
-            Some(config)
-        } else {
-            None
-        };
 
         let gas_multiplier = testnet.gas_multiplier.or(gas_multiplier);
 
@@ -249,7 +235,7 @@ impl Opt {
             run_optional_services: !self.disable_optional_services,
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
-            countertrade,
+            run_countertrade: self.enable_copy_trade,
             run_copy_trade: self.enable_copy_trade,
         };
 
@@ -355,9 +341,7 @@ impl Opt {
             run_optional_services: !self.disable_optional_services,
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
-            countertrade: self
-                .countertrade
-                .map(|contract| CounterTradeBotConfig { contract }),
+            run_countertrade: self.enable_countertrade,
             run_copy_trade: self.enable_copy_trade,
         };
         Ok(FullBotConfig {
