@@ -235,7 +235,7 @@ impl Opt {
             run_optional_services: !self.disable_optional_services,
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
-            run_countertrade: self.enable_copy_trade,
+            run_countertrade: self.enable_countertrade,
             run_copy_trade: self.enable_copy_trade,
         };
 
