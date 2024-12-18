@@ -389,7 +389,7 @@ pub struct CodeIds {
     /// Liquidity token proxy code ID
     pub liquidity_token: Uint64,
     /// Countertrade code ID
-    pub counter_trade: Option<Uint64>
+    pub counter_trade: Option<Uint64>,
 }
 
 /// Response from [QueryMsg::GetReferrer]
