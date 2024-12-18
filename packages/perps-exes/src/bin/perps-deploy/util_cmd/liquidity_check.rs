@@ -1,7 +1,7 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use cosmwasm_std::Decimal256;
 use perps_exes::contracts::MarketContract;
-use perps_exes::{config::MainnetFactories, contracts::Factory, PerpsNetwork};
+use perps_exes::{config::MainnetFactories, contracts::Factory};
 use perpswap::number::{UnsignedDecimal, Usd};
 use perpswap::storage::MarketId;
 use reqwest::Client;
@@ -70,20 +70,12 @@ async fn go(
         factory,
         recalculation_frequency_in_seconds,
     }: LiquidityCheckOpt,
-    _opt: Opt,
+    opt: Opt,
 ) -> Result<()> {
     let mainnet_factories = MainnetFactories::load()?;
     let factory = mainnet_factories.get(&factory)?;
 
-    let cosmos_network = {
-        if let PerpsNetwork::Regular(cosmos_network) = factory.network {
-            cosmos_network
-        } else {
-            bail!("Unsupported network: {}", factory.network);
-        }
-    };
-    let builder = cosmos_network.builder_with_config().await?;
-    let cosmos = builder.build()?;
+    let cosmos = opt.load_app_mainnet(factory.network).await?.cosmos;
     let factory = Factory::from_contract(cosmos.make_contract(factory.address));
 
     loop {
