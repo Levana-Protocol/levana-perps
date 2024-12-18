@@ -282,7 +282,11 @@ impl Opt {
             RwLock::new(None)
         };
 
-        let counter_trade = get_countertrade_addresses(&factory_contract).await?;
+        let counter_trade = if self.enable_countertrade {
+            get_countertrade_addresses(&factory_contract).await?
+        } else {
+            HashMap::new()
+        };
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -407,7 +411,11 @@ impl App {
         contracts.get(market_id).cloned()
     }
 
-    pub(crate) async fn set_countertrade_contract(&self, market_id: MarketId, contract: Addr) -> Option<Addr> {
+    pub(crate) async fn set_countertrade_contract(
+        &self,
+        market_id: MarketId,
+        contract: Addr,
+    ) -> Option<Addr> {
         let mut contracts = self.counter_trade.write().await;
         contracts.insert(market_id, contract)
     }
