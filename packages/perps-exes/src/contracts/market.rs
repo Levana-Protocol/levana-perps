@@ -750,7 +750,7 @@ impl MarketContract {
         self.0
             .query_raw(CLOSE_ALL_POSITIONS)
             .await
-            .map(|v| !v.is_empty())
+            .map(|v| !v.is_empty() && v != b"null")
     }
 
     pub async fn get_deferred_exec(&self, id: DeferredExecId) -> Result<GetDeferredExecResp> {
