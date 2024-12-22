@@ -214,7 +214,7 @@ fn execute_msg(
                 &migration_admin,
                 countertrade_code_id,
                 format!(
-                    "Levana Perps Countertrade ({}) - {label_suffix}",
+                    "Levana Perps Countertrade - {}{label_suffix}",
                     new_counter_trade.market_id
                 ),
                 &perpswap::contracts::countertrade::InstantiateMsg {
