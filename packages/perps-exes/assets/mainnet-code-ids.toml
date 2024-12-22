@@ -452,3 +452,11 @@ hash = "47b600adc0376c87f3edaec900f79f184a53a3316ebc212a5d08138819cb64f4"
 
 [hashes.code-ids]
 osmosis-mainnet = 1331
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "eefb0f15764f376cb180eccdd6faf539a7bfd4df"
+hash = "67db51fd0f33477090239930d3e6e4dc29a4175abc59cd2569f515e573083d83"
+
+[hashes.code-ids]
+osmosis-mainnet = 1332
