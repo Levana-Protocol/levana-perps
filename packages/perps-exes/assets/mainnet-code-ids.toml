@@ -420,3 +420,35 @@ hash = "caeff1ecb9318fbffb0c49bf4436beaccec8ead2d187a40602951029fcfa102b"
 
 [hashes.code-ids]
 osmosis-mainnet = 1064
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "a4f86a8b9552340b9aff7b994473e3618a0d511e"
+hash = "390d02fa28654be60d3b2eda4f45842226f1848c2848028f0cab0bf58c5304f5"
+
+[hashes.code-ids]
+osmosis-mainnet = 1327
+
+[[hashes]]
+contract-type = "market"
+gitrev = "a4f86a8b9552340b9aff7b994473e3618a0d511e"
+hash = "ebbbe2f8c1a780f0222ea29079798d15ef4a3b7f6d48667574064d17d57c37eb"
+
+[hashes.code-ids]
+osmosis-mainnet = 1328
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "a4f86a8b9552340b9aff7b994473e3618a0d511e"
+hash = "f48d1c4c4bd4c129f421b7026f82614f3ed30759066185f678da7854f61e820a"
+
+[hashes.code-ids]
+osmosis-mainnet = 1329
+
+[[hashes]]
+contract-type = "countertrade"
+gitrev = "a4f86a8b9552340b9aff7b994473e3618a0d511e"
+hash = "47b600adc0376c87f3edaec900f79f184a53a3316ebc212a5d08138819cb64f4"
+
+[hashes.code-ids]
+osmosis-mainnet = 1331
