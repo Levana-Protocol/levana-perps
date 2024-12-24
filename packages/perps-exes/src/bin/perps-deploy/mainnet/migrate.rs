@@ -104,6 +104,9 @@ async fn go(
         }
     }
 
+    let mut migrate_msgs = Vec::<CosmosMsg<Empty>>::new();
+    let migration_admin = factory.query_migration_admin().await?;
+
     if let Some(counter_trade_code_id) = counter_trade_code_id {
         let mut should_set_countertrade = false;
         if let Some(cur_counter_trade_code_id) = &current_counter_trade_code_id {
@@ -126,7 +129,7 @@ async fn go(
                 // code id is already set. No need to migration if
                 // this is the first time we deployed it.
                 for (_, counter_trade) in factory.get_countertrade_address().await? {
-                    factory_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                    migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                         contract_addr: counter_trade.into_string(),
                         new_code_id: counter_trade_code_id,
                         msg: to_json_binary(&perpswap::contracts::countertrade::MigrateMsg {})?,
@@ -156,12 +159,9 @@ async fn go(
         }
     }
 
-    let mut msgs = Vec::<CosmosMsg<Empty>>::new();
-    let migration_admin = factory.query_migration_admin().await?;
-
     if let Some(factory_code_id) = factory_code_id {
         if current_factory_code_id != factory_code_id {
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+            migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                 contract_addr: factory.get_address_string(),
                 new_code_id: factory_code_id,
                 msg: to_json_binary(&perpswap::contracts::factory::entry::MigrateMsg {})?,
@@ -182,7 +182,7 @@ async fn go(
         anyhow::ensure!(info.admin == migration_admin.get_address_string(), "Invalid migration admin set up. Factory says: {migration_admin}. But market contract {market} has {}.", info.admin);
         if let Some(market_code_id) = market_code_id {
             if info.code_id != market_code_id {
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: market.get_address_string(),
                     new_code_id: market_code_id,
                     msg: to_json_binary(&perpswap::contracts::market::entry::MigrateMsg {})?,
@@ -193,7 +193,7 @@ async fn go(
         if let Some(liquidity_token_code_id) = liquidity_token_code_id {
             let info = lp.info().await?;
             if info.code_id != liquidity_token_code_id {
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: lp.get_address_string(),
                     new_code_id: liquidity_token_code_id,
                     msg: to_json_binary(
@@ -203,7 +203,7 @@ async fn go(
             }
             let info = xlp.info().await?;
             if info.code_id != liquidity_token_code_id {
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: xlp.get_address_string(),
                     new_code_id: liquidity_token_code_id,
                     msg: to_json_binary(
@@ -216,7 +216,7 @@ async fn go(
         let info = pos.info().await?;
         if let Some(position_token_code_id) = position_token_code_id {
             if info.code_id != position_token_code_id {
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: pos.get_address_string(),
                     new_code_id: position_token_code_id,
                     msg: to_json_binary(
@@ -227,12 +227,12 @@ async fn go(
         }
     }
 
-    if !msgs.is_empty() {
+    if !migrate_msgs.is_empty() {
         tracing::info!("Migrate existing markets");
         tracing::info!("CW3 contract: {migration_admin}");
         signers.push(migration_admin);
 
-        let chunks = msgs.chunks(30);
+        let chunks = migrate_msgs.chunks(30);
         let chunk_count = chunks.len();
         for (idx, msgs) in chunks.enumerate() {
             let idx = idx + 1;
