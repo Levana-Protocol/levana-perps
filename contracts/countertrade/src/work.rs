@@ -916,6 +916,8 @@ pub(crate) fn execute(
         }
         WorkDescription::ResetShares => {
             crate::state::SHARES.clear(storage);
+            totals.shares = LpToken::zero();
+            crate::state::TOTALS.save(storage, &totals)?;
             res = res.add_event(Event::new("reset-shares"));
         }
         WorkDescription::ClearDeferredExec { id } => {
