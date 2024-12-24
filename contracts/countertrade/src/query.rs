@@ -21,32 +21,39 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
 
 fn balance(state: State, storage: &dyn Storage, address: RawAddr) -> Result<MarketBalance> {
     let address = address.validate(state.api)?;
-    let shares = crate::state::SHARES
-        .may_load(storage, &address)?
-        .context("SHARES store is empty")?;
+    let shares = crate::state::SHARES.may_load(storage, &address)?;
 
     let market_info = state.load_market_info(storage)?;
-    let totals = crate::state::TOTALS
-        .may_load(storage)?
-        .with_context(|| format!("No totals found for market with shares: {}", market_info.id))?;
-    let pos = PositionsInfo::load(&state, &market_info)?;
+    let totals = crate::state::TOTALS.may_load(storage)?;
 
-    let contract_balance = state.contract_balance(storage)?;
+    let pool_size = match totals {
+        Some(ref totals) => totals.shares,
+        None => LpToken::zero(),
+    };
+
+    let shares = match shares {
+        Some(shares) => shares.raw(),
+        None => LpToken::zero(),
+    };
+
+    let collateral = match totals {
+        Some(totals) => {
+            if totals.shares.is_zero() {
+                Collateral::zero()
+            } else {
+                let contract_balance = state.contract_balance(storage)?;
+                let pos = PositionsInfo::load(&state, &market_info)?;
+                totals.shares_to_collateral(contract_balance, shares, &pos)?
+            }
+        }
+        None => Collateral::zero(),
+    };
+
     let result = MarketBalance {
         token: market_info.token,
         shares,
-        collateral: NonZero::new(totals.shares_to_collateral(
-            contract_balance,
-            shares.raw(),
-            &pos,
-        )?)
-        .with_context(|| format!("Ended up with 0 collateral for market {}", market_info.id))?,
-        pool_size: NonZero::new(totals.shares).with_context(|| {
-            format!(
-                "No shares found for pool with share entries: {}",
-                market_info.id
-            )
-        })?,
+        collateral,
+        pool_size,
         market: market_info.id,
     };
     Ok(result)
