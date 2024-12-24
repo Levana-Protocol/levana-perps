@@ -37,7 +37,7 @@ fn deposit() {
     let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
-    market.query_countertrade_balances(&lp).unwrap_err();
+    market.query_countertrade_balances(&lp).unwrap();
 
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
@@ -2001,7 +2001,7 @@ fn deposit_extra_money() {
     let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
-    market.query_countertrade_balances(&lp).unwrap_err();
+    market.query_countertrade_balances(&lp).unwrap();
 
     market
         .exec_countertrade_mint_and_deposit(&lp, "100")
