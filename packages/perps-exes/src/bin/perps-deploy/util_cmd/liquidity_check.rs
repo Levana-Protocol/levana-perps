@@ -5,6 +5,7 @@ use perps_exes::{config::MainnetFactories, contracts::Factory};
 use perpswap::number::{UnsignedDecimal, Usd};
 use perpswap::storage::MarketId;
 use reqwest::Client;
+use std::fmt::Display;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinSet;
@@ -61,6 +62,21 @@ struct MarketInfo {
     market_id: Arc<MarketId>,
 }
 
+struct VolatileMarketInfo {
+    market_id: Arc<MarketId>,
+    unlocked_liquidity_usd: Usd,
+}
+
+impl Display for VolatileMarketInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} (Unlocked Liquidity: {}USD)",
+            self.market_id, self.unlocked_liquidity_usd
+        )
+    }
+}
+
 async fn go(
     LiquidityCheckOpt {
         slack_webhook,
@@ -111,12 +127,12 @@ async fn go(
             start = end;
         }
 
-        let mut volatile_market_ids = Vec::new();
+        let mut volatile_market_info = Vec::new();
 
         while let Some(res) = set.join_next().await {
             match res {
                 Ok(Ok(ids)) => {
-                    volatile_market_ids.extend(ids);
+                    volatile_market_info.extend(ids);
                 }
                 Ok(Err(e)) => {
                     set.abort_all();
@@ -129,15 +145,19 @@ async fn go(
             }
         }
 
-        if !volatile_market_ids.is_empty() {
+        if !volatile_market_info.is_empty() {
             tracing::info!(
                 "Found {} volatile markets, sending a slack notification.",
-                volatile_market_ids.len()
+                volatile_market_info.len()
             );
             send_slack_notification(
                 slack_webhook.clone(),
                 "Volatile markets found".to_owned(),
-                format!("Markets: {:?}", volatile_market_ids),
+                volatile_market_info
+                    .iter()
+                    .map(|info| info.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
             )
             .await?;
         }
@@ -151,8 +171,8 @@ async fn liquidity_check_helper(
     market_info: Vec<MarketInfo>,
     unlocked_liquidity_threshold_usd: Usd,
     ratio_threshold: Decimal256,
-) -> Result<Vec<Arc<MarketId>>> {
-    let mut volatile_market_ids = Vec::new();
+) -> Result<Vec<VolatileMarketInfo>> {
+    let mut volatile_market_info = Vec::new();
 
     for target_market in market_info {
         let contract = target_market.market.clone();
@@ -165,6 +185,7 @@ async fn liquidity_check_helper(
             .locked
             .checked_add(status.liquidity.unlocked)?;
         let price_point = contract.current_price().await?;
+        let unlocked_liquidity_usd = price_point.collateral_to_usd(status.liquidity.unlocked);
 
         if total_liquidity.is_zero()
             || status
@@ -174,13 +195,15 @@ async fn liquidity_check_helper(
                 .checked_mul(Decimal256::from_ratio(100u32, 1u32))?
                 .checked_div(total_liquidity.into_decimal256())?
                 < ratio_threshold
-            || price_point.collateral_to_usd(status.liquidity.unlocked)
-                < unlocked_liquidity_threshold_usd
+            || unlocked_liquidity_usd < unlocked_liquidity_threshold_usd
         {
-            volatile_market_ids.push(market_id);
+            volatile_market_info.push(VolatileMarketInfo {
+                market_id,
+                unlocked_liquidity_usd,
+            });
         }
     }
-    Ok(volatile_market_ids)
+    Ok(volatile_market_info)
 }
 
 pub(crate) async fn send_slack_notification(
