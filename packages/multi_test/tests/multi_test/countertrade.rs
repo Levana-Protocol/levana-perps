@@ -2242,10 +2242,11 @@ fn deposit_minimal_loss_and_deposit() {
     assert_ne!(balance.shares, "0".parse().unwrap());
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
-        HasWorkResp::Work { desc: WorkDescription::ResetShares }
+        HasWorkResp::Work {
+            desc: WorkDescription::ResetShares
+        }
     );
     market.exec_countertrade_do_work().unwrap();
-
 
     market
         .exec_countertrade_mint_and_deposit(&lp, "50")
