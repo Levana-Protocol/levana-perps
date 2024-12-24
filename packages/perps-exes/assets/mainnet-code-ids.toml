@@ -460,3 +460,11 @@ hash = "67db51fd0f33477090239930d3e6e4dc29a4175abc59cd2569f515e573083d83"
 
 [hashes.code-ids]
 osmosis-mainnet = 1332
+
+[[hashes]]
+contract-type = "countertrade"
+gitrev = "817b45399f10c8aac58e58de3438512515ec0968"
+hash = "ee0c7221f0192e9a8668cffe6a081cbc72994971f17e0d5607340e7205a3783b"
+
+[hashes.code-ids]
+osmosis-mainnet = 1337
