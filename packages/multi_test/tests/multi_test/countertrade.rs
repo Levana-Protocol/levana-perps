@@ -10,7 +10,7 @@ use perpswap::{
         countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, MarketStatus, WorkDescription},
         market::position::PositionId,
     },
-    number::{Collateral, LpToken, NonZero, Signed},
+    number::{Collateral, LpToken, Signed},
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
 };
 
@@ -895,10 +895,7 @@ fn deduct_balance() {
 
     let balance = market.query_countertrade_balances(&lp).unwrap();
 
-    assert_eq!(
-        balance.collateral,
-        NonZero::new(Collateral::from_str("100").unwrap()).unwrap()
-    );
+    assert_eq!(balance.collateral, Collateral::from_str("100").unwrap());
 
     match market.query_countertrade_has_work().unwrap() {
         HasWorkResp::Work {
@@ -943,11 +940,9 @@ fn deduct_balance() {
     match market_type {
         perpswap::storage::MarketType::CollateralIsQuote => assert!(balance
             .collateral
-            .raw()
             .approx_eq(Collateral::from_str("98.384624").unwrap())),
         perpswap::storage::MarketType::CollateralIsBase => assert!(balance
             .collateral
-            .raw()
             .approx_eq(Collateral::from_str("98.531477").unwrap())),
     }
 }
@@ -2052,4 +2047,207 @@ fn query_countertrade_status_no_crash() {
         .unwrap();
     assert_eq!(result.shares, LpToken::zero());
     assert_eq!(result.collateral, Collateral::zero());
+}
+
+#[test]
+fn query_countertrade_balance_no_crash() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let result: MarketBalance = market
+        .query_countertrade(&perpswap::contracts::countertrade::QueryMsg::Balance {
+            address: lp.into(),
+        })
+        .unwrap();
+    assert_eq!(result.shares, "0".parse().unwrap());
+}
+
+#[test]
+fn deposit_full_loss_and_deposit() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Make sure there are funds to open a position
+    market.exec_countertrade_mint_and_deposit(&lp, "1").unwrap();
+
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Open up unbalanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "2",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+
+    assert_eq!(balance.collateral, Collateral::from_str("1").unwrap());
+
+    match market.query_countertrade_has_work().unwrap() {
+        HasWorkResp::Work {
+            desc:
+                WorkDescription::OpenPosition {
+                    direction: DirectionToBase::Short,
+                    collateral,
+                    ..
+                },
+        } => {
+            assert_eq!(collateral.raw(), "1".parse().unwrap());
+        }
+        has_work => panic!("Unexpected has_work: {has_work:?}"),
+    }
+
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    // Handle deferred exec id
+    market.exec_countertrade_do_work().unwrap();
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Force the countertrade position to be closed
+    market.exec_set_price("1.2".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    assert_eq!(balance.collateral, "0".parse().unwrap());
+    assert_eq!(balance.shares, "1".parse().unwrap());
+
+    // Because of invalid collateral and shares. Chain balance is zero and shares is one.
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "1")
+        .unwrap_err();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::Work {
+            desc: WorkDescription::ResetShares
+        }
+    );
+    market.exec_countertrade_do_work().unwrap();
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    assert_eq!(balance.collateral, "0".parse().unwrap());
+    assert_eq!(balance.shares, "0".parse().unwrap());
+    // Able to deposit now
+    market.exec_countertrade_mint_and_deposit(&lp, "1").unwrap();
+}
+
+#[test]
+fn deposit_minimal_loss_and_deposit() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Make sure there are funds to open a position
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "1.46009")
+        .unwrap();
+
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Open up unbalanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "5",
+                perpswap::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            match market_type {
+                perpswap::prelude::MarketType::CollateralIsQuote => "3",
+                perpswap::prelude::MarketType::CollateralIsBase => "2",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            perpswap::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    match market.query_countertrade_has_work().unwrap() {
+        HasWorkResp::Work {
+            desc:
+                WorkDescription::OpenPosition {
+                    direction: DirectionToBase::Short,
+                    ..
+                },
+        } => (),
+        has_work => panic!("Unexpected has_work: {has_work:?}"),
+    }
+
+    market.exec_countertrade_do_work().unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    // Handle deferred exec id
+    market.exec_countertrade_do_work().unwrap();
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Force the countertrade position to be closed
+    market.exec_set_price("1.2".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    // Calculate before deferred execution so that DNF fee doesn't
+    // influence the available total
+    let balance = market.query_countertrade_balances(&lp).unwrap();
+    assert_eq!(balance.collateral, "0".parse().unwrap());
+    assert_ne!(balance.shares, "0".parse().unwrap());
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::Work { desc: WorkDescription::ResetShares }
+    );
+    market.exec_countertrade_do_work().unwrap();
+
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "50")
+        .unwrap();
 }
