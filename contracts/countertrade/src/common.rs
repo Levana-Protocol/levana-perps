@@ -113,21 +113,21 @@ impl Totals {
     ) -> Result<NonZero<LpToken>> {
         let collateral = contract_balance.checked_add(pos.active_collateral()?)?;
         let collateral = collateral.checked_sub(funds.raw())?;
-        let new_shares =
-            if (collateral.is_zero() && self.shares.is_zero()) || contract_balance.is_zero() {
-                NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
-                    .expect("Impossible: NonZero to NonZero produced a 0")
-            } else if collateral.is_zero() || self.shares.is_zero() {
-                bail!("Invalid collateral/shares totals: {self:?}");
-            } else {
-                let new_shares = LpToken::from_decimal256(
-                    funds
-                        .into_decimal256()
-                        .checked_mul(self.shares.into_decimal256())?
-                        .checked_div(collateral.into_decimal256())?,
-                );
-                NonZero::new(new_shares).context("new_shares ended up 0")?
-            };
+        let new_shares = if (collateral.is_zero() && self.shares.is_zero())
+            || contract_balance.is_zero()
+        {
+            NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
+                .expect("Impossible: NonZero to NonZero produced a 0")
+        } else if collateral.is_zero() || self.shares.is_zero() {
+            bail!("Invalid collateral/shares totals: {self:?}");
+        } else {
+            let fund_units = funds
+                .into_decimal256()
+                .checked_div(collateral.into_decimal256())?;
+            let new_shares =
+                LpToken::from_decimal256(fund_units.checked_mul(self.shares.into_decimal256())?);
+            NonZero::new(new_shares).context("new_shares ended up 0")?
+        };
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
     }
@@ -216,6 +216,23 @@ mod tests {
     use perpswap::number::{Collateral, UnsignedDecimal};
 
     use crate::{PositionsInfo, Totals};
+
+    #[test]
+    fn regression_perp_4368() {
+        let mut totals = Totals {
+            shares: "0.000000000001445".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let contract_balance = "0.000000000001445".parse().unwrap();
+        totals
+            .add_collateral(
+                contract_balance,
+                "0.000000000001345".parse().unwrap(),
+                &PositionsInfo::NoPositions,
+            )
+            .unwrap();
+    }
 
     #[test]
     fn regression_perp_4062() {
