@@ -158,12 +158,12 @@ pub struct MarketBalance {
     pub market: MarketId,
     /// Token for this market
     pub token: crate::token::Token,
-    /// Shares of the pool held by this LP
-    pub shares: NonZero<LpToken>,
+    /// Shares of the pool held by this specific wallet.
+    pub shares: LpToken,
     /// Collateral equivalent of these shares
-    pub collateral: NonZero<Collateral>,
+    pub collateral: Collateral,
     /// Size of the entire pool, in LP tokens
-    pub pool_size: NonZero<LpToken>,
+    pub pool_size: LpToken,
 }
 
 /// Either a native token or CW20 contract
