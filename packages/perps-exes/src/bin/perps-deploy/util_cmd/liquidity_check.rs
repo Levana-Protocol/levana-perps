@@ -213,7 +213,7 @@ pub(crate) async fn send_slack_notification(
 ) -> anyhow::Result<()> {
     let value = serde_json::json!(
     {
-        "text": "volatile markets alert",
+        "text": "Insufficient liquidity",
         "blocks": [
             {
                 "type": "header",
