@@ -108,7 +108,9 @@ async fn go(
         for market in markets {
             let market_id = market.market_id.into();
             let market = MarketContract::new(market.market);
-            market_info.push(MarketInfo { market, market_id })
+            if !market.is_wound_down().await? {
+                market_info.push(MarketInfo { market, market_id })
+            }
         }
 
         let mut set = JoinSet::new();
@@ -152,7 +154,7 @@ async fn go(
             );
             send_slack_notification(
                 slack_webhook.clone(),
-                "Volatile markets found".to_owned(),
+                "Insufficient liquidity".to_owned(),
                 volatile_market_info
                     .iter()
                     .map(|info| info.to_string())
