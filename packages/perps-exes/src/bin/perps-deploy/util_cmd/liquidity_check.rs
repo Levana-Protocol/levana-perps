@@ -178,6 +178,10 @@ async fn liquidity_check_helper(
         let contract = target_market.market.clone();
         let market_id = target_market.market_id.clone();
 
+        if contract.is_wound_down().await? {
+            continue;
+        }
+
         let status = contract.status().await?;
 
         let total_liquidity = status
