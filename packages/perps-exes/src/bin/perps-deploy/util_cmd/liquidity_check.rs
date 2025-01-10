@@ -108,7 +108,9 @@ async fn go(
         for market in markets {
             let market_id = market.market_id.into();
             let market = MarketContract::new(market.market);
-            market_info.push(MarketInfo { market, market_id })
+            if !market.is_wound_down().await? {
+                market_info.push(MarketInfo { market, market_id })
+            }
         }
 
         let mut set = JoinSet::new();
@@ -177,10 +179,6 @@ async fn liquidity_check_helper(
     for target_market in market_info {
         let contract = target_market.market.clone();
         let market_id = target_market.market_id.clone();
-
-        if contract.is_wound_down().await? {
-            continue;
-        }
 
         let status = contract.status().await?;
 
