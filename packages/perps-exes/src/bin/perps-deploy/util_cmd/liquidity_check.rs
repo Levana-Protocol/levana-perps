@@ -113,6 +113,8 @@ async fn go(
             }
         }
 
+        let market_count = market_info.len();
+
         let mut set = JoinSet::new();
 
         let market_count_per_worker = market_count.div_euclid(workers.try_into()?);
