@@ -152,7 +152,7 @@ async fn go(
             );
             send_slack_notification(
                 slack_webhook.clone(),
-                "Volatile markets found".to_owned(),
+                "Insufficient liquidity".to_owned(),
                 volatile_market_info
                     .iter()
                     .map(|info| info.to_string())
