@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{fmt::Write, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use axum::async_trait;
 
 use crate::watcher::{Heartbeat, TaskLabel, WatchedTask, WatchedTaskOutput};
@@ -27,17 +27,22 @@ impl WatchedTask for BlockLag {
 }
 
 async fn check_block_lag_single(app: &App) -> Result<String> {
-    let report = app
-        .cosmos
-        .node_health_report()
-        .nodes
-        .into_iter()
-        .next()
-        .context("Impossible! No nodes found in health report")?;
-    match report.node_health_level {
-        cosmos::error::NodeHealthLevel::Unblocked { error_count } if error_count < 4 => {
-            Ok(format!("Primary node is healthy:\n{report}"))
+    let mut is_healthy = false;
+    let mut res = String::new();
+    for report in app.cosmos.node_health_report().nodes {
+        match report.node_health_level {
+            cosmos::error::NodeHealthLevel::Unblocked { error_count } if error_count < 4 => {
+                writeln!(&mut res, "Healthy: {report}")?;
+                is_healthy = true;
+            }
+            _ => {
+                writeln!(&mut res, "Unhealthy: {report}")?;
+            }
         }
-        _ => Err(anyhow::anyhow!("Primary node is not healthy:\n{report}")),
+    }
+    if is_healthy {
+        Ok(res)
+    } else {
+        Err(anyhow::anyhow!(res))
     }
 }
