@@ -32,8 +32,7 @@ pub use network::PerpsNetwork;
 
 /// Get the Git SHA from GitHub Actions env vars
 pub fn build_version() -> &'static str {
-    const BUILD_VERSION: Option<&str> = option_env!("GITHUB_SHA");
-    BUILD_VERSION.unwrap_or("Local build")
+    include_str!("../../build-version.txt")
 }
 
 pub struct PerpApp {

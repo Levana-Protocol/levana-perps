@@ -662,8 +662,8 @@ impl Default for WatcherConfig {
             },
             block_lag: TaskConfig {
                 delay: Delay::Constant(20),
-                out_of_date: Some(20),
-                retries: None,
+                out_of_date: Some(180),
+                retries: Some(10),
                 delay_between_retries: None,
             },
             counter_trade_bot: TaskConfig {
