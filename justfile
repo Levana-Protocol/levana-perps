@@ -123,6 +123,7 @@ cargo-bots-release:
 
 # Build bots binary in release mode
 cargo-bots-release-arm:
+    echo -e "$GIT_SHA" > packages/build-version.txt
     cross build --bin perps-bots --release --target aarch64-unknown-linux-musl
 
 # Build bots docker image
