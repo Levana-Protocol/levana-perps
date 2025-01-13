@@ -791,4 +791,16 @@ mod tests {
             LpToken::from_u128(12345678).unwrap(),
         );
     }
+
+    #[test]
+    fn floor_unsigned_type_with_precision() {
+        unsigned!(UnsignedStruct);
+
+        assert_eq!(
+            UnsignedStruct::from_str("12.3456789")
+                .unwrap()
+                .floor_with_precision(2),
+            UnsignedStruct::from_str("12.34").unwrap()
+        );
+    }
 }
