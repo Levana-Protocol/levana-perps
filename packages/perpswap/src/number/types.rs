@@ -261,6 +261,17 @@ macro_rules! unsigned {
                 Ok(Self::from_decimal256(arbitrary_decimal_256(u)?))
             }
         }
+
+        impl $t {
+            /// Floor the current value with given decimal precision
+            pub fn floor_with_precision(&self, precision: u32) -> Self {
+                // Adjust precision based on given value and chuck in array
+                let factor = Decimal256::one().atomics() / Uint256::from_u128(10).pow(precision);
+                let raw = self.0.atomics() / factor * factor;
+
+                Self(Decimal256::new(raw))
+            }
+        }
     };
 }
 

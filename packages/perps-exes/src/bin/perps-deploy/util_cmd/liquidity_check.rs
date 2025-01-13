@@ -76,7 +76,9 @@ impl Display for VolatileMarketInfo {
         write!(
             f,
             "{} (Unlocked Liquidity: {}USD) from {}",
-            self.market_id, self.unlocked_liquidity_usd, self.network
+            self.market_id,
+            self.unlocked_liquidity_usd.floor_with_precision(2),
+            self.network
         )
     }
 }
