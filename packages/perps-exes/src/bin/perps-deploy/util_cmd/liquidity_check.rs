@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use cosmwasm_std::Decimal256;
 use perps_exes::contracts::MarketContract;
+use perps_exes::PerpsNetwork;
 use perps_exes::{config::MainnetFactories, contracts::Factory};
 use perpswap::number::{UnsignedDecimal, Usd};
 use perpswap::storage::MarketId;
@@ -38,9 +39,10 @@ pub(super) struct LiquidityCheckOpt {
     #[clap(
         long,
         default_value = "osmomainnet1",
-        env = "LEVANA_LIQUIDITY_CHECK_FACTORY"
+        env = "LEVANA_LIQUIDITY_CHECK_FACTORY",
+        value_delimiter = ','
     )]
-    factory: String,
+    factories: Vec<String>,
     /// Run check after specified seconds
     #[arg(
         long,
@@ -60,19 +62,21 @@ impl LiquidityCheckOpt {
 struct MarketInfo {
     market: MarketContract,
     market_id: Arc<MarketId>,
+    network: PerpsNetwork,
 }
 
 struct VolatileMarketInfo {
     market_id: Arc<MarketId>,
     unlocked_liquidity_usd: Usd,
+    network: PerpsNetwork,
 }
 
 impl Display for VolatileMarketInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} (Unlocked Liquidity: {}USD)",
-            self.market_id, self.unlocked_liquidity_usd
+            "{} (Unlocked Liquidity: {}USD) from {}",
+            self.market_id, self.unlocked_liquidity_usd, self.network
         )
     }
 }
@@ -83,33 +87,41 @@ async fn go(
         unlocked_liquidity_threshold_usd,
         ratio_threshold,
         workers,
-        factory,
+        factories,
         recalculation_frequency_in_seconds,
     }: LiquidityCheckOpt,
     opt: Opt,
 ) -> Result<()> {
     let mainnet_factories = MainnetFactories::load()?;
-    let factory = mainnet_factories.get(&factory)?;
-
-    let cosmos = opt.load_app_mainnet(factory.network).await?.cosmos;
-    let factory = Factory::from_contract(cosmos.make_contract(factory.address));
 
     loop {
         tracing::info!("Started Liquidity check for the markets.");
-        let markets = factory.get_markets().await?;
-        let market_count = markets.len();
-        tracing::info!(
-            "Fetched {} markets' information for Liquidity check.",
-            market_count
-        );
-
         let mut market_info = Vec::<MarketInfo>::new();
+        for factory in factories.iter() {
+            let factory = mainnet_factories.get(factory)?;
+            let network = factory.network;
 
-        for market in markets {
-            let market_id = market.market_id.into();
-            let market = MarketContract::new(market.market);
-            if !market.is_wound_down().await? {
-                market_info.push(MarketInfo { market, market_id })
+            let cosmos = opt.load_app_mainnet(factory.network).await?.cosmos;
+            let factory = Factory::from_contract(cosmos.make_contract(factory.address));
+
+            let markets = factory.get_markets().await?;
+            let market_count = markets.len();
+            tracing::info!(
+                "Fetched {} markets' information from {} for Liquidity check.",
+                market_count,
+                network.clone()
+            );
+
+            for market in markets {
+                let market_id = market.market_id.into();
+                let market = MarketContract::new(market.market);
+                if !market.is_wound_down().await? {
+                    market_info.push(MarketInfo {
+                        market,
+                        market_id,
+                        network,
+                    })
+                }
             }
         }
 
@@ -204,6 +216,7 @@ async fn liquidity_check_helper(
             volatile_market_info.push(VolatileMarketInfo {
                 market_id,
                 unlocked_liquidity_usd,
+                network: target_market.network,
             });
         }
     }
