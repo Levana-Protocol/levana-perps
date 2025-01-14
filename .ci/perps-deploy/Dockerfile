@@ -4,7 +4,7 @@ ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.6.0/he
 ENV NO_COLOR=1
 
 COPY --chmod=755 --chown=1000 ./mainnet-factories.toml /app/packages/perps-exes/assets
-COPY --chmod=755 --chown=1000 ./config-network.toml /root/.config/cosmos-rs
+COPY --chmod=755 --chown=1000 ./config-network.toml /app/.config/cosmos-rs
 COPY --chmod=755 --chown=1000 perps-deploy /usr/bin/perps-deploy
 
 WORKDIR /app
