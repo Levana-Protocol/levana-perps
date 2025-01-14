@@ -1,0 +1,7 @@
+[network.osmosis-mainnet]
+grpc = "https://osmo-priv-grpc.kingnodes.com"
+grpc-fallbacks = [
+    "https://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.osmosis-1.mesa-grpc.newmetric.xyz",
+    "https://grpc.osmosis.zone",
+    "http://osmosis-grpc.polkachu.com:12590",
+]
