@@ -50,6 +50,9 @@ pub(super) struct LiquidityCheckOpt {
         default_value = "3600"
     )]
     pub(crate) recalculation_frequency_in_seconds: u64,
+    /// Markets to ignore for liquidity check
+    #[arg(long, env = "LEVANA_LIQUIDITY_IGNORED_MARKETS", value_delimiter = ',')]
+    ignored_markets: Vec<MarketId>,
 }
 
 impl LiquidityCheckOpt {
@@ -91,6 +94,7 @@ async fn go(
         workers,
         factories,
         recalculation_frequency_in_seconds,
+        ignored_markets,
     }: LiquidityCheckOpt,
     opt: Opt,
 ) -> Result<()> {
@@ -115,12 +119,12 @@ async fn go(
             );
 
             for market in markets {
-                let market_id = market.market_id.into();
+                let market_id = market.market_id;
                 let market = MarketContract::new(market.market);
-                if !market.is_wound_down().await? {
+                if !market.is_wound_down().await? && !ignored_markets.contains(&market_id) {
                     market_info.push(MarketInfo {
                         market,
-                        market_id,
+                        market_id: market_id.into(),
                         network,
                     })
                 }
