@@ -1210,7 +1210,6 @@ key = "ETH_USD"
 inverted = false
 
 [networks.osmosis-testnet.milkTIA_USD]
-stride-contract = "osmo1qemh23s4qwymxyzqs0puhle60djhtytjhvv4ghdfdf0x9tgkapss6q6sj8"
 
 [[networks.osmosis-testnet.milkTIA_USD.feeds]]
 
@@ -1218,25 +1217,11 @@ stride-contract = "osmo1qemh23s4qwymxyzqs0puhle60djhtytjhvv4ghdfdf0x9tgkapss6q6s
 key = "TIA_USD"
 inverted = false
 
-[[networks.osmosis-testnet.milkTIA_USD.feeds]]
-
-[networks.osmosis-testnet.milkTIA_USD.feeds.stride]
-denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
-inverted = false
-age_tolerance = 31536000
-
 [[networks.osmosis-testnet.milkTIA_USD.feeds-usd]]
 
 [networks.osmosis-testnet.milkTIA_USD.feeds-usd.pyth]
 key = "TIA_USD"
 inverted = false
-
-[[networks.osmosis-testnet.milkTIA_USD.feeds-usd]]
-
-[networks.osmosis-testnet.milkTIA_USD.feeds-usd.stride]
-denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
-inverted = false
-age_tolerance = 31536000
 
 [[networks.osmosis-testnet.nBTC_USD.feeds]]
 
