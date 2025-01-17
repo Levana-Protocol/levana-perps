@@ -336,7 +336,11 @@ impl PnlInfo {
 
     fn image_svg(self) -> Response {
         // Generate the raw SVG text by rendering the template
-        let svg = PnlSvg { info: &self }.render().unwrap();
+        let svg = match ChainId::try_from(self.chain.clone()).unwrap() {
+            ChainId::RujiraTestnet => PnlRujiraSvg { info: &self }.render(),
+            _ => PnlLevanaSvg { info: &self }.render(),
+        }
+        .unwrap();
 
         let mut res = svg.into_response();
         res.headers_mut().insert(
@@ -352,7 +356,10 @@ impl PnlInfo {
 
     fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
-        let svg = PnlSvg { info: self }.render().unwrap();
+        let svg = match ChainId::try_from(self.chain.clone()).unwrap() {
+            ChainId::RujiraTestnet => PnlRujiraSvg { info: self }.render(),
+            _ => PnlLevanaSvg { info: self }.render(),
+        }?;
 
         // Convert the SVG into a usvg tree using default settings
         let tree = resvg::usvg::Tree::from_str(
@@ -521,7 +528,13 @@ mod tests {
 }
 
 #[derive(askama::Template)]
-#[template(path = "pnl.svg.xml")]
-struct PnlSvg<'a> {
+#[template(path = "pnl-levana.svg.xml")]
+struct PnlLevanaSvg<'a> {
+    info: &'a PnlInfo,
+}
+
+#[derive(askama::Template)]
+#[template(path = "pnl-rujira.svg.xml")]
+struct PnlRujiraSvg<'a> {
     info: &'a PnlInfo,
 }

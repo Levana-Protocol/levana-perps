@@ -4,7 +4,7 @@
 use std::fmt::Display;
 
 use anyhow::Result;
-use cosmos::CosmosNetwork;
+use cosmos::{CosmosBuilder, CosmosNetwork};
 use cosmwasm_std::Decimal256;
 use perps_exes::PerpsNetwork;
 use perpswap::storage::{DirectionToBase, Signed};
@@ -41,6 +41,8 @@ pub(crate) enum ChainId {
     Neutron1 = 12,
     #[serde(rename = "pion-1")]
     Pion1 = 13,
+    #[serde(rename = "dev-1")]
+    RujiraTestnet = 14,
 }
 
 impl From<ChainId> for i32 {
@@ -59,6 +61,7 @@ impl From<ChainId> for i32 {
             ChainId::Injective888 => 11,
             ChainId::Neutron1 => 12,
             ChainId::Pion1 => 13,
+            ChainId::RujiraTestnet => 14,
         }
     }
 }
@@ -80,6 +83,7 @@ impl TryFrom<&str> for ChainId {
             "pacific-1" => Ok(ChainId::Pacific1),
             "neutron-1" => Ok(ChainId::Neutron1),
             "pion-1" => Ok(ChainId::Pion1),
+            "dev-1" => Ok(ChainId::RujiraTestnet),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
     }
@@ -102,6 +106,7 @@ impl Display for ChainId {
             ChainId::Injective888 => "injective-888",
             ChainId::Neutron1 => "neutron-1",
             ChainId::Pion1 => "pion-1",
+            ChainId::RujiraTestnet => "dev-1",
         })
     }
 }
@@ -115,7 +120,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 12] {
+    pub(crate) fn all() -> [ChainId; 13] {
         [
             ChainId::Atlantic2,
             ChainId::Elgafar1,
@@ -129,13 +134,18 @@ impl ChainId {
             ChainId::Injective888,
             ChainId::Neutron1,
             ChainId::Pion1,
+            ChainId::RujiraTestnet,
         ]
     }
 
-    pub(crate) fn into_cosmos_network(self) -> Result<CosmosNetwork> {
+    pub(crate) async fn into_cosmos_builder(self) -> Result<CosmosBuilder> {
         // In the future this may be a partial mapping (i.e. to None) if we drop
         // support for some chains. But by keeping the ChainId present, we can
         // load historical data from the database.
+        if self == ChainId::RujiraTestnet {
+            return Ok(PerpsNetwork::RujiraTestnet.builder().await?);
+        }
+
         Ok(match self {
             ChainId::Atlantic2 => CosmosNetwork::SeiTestnet,
             ChainId::Dragonfire4 => anyhow::bail!("Dragonfire network is no longer supported"),
@@ -150,20 +160,21 @@ impl ChainId {
             ChainId::Injective888 => CosmosNetwork::InjectiveTestnet,
             ChainId::Neutron1 => CosmosNetwork::NeutronMainnet,
             ChainId::Pion1 => CosmosNetwork::NeutronTestnet,
-        })
+            _ => anyhow::bail!("Unsupported Chain Id"),
+        }
+        .builder()
+        .await?)
     }
 
     pub(crate) fn from_perps_network(network: PerpsNetwork) -> Result<Self> {
         match network {
             PerpsNetwork::Regular(network) => Self::from_cosmos_network(network),
+            PerpsNetwork::RujiraTestnet => Ok(ChainId::RujiraTestnet),
             PerpsNetwork::DymensionTestnet => Err(anyhow::anyhow!(
                 "Cannot run companion server for Dymension testnet"
             )),
             PerpsNetwork::NibiruTestnet => Err(anyhow::anyhow!(
                 "Cannot run companion server for Nibiru testnet"
-            )),
-            PerpsNetwork::RujiraTestnet => Err(anyhow::anyhow!(
-                "Cannot run companion server for Rujira testnet"
             )),
         }
     }
@@ -201,6 +212,7 @@ impl ChainId {
             ChainId::Injective888 => false,
             ChainId::Neutron1 => true,
             ChainId::Pion1 => false,
+            ChainId::RujiraTestnet => false,
         }
     }
 }

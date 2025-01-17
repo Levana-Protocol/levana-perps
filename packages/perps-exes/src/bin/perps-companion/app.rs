@@ -23,8 +23,7 @@ impl App {
         let db = Db::new(&postgres_uri).await?;
         let mut cosmos_map = HashMap::new();
         for chain_id in ChainId::all() {
-            let network = chain_id.into_cosmos_network()?;
-            let mut builder = network.builder().await?;
+            let mut builder = chain_id.into_cosmos_builder().await?;
 
             let grpc = match chain_id {
                 ChainId::Atlantic2
@@ -46,6 +45,9 @@ impl App {
                 )),
                 ChainId::Neutron1 => {
                     Some((&opt.neutron_mainnet_primary, &opt.neutron_mainnet_fallbacks))
+                }
+                ChainId::RujiraTestnet => {
+                    Some((&opt.rujira_testnet_primary, &opt.rujira_testnet_fallbacks))
                 }
             };
 
