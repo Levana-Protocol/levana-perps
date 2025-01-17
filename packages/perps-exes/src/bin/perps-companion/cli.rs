@@ -48,6 +48,14 @@ pub(crate) struct Opt {
         value_delimiter = ',',
         default_value = "https://osmo-priv-grpc.kingnodes.com"
     )]
+    pub(crate) rujira_testnet_primary: String,
+    /// Primary GRPC endpoints for Rujira testnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_RUJIRA_TESTNET_GRPC",
+        value_delimiter = ',',
+        default_value = "https://thornode-devnet-grpc.bryanlabs.net"
+    )]
     pub(crate) osmosis_mainnet_fallbacks: Vec<String>,
     /// Fallback GRPC endpoints for Injective mainnet.
     #[clap(
@@ -71,6 +79,14 @@ pub(crate) struct Opt {
         env = "LEVANA_COMPANION_NEUTRON_MAINNET_FALLBACKS_GRPC",
         value_delimiter = ',',
         default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
+    )]
+    pub(crate) rujira_testnet_fallbacks: Vec<String>,
+    /// Fallback GRPC endpoints for Rujira testnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_RUJIRA_TESTNET_FALLBACKS_GRPC",
+        value_delimiter = ',',
+        default_value = "https://thornode-devnet-grpc.bryanlabs.net"
     )]
     pub(crate) neutron_mainnet_fallbacks: Vec<String>,
     /// Reqests timeout in seconds
