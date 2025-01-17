@@ -85,8 +85,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_COMPANION_RUJIRA_TESTNET_FALLBACKS_GRPC",
-        value_delimiter = ',',
-        default_value = "https://thornode-devnet-grpc.bryanlabs.net"
+        value_delimiter = ','
     )]
     pub(crate) neutron_mainnet_fallbacks: Vec<String>,
     /// Reqests timeout in seconds
