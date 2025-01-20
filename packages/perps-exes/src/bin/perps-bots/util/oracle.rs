@@ -27,7 +27,6 @@ pub(crate) struct OffchainPriceData {
 }
 
 impl OffchainPriceData {
-    #[tracing::instrument(skip_all)]
     pub(crate) async fn load(app: &App, markets: &[Market]) -> Result<OffchainPriceData> {
         // For now this is only Pyth data
         let mut stable_feeds = HashSet::new();
@@ -456,7 +455,6 @@ impl PythPriceStatsSingle {
     }
 }
 
-#[tracing::instrument(skip_all)]
 async fn fetch_pyth_prices(
     client: &reqwest::Client,
     endpoint: &reqwest::Url,
