@@ -20,9 +20,6 @@ pub(crate) struct Opt {
         global = true
     )]
     pub(crate) bind: SocketAddr,
-    /// Sentry client key
-    #[arg(short, long, env = "SENTRY_KEY")]
-    pub(crate) sentry_dsn: Option<String>,
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
@@ -227,19 +224,14 @@ impl Opt {
             Level::INFO.into()
         };
 
-        let subscriber = tracing_subscriber::registry().with(
-            fmt::Layer::default()
-                .log_internal_errors(true)
-                .and_then(EnvFilter::from_default_env().add_directive(env_directive)),
-        );
-
-        if self.sentry_dsn.is_some() {
-            subscriber.with(sentry_tracing::layer()).init();
-            tracing::info!("Initialized Logging with Sentry tracing");
-        } else {
-            subscriber.init();
-            tracing::info!("Initialized Logging");
-        }
+        tracing_subscriber::registry()
+            .with(
+                fmt::Layer::default()
+                    .log_internal_errors(true)
+                    .and_then(EnvFilter::from_default_env().add_directive(env_directive)),
+            )
+            .init();
+        tracing::info!("Initialized Logging");
         Ok(())
     }
 
