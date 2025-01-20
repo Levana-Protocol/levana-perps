@@ -118,7 +118,6 @@ pub(crate) struct CrankReceiver {
 }
 
 impl TriggerCrank {
-    #[tracing::instrument(skip_all)]
     pub(crate) async fn trigger_crank(
         &self,
         contract: Address,

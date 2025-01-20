@@ -366,7 +366,6 @@ impl AppBuilder {
 }
 
 impl App {
-    #[tracing::instrument(skip_all)]
     pub(crate) async fn get_factory_info(&self) -> Arc<FactoryInfo> {
         self.factory.read().await.clone()
     }

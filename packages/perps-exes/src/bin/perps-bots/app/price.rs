@@ -81,7 +81,6 @@ impl WatchedTask for Worker {
     }
 }
 
-#[tracing::instrument(skip_all)]
 async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedTaskOutput> {
     let factory = app.get_factory_info().await;
     let mut successes = vec![];
@@ -247,13 +246,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     }
                 }
                 Err(e) => {
-                    // PERP-4383: Using a warn instead of an error here.
-                    // Motivation: we often get account sequence errors here
-                    // when there are minor node sync issues. We want retry
-                    // logic to kick in without flooding us with Sentry
-                    // errors. By using a warning instead, we ensure that
-                    // we'll only generate errors if the retries all fail.
-                    tracing::warn!("Error: {e:?}\nRetrying...");
+                    tracing::error!("Error: {e:?}\nRetrying...");
 
                     // Correct, not technically a success, but we want to display this info in the UI without forcing it to be treated as an error.
                     successes.push(format!("Error while doing multimessage price update, retrying with single message updates: {e:?}"));
@@ -541,7 +534,6 @@ impl NeedsPriceUpdateInfo {
     }
 }
 
-#[tracing::instrument(skip_all)]
 async fn check_market_needs_price_update(
     app: &App,
     offchain_price_data: Arc<OffchainPriceData>,
