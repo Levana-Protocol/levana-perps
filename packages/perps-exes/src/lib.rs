@@ -32,7 +32,7 @@ pub use network::PerpsNetwork;
 
 /// Get the Git SHA from GitHub Actions env vars
 pub fn build_version() -> &'static str {
-    include_str!("../../build-version.txt")
+    include_str!("../../build-version.txt").trim()
 }
 
 pub struct PerpApp {
