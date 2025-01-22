@@ -1371,7 +1371,7 @@ dependencies = [
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/fpco/cosmos-rs.git?rev=bf6844adc6c8c056f80e793ace46d5126488c358#bf6844adc6c8c056f80e793ace46d5126488c358"
+source = "git+https://github.com/fpco/cosmos-rs.git?rev=9ea2e62e5a6ef59436c86a4225147cbc5e29f2bd#9ea2e62e5a6ef59436c86a4225147cbc5e29f2bd"
 dependencies = [
  "base64 0.22.1",
  "bech32",
