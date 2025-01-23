@@ -1,7 +1,7 @@
 // The types must be represented with repr statement which is using as conversion internally.
 #![allow(clippy::as_conversions)]
 
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use anyhow::Result;
 use cosmos::{CosmosBuilder, CosmosNetwork};
@@ -88,6 +88,14 @@ impl TryFrom<&str> for ChainId {
             "dev-1" => Ok(ChainId::RujiraTestnet),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
+    }
+}
+
+impl FromStr for ChainId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        s.try_into()
     }
 }
 
@@ -351,5 +359,32 @@ impl Display for TwoDecimalPoints {
             y
         };
         write!(f, "{}.{}{}", whole, x, y)
+    }
+}
+
+/// Check if a given chain ID is for Rujira.
+pub(crate) fn is_rujira_chain(chain_id: &str) -> bool {
+    match chain_id.parse::<ChainId>() {
+        // If it's an invalid chain ID, treat it as non-Rujira
+        Err(_) => false,
+        Ok(ChainId::RujiraTestnet) => true,
+        // Keep an explicit list here so that, when adding new chains,
+        // the compiler forces us to decide if the chain should use
+        // Rujira styling or not.
+        Ok(
+            ChainId::Atlantic2
+            | ChainId::Dragonfire4
+            | ChainId::Elgafar1
+            | ChainId::Juno1
+            | ChainId::OsmoTest5
+            | ChainId::Osmosis1
+            | ChainId::Stargaze1
+            | ChainId::Uni6
+            | ChainId::Pacific1
+            | ChainId::Injective1
+            | ChainId::Injective888
+            | ChainId::Neutron1
+            | ChainId::Pion1,
+        ) => false,
     }
 }

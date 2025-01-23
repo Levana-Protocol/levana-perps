@@ -30,7 +30,9 @@ use serde_json::{json, Value};
 use crate::{
     app::App,
     db::models::{PositionInfoFromDb, PositionInfoToDb},
-    types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
+    types::{
+        is_rujira_chain, ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints,
+    },
 };
 
 use super::{Error, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
@@ -336,9 +338,10 @@ impl PnlInfo {
 
     fn image_svg(self) -> Response {
         // Generate the raw SVG text by rendering the template
-        let svg = match ChainId::try_from(self.chain.clone()).unwrap() {
-            ChainId::RujiraTestnet => PnlRujiraSvg { info: &self }.render(),
-            _ => PnlLevanaSvg { info: &self }.render(),
+        let svg = if is_rujira_chain(&self.chain) {
+            PnlRujiraSvg { info: &self }.render()
+        } else {
+            PnlLevanaSvg { info: &self }.render()
         }
         .unwrap();
 
@@ -356,9 +359,10 @@ impl PnlInfo {
 
     fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
-        let svg = match ChainId::try_from(self.chain.clone()).unwrap() {
-            ChainId::RujiraTestnet => PnlRujiraSvg { info: self }.render(),
-            _ => PnlLevanaSvg { info: self }.render(),
+        let svg = if is_rujira_chain(&self.chain) {
+            PnlRujiraSvg { info: self }.render()
+        } else {
+            PnlLevanaSvg { info: self }.render()
         }?;
 
         // Convert the SVG into a usvg tree using default settings
