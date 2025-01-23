@@ -139,6 +139,7 @@ push-bots-image:
 
 # Build companion binary in release mode
 cargo-companion-release-arm:
+    echo {{GIT_SHA}} > packages/build-version.txt
     cross build --bin perps-companion --release --target aarch64-unknown-linux-musl
 
 # Build companion docker image
