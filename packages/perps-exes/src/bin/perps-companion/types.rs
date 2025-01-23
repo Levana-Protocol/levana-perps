@@ -81,6 +81,8 @@ impl TryFrom<&str> for ChainId {
             "stargaze-1" => Ok(ChainId::Stargaze1),
             "uni-6" => Ok(ChainId::Uni6),
             "pacific-1" => Ok(ChainId::Pacific1),
+            "injective-1" => Ok(ChainId::Injective1),
+            "injective-888" => Ok(ChainId::Injective888),
             "neutron-1" => Ok(ChainId::Neutron1),
             "pion-1" => Ok(ChainId::Pion1),
             "dev-1" => Ok(ChainId::RujiraTestnet),
