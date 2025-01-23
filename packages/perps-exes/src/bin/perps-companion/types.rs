@@ -76,7 +76,7 @@ impl TryFrom<&str> for ChainId {
             "dragonfire-4" => Ok(ChainId::Dragonfire4),
             "elgafar-1" => Ok(ChainId::Elgafar1),
             "juno-1" => Ok(ChainId::Juno1),
-            "omso-test-5" => Ok(ChainId::OsmoTest5),
+            "osmo-test-5" => Ok(ChainId::OsmoTest5),
             "osmosis-1" => Ok(ChainId::Osmosis1),
             "stargaze-1" => Ok(ChainId::Stargaze1),
             "uni-6" => Ok(ChainId::Uni6),
