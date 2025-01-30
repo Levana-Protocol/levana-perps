@@ -317,7 +317,13 @@ impl PositionInfo {
 
 impl PnlInfo {
     fn html(self) -> Response {
-        let mut res = Html(self.render().unwrap()).into_response();
+        let html = if is_rujira_chain(&self.chain) {
+            PnlRujira::from_pnl_info(self).render().unwrap()
+        } else {
+            self.render().unwrap()
+        };
+
+        let mut res = Html(html).into_response();
         res.headers_mut().insert(
             http::header::CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=300"),
@@ -410,7 +416,7 @@ pub(crate) enum QueryType {
 }
 
 #[derive(askama::Template)]
-#[template(path = "pnl.html")]
+#[template(path = "pnl-levana.html")]
 struct PnlInfo {
     amplitude_key: &'static str,
     host: String,
@@ -426,6 +432,47 @@ struct PnlInfo {
     pnl: PnlDetails,
     quote_currency: String,
     cache_bust_param: u32,
+}
+
+#[derive(askama::Template)]
+#[allow(dead_code)]
+#[template(path = "pnl-rujira.html")]
+struct PnlRujira {
+    amplitude_key: &'static str,
+    host: String,
+    chain: String,
+    image_url: String,
+    html_url: String,
+    market_id: String,
+    direction: DirectionForDb,
+    entry_price: String,
+    exit_price: String,
+    leverage: String,
+    wallet: Option<String>,
+    pnl: PnlDetails,
+    quote_currency: String,
+    cache_bust_param: u32,
+}
+
+impl PnlRujira {
+    fn from_pnl_info(pnl_info: PnlInfo) -> Self {
+        PnlRujira {
+            amplitude_key: pnl_info.amplitude_key,
+            host: pnl_info.host,
+            chain: pnl_info.chain,
+            image_url: pnl_info.image_url,
+            html_url: pnl_info.html_url,
+            market_id: pnl_info.market_id,
+            direction: pnl_info.direction,
+            entry_price: pnl_info.entry_price,
+            exit_price: pnl_info.exit_price,
+            leverage: pnl_info.leverage,
+            wallet: pnl_info.wallet,
+            pnl: pnl_info.pnl,
+            quote_currency: pnl_info.quote_currency,
+            cache_bust_param: pnl_info.cache_bust_param,
+        }
+    }
 }
 
 enum PnlDetails {

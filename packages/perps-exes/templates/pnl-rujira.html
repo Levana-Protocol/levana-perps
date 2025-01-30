@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4b1596" />
+
+    <title>Rujira PnL Celebration</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/pnl.css" />
+
+    <meta property="og:title" content="Rujira PnL">
+    <meta property="og:type" content="website">
+    <meta property="og:description" content="Trade on Rujira Perps, a safe and low-cost decentralized perpetual swaps platform.">
+    <meta property="og:image" content="https://{{ host }}{{ image_url }}?v={{ cache_bust_param }}">
+    <meta property="og:url" content="https://{{ host }}{{ html_url }}">
+    <meta property="og:site_property" content="Rujira PnL Celebration">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@Rujira">
+    <meta name="twitter:creator" content="@Rujira">
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7PJQQZ2WF7"></script>
+  </head>
+  <body>
+    <div class="content">
+      <div class="rujira-container">
+        <img src="https://static.rujiperps.com/logo-rujira.svg" alt="Rujira Logo" class="logo-rujira">
+        <span class="rujira-label">RUJIRA</span>
+      </div>
+      <div class="pnl">
+        {% match pnl %}
+          {% when PnlDetails::Usd with (usd) %}
+            {{ usd }}
+          {% when PnlDetails::Percentage with (percentage) %}
+            {{ percentage }}
+          {% when PnlDetails::Both with { usd, percentage } %}
+            {{ usd }} / {{ percentage }}
+        {% endmatch %}
+      </div>
+      <div class="market-info">
+        {{ market_id }} - {{ direction }}
+      </div>
+      <div class="trade-stats">
+        <div class="trade-stat">
+          Entry Price
+          <span>{{ entry_price }} USD</span>
+        </div>
+        <div class="trade-stat">
+          Exit Price
+          <span>{{ exit_price }} USD</span>
+        </div>
+        <div class="trade-stat">
+          Leverage
+          <span>{{ leverage }}x</span>
+        </div>
+      </div>
+      <div class="separator">
+        <div class="separator-line"></div>
+        <div class="separator-icon-container">
+          <img src="https://static.levana.finance/images/trade.svg" alt="Trade Icon" class="separator-icon" />
+        </div>
+      </div>
+      <div class="levana-description">
+        Rujira offers safe and low-cost perpetual swaps on Cosmos.
+      </div>
+      <a class="cta" href="https://trade.levana.finance">
+        Start Trading
+      </a>
+    </div>
+
+    <script type="text/javascript">
+      // Initializing Amplitude
+      !function(){"use strict";!function(e,t){var n=e.amplitude||{_q:[],_iq:{}};if(n.invoked)e.console&&console.error&&console.error("Amplitude snippet has been loaded.");else{var r=function(e,t){e.prototype[t]=function(){return this._q.push({name:t,args:Array.prototype.slice.call(arguments,0)}),this}},s=function(e,t,n){return function(r){e._q.push({name:t,args:Array.prototype.slice.call(n,0),resolve:r})}},o=function(e,t,n){e[t]=function(){if(n)return{promise:new Promise(s(e,t,Array.prototype.slice.call(arguments)))}}},i=function(e){for(var t=0;t<m.length;t++)o(e,m[t],!1);for(var n=0;n<g.length;n++)o(e,g[n],!0)};n.invoked=!0;var u=t.createElement("script");u.type="text/javascript",u.integrity="sha384-x0ik2D45ZDEEEpYpEuDpmj05fY91P7EOZkgdKmq4dKL/ZAVcufJ+nULFtGn0HIZE",u.crossOrigin="anonymous",u.async=!0,u.src="https://cdn.amplitude.com/libs/analytics-browser-2.0.0-min.js.gz",u.onload=function(){e.amplitude.runQueuedFunctions||console.log("[Amplitude] Error: could not load SDK")};var a=t.getElementsByTagName("script")[0];a.parentNode.insertBefore(u,a);for(var c=function(){return this._q=[],this},p=["add","append","clearAll","prepend","set","setOnce","unset","preInsert","postInsert","remove","getUserProperties"],l=0;l<p.length;l++)r(c,p[l]);n.Identify=c;for(var d=function(){return this._q=[],this},f=["getEventProperties","setProductId","setQuantity","setPrice","setRevenue","setRevenueType","setEventProperties"],v=0;v<f.length;v++)r(d,f[v]);n.Revenue=d;var m=["getDeviceId","setDeviceId","getSessionId","setSessionId","getUserId","setUserId","setOptOut","setTransport","reset","extendSession"],g=["init","add","remove","track","logEvent","identify","groupIdentify","setGroup","revenue","flush"];i(n),n.createInstance=function(e){return n._iq[e]={_q:[]},i(n._iq[e]),n._iq[e]},e.amplitude=n}}(window,document)}();
+
+      // Initializing GA
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-7PJQQZ2WF7', { send_page_view: false });
+
+
+      var API_KEY = '{{ amplitude_key }}'
+
+      var pnl = '{{ pnl }}'
+      var direction = '{{ direction }}'
+      var market = '{{ market_id }}'
+      var chain = '{{ chain }}'
+      var domain = window.location.host
+
+      amplitude.init(API_KEY);
+
+      var eventProperties = {
+        pnl: pnl,
+        direction: direction,
+        market: market,
+        chain: chain,
+        domain: domain,
+      };
+
+      amplitude.track('view_pnl_share_page', eventProperties);
+      gtag('event', 'view_pnl_share_page', eventProperties);
+
+    </script>
+  </body>
+</html>
