@@ -133,7 +133,7 @@ impl GasCheck {
             let gas = match get_gas_balance(cosmos, *address, self.app.config.gas_decimals).await {
                 Ok(gas) => gas,
                 Err(e) => {
-                    errors.push(format!("Unable to query gas balance for {address}: {e:?}"));
+                    errors.push(format!("Unable to query gas balance for {address}: {e}"));
                     continue;
                 }
             };
@@ -186,8 +186,8 @@ impl GasCheck {
 
             match builder.sign_and_broadcast(cosmos, &gas_wallet).await {
                 Err(e) => {
-                    tracing::error!("Error filling up gas: {e:?}");
-                    errors.push(format!("{e:?}"))
+                    tracing::error!("Error filling up gas: {e}");
+                    errors.push(format!("{e}"))
                 }
                 Ok(tx) => {
                     tracing::info!("Filled up gas in {}", tx.txhash);
