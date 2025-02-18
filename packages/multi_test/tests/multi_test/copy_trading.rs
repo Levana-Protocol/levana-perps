@@ -46,7 +46,7 @@ fn deposit() {
     assert_eq!(
         item,
         &QueueItemStatus {
-            item: QueueItem::IncCollaleteral {
+            item: QueueItem::IncCollateral {
                 item: IncQueueItem::Deposit {
                     funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
                     token,

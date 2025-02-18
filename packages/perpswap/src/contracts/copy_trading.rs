@@ -344,7 +344,7 @@ pub enum FailedReason {
 #[serde(rename_all = "snake_case")]
 pub enum QueueItem {
     /// Item that will lead to increase or no change of collateral
-    IncCollaleteral {
+    IncCollateral {
         /// Item type
         item: IncQueueItem,
         /// Queue position id
