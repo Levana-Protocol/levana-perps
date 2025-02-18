@@ -325,7 +325,7 @@ impl DecQueuePosition {
 impl IncQueuePosition {
     pub fn into_queue_item(self, id: IncQueuePositionId) -> QueueItemStatus {
         QueueItemStatus {
-            item: QueueItem::IncCollaleteral {
+            item: QueueItem::IncCollateral {
                 item: self.item,
                 id,
             },
