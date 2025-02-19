@@ -80,6 +80,7 @@ figment = { version = "0.10.19", features = ["env", "yaml", "toml"] }
 toml = "0.8.19"
 backon = "1.2.0"
 comfy-table = "7.1.1"
+mimalloc = "0.1.43"
 
 [features]
 default = []

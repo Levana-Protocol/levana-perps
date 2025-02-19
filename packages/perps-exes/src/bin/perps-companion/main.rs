@@ -12,6 +12,9 @@ use clap::Parser;
 use cli::Opt;
 use pid1::Pid1Settings;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     main_inner().await
