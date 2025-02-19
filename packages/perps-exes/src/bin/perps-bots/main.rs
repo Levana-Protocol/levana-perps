@@ -14,6 +14,9 @@ mod util;
 pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() -> Result<()> {
     Pid1Settings::new().enable_log(true).launch()?;
     main_inner()

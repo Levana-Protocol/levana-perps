@@ -22,6 +22,9 @@ mod s3;
 mod slack;
 mod web;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() -> Result<()> {
     let opt = Opt::parse();
     opt.init_logger()?;

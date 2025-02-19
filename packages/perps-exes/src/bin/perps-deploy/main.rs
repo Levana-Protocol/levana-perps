@@ -20,6 +20,9 @@ mod tracker;
 mod util;
 mod util_cmd;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     main_inner().await
