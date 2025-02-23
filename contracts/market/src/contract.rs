@@ -758,7 +758,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
+pub fn migrate(deps: DepsMut, env: Env, MigrateMsg { token }: MigrateMsg) -> Result<Response> {
     let (state, ctx) = StateContext::new(deps, env)?;
 
     #[cfg(feature = "sanity")]
@@ -789,6 +789,9 @@ pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Res
             CONTRACT_VERSION
         ))
     } else {
+        if let Some(token) = token {
+            token_init(ctx.storage, &state.querier, token)?;
+        }
         set_contract_version(ctx.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
         let response = Response::new()
             .add_attribute("old_contract_name", old_cw2.contract)

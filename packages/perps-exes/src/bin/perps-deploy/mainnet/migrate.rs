@@ -185,7 +185,9 @@ async fn go(
                 migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: market.get_address_string(),
                     new_code_id: market_code_id,
-                    msg: to_json_binary(&perpswap::contracts::market::entry::MigrateMsg {})?,
+                    msg: to_json_binary(&perpswap::contracts::market::entry::MigrateMsg {
+                        token: None,
+                    })?,
                 }));
             }
         }

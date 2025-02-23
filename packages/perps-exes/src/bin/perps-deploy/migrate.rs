@@ -191,7 +191,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .migrate(
                     wallet,
                     market_code_id.get_code_id(),
-                    perpswap::contracts::market::entry::MigrateMsg {},
+                    perpswap::contracts::market::entry::MigrateMsg { token: None },
                 )
                 .await?;
             tracing::info!("Market contract for {market_id} migrated");
