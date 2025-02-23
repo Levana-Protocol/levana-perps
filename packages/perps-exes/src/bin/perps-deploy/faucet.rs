@@ -96,7 +96,7 @@ impl Faucet {
             "NTRN" => "2000",
             "SCRT" => "2000",
             "BNB" => "10",
-            "MANTRA" => "10000",
+            "OM" => "10000",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;

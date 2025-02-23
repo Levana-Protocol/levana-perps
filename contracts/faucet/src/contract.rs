@@ -153,6 +153,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                             tap_amount,
                         },
                     )?;
+
+                    // Ensure we have enough characters for CW20 rules
+                    let mut padded_name = name.clone();
+                    while padded_name.len() < 3 {
+                        padded_name.push('X');
+                    }
                     ctx.response.add_instantiate_submessage(
                         ReplyId,
                         &state.env.contract.address,
@@ -162,8 +168,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                             None => format!("Levana Faucet CW20 {name}"),
                         },
                         &perpswap::contracts::cw20::entry::InstantiateMsg {
-                            name: name.clone(),
-                            symbol: name,
+                            name: padded_name.clone(),
+                            symbol: padded_name,
                             decimals: 6,
                             initial_balances,
                             minter: InstantiateMinter {

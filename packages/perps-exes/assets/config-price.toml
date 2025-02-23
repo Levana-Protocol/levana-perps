@@ -39,7 +39,7 @@ XAG_USD = "f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e"
 XAU_USD = "765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2"
 wstETH_USD = "6df640f3b8963d8f8358f791f352b8364513f6ab1cca5ed3f1f7b5448980e784"
 MAGA_USD = "a80e97f70f6a4a8a0273822fb86d51b2bdb9a16ce0edb7ea8c8b84cbaecb5ce5"
-MANTRA_USD = "ef8382df144cd3289a754b07bfb51acbe5bbc47444c36f727169c06387469ac6"
+OM_USD = "ef8382df144cd3289a754b07bfb51acbe5bbc47444c36f727169c06387469ac6"
 
 [pyth.edge]
 update-age-tolerance = 21
@@ -396,16 +396,16 @@ inverted = false
 key = "OSMO_USD"
 inverted = false
 
-[[networks.osmosis-mainnet.MANTRA_USD.feeds]]
+[[networks.osmosis-mainnet.OM_USD.feeds]]
 
-[networks.osmosis-mainnet.MANTRA_USD.feeds.pyth]
-key = "MANTRA_USD"
+[networks.osmosis-mainnet.OM_USD.feeds.pyth]
+key = "OM_USD"
 inverted = false
 
-[[networks.osmosis-mainnet.MANTRA_USD.feeds-usd]]
+[[networks.osmosis-mainnet.OM_USD.feeds-usd]]
 
-[networks.osmosis-mainnet.MANTRA_USD.feeds-usd.pyth]
-key = "MANTRA_USD"
+[networks.osmosis-mainnet.OM_USD.feeds-usd.pyth]
+key = "OM_USD"
 inverted = false
 
 [[networks.osmosis-mainnet.OSMO_USDC.feeds]]
@@ -1090,16 +1090,16 @@ inverted = false
 key = "OSMO_USD"
 inverted = false
 
-[[networks.osmosis-testnet.MANTRA_USD.feeds]]
+[[networks.osmosis-testnet.OM_USD.feeds]]
 
-[networks.osmosis-testnet.MANTRA_USD.feeds.pyth]
-key = "MANTRA_USD"
+[networks.osmosis-testnet.OM_USD.feeds.pyth]
+key = "OM_USD"
 inverted = false
 
-[[networks.osmosis-testnet.MANTRA_USD.feeds-usd]]
+[[networks.osmosis-testnet.OM_USD.feeds-usd]]
 
-[networks.osmosis-testnet.MANTRA_USD.feeds-usd.pyth]
-key = "MANTRA_USD"
+[networks.osmosis-testnet.OM_USD.feeds-usd.pyth]
+key = "OM_USD"
 inverted = false
 
 [[networks.osmosis-testnet.OSMO_USDC.feeds]]

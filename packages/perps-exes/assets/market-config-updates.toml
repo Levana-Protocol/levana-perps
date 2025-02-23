@@ -624,10 +624,10 @@ delta_neutrality_fee_tax = "0.35"
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
-[markets.MANTRA_USD]
+[markets.OM_USD]
 initial-borrow-fee-rate = "0.12"
 
-[markets.MANTRA_USD.config]
+[markets.OM_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
 max_leverage = "4"
