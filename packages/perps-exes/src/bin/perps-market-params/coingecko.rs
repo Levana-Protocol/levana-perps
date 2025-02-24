@@ -99,7 +99,7 @@ impl ExchangeId {
             | 983 | 1232 | 1281 | 1370 | 1378 | 1407 | 1413 | 1457 | 1480 | 1487 | 1489 | 1514
             | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 | 9882 | 9883 | 1577
             | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 | 1675 | 10403 | 11090
-            | 11216 | 9381 | 7504 => Ok(ExchangeKind::Dex),
+            | 11216 | 9381 | 7504 | 9391 => Ok(ExchangeKind::Dex),
             other => Err(anyhow!("Exchange type not known for id {}", other)),
         }
     }
@@ -207,6 +207,7 @@ pub(crate) enum Coin {
     Datom,
     AmAtom,
     AllBtc,
+    Om,
 }
 
 impl FromStr for Coin {
@@ -260,6 +261,7 @@ impl FromStr for Coin {
             "dATOM" => Ok(Coin::Datom),
             "amATOM" => Ok(Coin::AmAtom),
             "allBTC" => Ok(Coin::AllBtc),
+            "OM" => Ok(Coin::Om),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -323,6 +325,7 @@ impl Coin {
             Coin::Datom => ATOM_CMC_ID, // Since we are speculating on ATOM
             Coin::AmAtom => ATOM_CMC_ID, // Since we are speculating on ATOM
             Coin::AllBtc => BTC_CMC_ID, // Since we are speculating on BTC
+            Coin::Om => 6536,
         }
     }
 
@@ -374,6 +377,7 @@ impl Coin {
             Coin::Datom => WrappedCoin(Coin::Atom),
             Coin::AmAtom => WrappedCoin(Coin::Atom),
             Coin::AllBtc => WrappedCoin(Coin::Btc),
+            Coin::Om => WrappedCoin(Coin::Om),
         }
     }
 }
