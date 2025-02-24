@@ -207,6 +207,7 @@ pub(crate) enum Coin {
     Datom,
     AmAtom,
     AllBtc,
+    Om,
 }
 
 impl FromStr for Coin {
@@ -260,6 +261,7 @@ impl FromStr for Coin {
             "dATOM" => Ok(Coin::Datom),
             "amATOM" => Ok(Coin::AmAtom),
             "allBTC" => Ok(Coin::AllBtc),
+            "OM" => Ok(Coin::Om),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -323,6 +325,7 @@ impl Coin {
             Coin::Datom => ATOM_CMC_ID, // Since we are speculating on ATOM
             Coin::AmAtom => ATOM_CMC_ID, // Since we are speculating on ATOM
             Coin::AllBtc => BTC_CMC_ID, // Since we are speculating on BTC
+            Coin::Om => 6536,
         }
     }
 
@@ -374,6 +377,7 @@ impl Coin {
             Coin::Datom => WrappedCoin(Coin::Atom),
             Coin::AmAtom => WrappedCoin(Coin::Atom),
             Coin::AllBtc => WrappedCoin(Coin::Btc),
+            Coin::Om => WrappedCoin(Coin::Om),
         }
     }
 }
