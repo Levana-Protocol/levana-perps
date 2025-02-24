@@ -80,7 +80,7 @@ impl ExchangeId {
             | 6637 | 10153 | 1222 | 3631 | 10361 | 629 | 10599 | 10702 | 10770 | 10846 | 10771
             | 10866 | 10922 | 10963 | 10946 | 10962 | 10970 | 11016 | 8304 | 10992 | 11087
             | 11124 | 11135 | 11136 | 21 | 11313 | 11356 | 11385 | 11339 | 1273 | 577 | 11608
-            | 1653 | 11664 | 11665 | 1323 => Ok(ExchangeKind::Cex),
+            | 1653 | 11664 | 11665 | 1323 | 11806 => Ok(ExchangeKind::Cex),
             1707 | 1454 | 1187 | 1530 | 1567 | 1344 | 1714 | 9244 | 1165 | 1293 | 1327 | 1395
             | 1447 | 1547 | 1551 | 1614 | 1657 | 1665 | 6255 | 6444 | 6706 | 6757 | 8915 | 9245
             | 1342 | 1426 | 1612 | 8161 | 1069 | 246 | 267 | 1062 | 1063 | 1070 | 1141 | 1206
@@ -99,7 +99,7 @@ impl ExchangeId {
             | 983 | 1232 | 1281 | 1370 | 1378 | 1407 | 1413 | 1457 | 1480 | 1487 | 1489 | 1514
             | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 | 9882 | 9883 | 1577
             | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 | 1675 | 10403 | 11090
-            | 11216 | 9381 | 7504 => Ok(ExchangeKind::Dex),
+            | 11216 | 9381 | 7504 | 9391 => Ok(ExchangeKind::Dex),
             other => Err(anyhow!("Exchange type not known for id {}", other)),
         }
     }
@@ -207,6 +207,7 @@ pub(crate) enum Coin {
     Datom,
     AmAtom,
     AllBtc,
+    Om,
 }
 
 impl FromStr for Coin {
@@ -260,6 +261,7 @@ impl FromStr for Coin {
             "dATOM" => Ok(Coin::Datom),
             "amATOM" => Ok(Coin::AmAtom),
             "allBTC" => Ok(Coin::AllBtc),
+            "OM" => Ok(Coin::Om),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -323,6 +325,7 @@ impl Coin {
             Coin::Datom => ATOM_CMC_ID, // Since we are speculating on ATOM
             Coin::AmAtom => ATOM_CMC_ID, // Since we are speculating on ATOM
             Coin::AllBtc => BTC_CMC_ID, // Since we are speculating on BTC
+            Coin::Om => 6536,
         }
     }
 
@@ -374,6 +377,7 @@ impl Coin {
             Coin::Datom => WrappedCoin(Coin::Atom),
             Coin::AmAtom => WrappedCoin(Coin::Atom),
             Coin::AllBtc => WrappedCoin(Coin::Btc),
+            Coin::Om => WrappedCoin(Coin::Om),
         }
     }
 }
