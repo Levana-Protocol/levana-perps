@@ -468,3 +468,11 @@ hash = "ee0c7221f0192e9a8668cffe6a081cbc72994971f17e0d5607340e7205a3783b"
 
 [hashes.code-ids]
 osmosis-mainnet = 1337
+
+[[hashes]]
+contract-type = "market"
+gitrev = "c6796dcec090137ff497953e9c5771e5dba8d94c"
+hash = "435baa20c865cfe193f213296034424405ffc8fe72a6621b51e7b93dd1fb5a3a"
+
+[hashes.code-ids]
+osmosis-mainnet = 1451
