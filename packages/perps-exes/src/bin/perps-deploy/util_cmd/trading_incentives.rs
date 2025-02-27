@@ -45,6 +45,9 @@ pub(super) struct DistributionsCsvOpt {
         value_delimiter = ','
     )]
     factories: Vec<String>,
+    /// Market identifier. If omitted, all available markets will be analyzed
+    #[clap(long, value_delimiter = ',')]
+    markets: Vec<String>,
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
@@ -89,6 +92,7 @@ async fn distributions_csv(
         end_date,
         min_rewards,
         factories,
+        markets,
         workers,
         retries,
         losses_pool_size,
@@ -175,12 +179,18 @@ async fn distributions_csv(
         let mut is_referee_cache = HashMap::<Address, bool>::new();
         for record in csv::Reader::from_path(&factory.cache_file)?.into_deserialize() {
             let PositionRecord {
+                market,
                 closed_at,
                 owner,
                 pnl_usd,
                 trading_fee_usd,
                 ..
             } = record?;
+
+            if !markets.is_empty() && !markets.contains(&market.to_string()) {
+                continue;
+            }
+
             let closed_at = match closed_at {
                 Some(closed_at) => closed_at,
                 None => continue,
