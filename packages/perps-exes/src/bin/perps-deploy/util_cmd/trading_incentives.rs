@@ -146,7 +146,7 @@ async fn distributions_csv(
             {
                 if attempted_retries < retries {
                     attempted_retries += 1;
-                    tracing::error!("Received error while generating csv files: {e}");
+                    tracing::error!("Received error while generating csv files: {e}.");
                     tracing::info!("Retrying... Attempt {attempted_retries}/{retries}");
                 } else {
                     return Err(e);
