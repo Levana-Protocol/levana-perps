@@ -321,6 +321,7 @@ fn update_config(
         event = event.add_attribute("new-stop-loss-factor", stop_loss_factor.to_string());
         state.config.stop_loss_factor = stop_loss_factor;
     }
+    state.config.check()?;
 
     crate::state::CONFIG.save(storage, &state.config)?;
 

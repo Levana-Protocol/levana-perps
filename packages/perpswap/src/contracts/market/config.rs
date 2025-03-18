@@ -326,6 +326,22 @@ impl Config {
             bail!(PerpError::market(ErrorId::Config, msg))
         }
 
+        if self.exposure_margin_ratio >= Decimal256::one() {
+            let msg = format!(
+                "Exposure margin ratio ({}) must be less than 1",
+                self.exposure_margin_ratio
+            );
+            bail!(PerpError::market(ErrorId::Config, msg))
+        }
+
+        if self.referral_reward_ratio >= Decimal256::one() {
+            let msg = format!(
+                "Referral reward ratio ({}) must be less than 1",
+                self.referral_reward_ratio
+            );
+            bail!(PerpError::market(ErrorId::Config, msg))
+        }
+
         Ok(())
     }
 }
