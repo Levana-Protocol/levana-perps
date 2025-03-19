@@ -10,6 +10,7 @@ members = [
     # Support of the real protocol
     "contracts/countertrade",
     "contracts/copy_trading",
+    "contracts/vault",
 
     # Testnet support contracts
     "contracts/cw20",

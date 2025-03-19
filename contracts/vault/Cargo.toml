@@ -1,0 +1,14 @@
+[package]
+name = "vault"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
+cosmwasm-std = { workspace = true, features = ["abort"] }
+cw2 = "2.0.0"
+cw20 = "2.0.0"
+semver = "1.0.15"
+anyhow = "1.0.82"
+cw-storage-plus = "2.0.0"
+serde = { version = "1.0.199", default-features = false, features = ["derive"] }
