@@ -207,6 +207,7 @@ fn leader_update_config(
             .add_attribute("old-name", state.config.name.to_string())
             .add_attribute("new-name", name);
     }
+    config.check()?;
     crate::state::CONFIG.save(storage, &config)?;
     Ok(Response::new().add_event(event))
 }
