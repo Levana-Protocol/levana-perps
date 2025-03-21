@@ -3,6 +3,7 @@ mod execute;
 mod prelude;
 mod query;
 mod state;
+mod types;
 
 use perpswap::contracts::vault::{Config, InstantiateMsg};
 use prelude::*;
@@ -29,12 +30,12 @@ pub fn instantiate(
     // Validate and convert the initial operators' addresses
     let operators = msg
         .initial_operators
-        .into_iter()
-        .map(|a| deps.api.addr_validate(&a))
+        .iter()
+        .map(|a| deps.api.addr_validate(a))
         .collect::<StdResult<Vec<_>>>()?;
 
     // Ensure the sum of allocation percentages does not exceed 100% (10,000 bps)
-    let total_bps: u16 = msg.yield_allocation_bps.iter().sum();
+    let total_bps: u16 = msg.markets_allocation_bps.iter().sum();
     if total_bps > 10_000 {
         return Err(StdError::generic_err("Yield allocation exceeds 100%"));
     }
@@ -43,16 +44,15 @@ pub fn instantiate(
     let config = Config {
         governance,
         operators,
-        yield_allocation_bps: msg.yield_allocation_bps,
+        markets_allocation_bps: msg.markets_allocation_bps,
         usdc_denom: msg.usdc_denom,
-        factory_address: deps.api.addr_validate(&msg.factory_address)?,
-        usdclp_address: deps.api.addr_validate(&msg.usdclp_address)?,
+        usdclp_address: msg.usdclp_address,
+        paused: false,
     };
 
     // Save configuration, initial LP supply, and paused state
     state::CONFIG.save(deps.storage, &config)?;
     state::TOTAL_LP_SUPPLY.save(deps.storage, &Uint128::zero())?; // Starts at 0
-    state::PAUSED.save(deps.storage, &false)?; // Contract is active by default
 
     // Return a response with an attribute indicating the action
     Ok(Response::new().add_attribute("action", "instantiate_vault"))
