@@ -1,4 +1,4 @@
-#![allow(missing_docs)]
+//! Vault contract
 use cosmwasm_std::{Addr, Uint128};
 
 /// Message to instantiate the contract
@@ -8,17 +8,8 @@ pub struct InstantiateMsg {
     /// Denomination of the USDC token
     pub usdc_denom: String,
 
-    /// Address of the factory (as string, validated later)
-    pub factory_address: String,
-
-    /// Address of the USDCLP contract (as string, validated later)
-    pub usdclp_address: String,
-
     /// Governance address (as string, validated later)
     pub governance: String,
-
-    /// Initial list of operators (as strings, validated later)
-    pub initial_operators: Vec<String>,
 
     /// Initial allocation percentages to markets
     pub markets_allocation_bps: Vec<u16>,
@@ -31,14 +22,8 @@ pub struct Config {
     /// Denomination of the USDC token (e.g., "uusdc")
     pub usdc_denom: String,
 
-    /// Token Factory denom for USDCLP, e.g., "factory/<vault_addr>/usdclp"
-    pub usdclp_address: String,
-
     /// Address authorized for critical actions (like pausing the contract)
     pub governance: Addr,
-
-    /// List of addresses authorized for specific operations
-    pub operators: Vec<Addr>,
 
     /// Allocation percentages to markets in basis points (100 bps = 1%)
     pub markets_allocation_bps: Vec<u16>,
@@ -55,24 +40,32 @@ pub enum ExecuteMsg {
     Deposit {},
 
     /// Request withdrawal by burning USDCLP
-    RequestWithdrawal { amount: Uint128 },
+    RequestWithdrawal {
+        /// Amount to withdraw
+        amount: Uint128,
+    },
 
     /// Redistribute excess funds to markets
-    RedistributeFunds {},
+    RedistributeFunds {
+        /// Batch limit
+        batch_limit: Option<u32>,
+    },
 
     /// Collect yields from markets
-    CollectYield { batch_limit: Option<u32> },
+    CollectYield {
+        /// Batch limit
+        batch_limit: Option<u32>,
+    },
 
     /// Process a pending withdrawal
     ProcessWithdrawal {},
 
     /// Withdraw funds from a market
-    WithdrawFromMarket { market: String, amount: Uint128 },
-
-    /// Update the list of operators
-    UpdateOperators {
-        add: Vec<String>,
-        remove: Vec<String>,
+    WithdrawFromMarket {
+        /// From Market
+        market: String,
+        /// Amount
+        amount: Uint128,
     },
 
     /// Pause the contract in an emergency
@@ -82,7 +75,10 @@ pub enum ExecuteMsg {
     ResumeOperations {},
 
     /// Update allocation percentages
-    UpdateAllocations { new_allocations: Vec<u16> },
+    UpdateAllocations {
+        /// New allocations for Markets
+        new_allocations: Vec<u16>,
+    },
 }
 
 /// Query messages for the contract
@@ -93,14 +89,19 @@ pub enum QueryMsg {
     GetVaultBalance {},
 
     /// Query a user's pending withdrawal
-    GetPendingWithdrawal { user: String },
+    GetPendingWithdrawal {
+        /// User to get pending withdrawal
+        user: String,
+    },
 
     /// Query total assets (balance + allocations)
     GetTotalAssets {},
 
     /// Query market allocations
     GetMarketAllocations {
+        /// Start from market
         start_after: Option<String>,
+        /// Limit
         limit: Option<u32>,
     },
 
