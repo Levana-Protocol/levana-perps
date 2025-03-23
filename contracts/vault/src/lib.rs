@@ -9,7 +9,12 @@ use perpswap::contracts::vault::{Config, InstantiateMsg};
 use prelude::*;
 
 #[entry_point]
-pub fn instantiate(deps: DepsMut, msg: InstantiateMsg) -> Result<Response> {
+pub fn instantiate(
+    deps: DepsMut,
+    _env: Env,
+    _info: MessageInfo,
+    msg: InstantiateMsg,
+) -> Result<Response> {
     let governance = deps.api.addr_validate(&msg.governance)?;
 
     // Ensure the sum of allocation percentages does not exceed 100% (10,000 bps)
