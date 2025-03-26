@@ -5,8 +5,10 @@ mod query;
 mod state;
 mod types;
 
+pub use execute::execute;
 use perpswap::contracts::vault::{Config, InstantiateMsg};
 use prelude::*;
+pub use query::query;
 
 #[entry_point]
 pub fn instantiate(

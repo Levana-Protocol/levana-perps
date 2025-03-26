@@ -37,11 +37,9 @@ impl KeyDeserialize for QueueId {
     const KEY_ELEMS: u16 = 1;
 }
 
-const QUEUE_ID: Item<QueueId> = Item::new("queue_id");
+pub const QUEUE_ID: Item<QueueId> = Item::new("queue_id");
 
 pub(crate) const WITHDRAWAL_QUEUE: Map<QueueId, WithdrawalRequest> = Map::new("withdrawal_queue");
-
-pub const QUEUE_COUNTER: Item<u64> = Item::new("queue_counter");
 
 pub(crate) const TOTAL_LP_SUPPLY: Item<Uint128> = Item::new("total_lp_supply");
 

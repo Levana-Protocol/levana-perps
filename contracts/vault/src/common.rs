@@ -89,8 +89,11 @@ pub fn check_not_paused(config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn get_and_increment_queue_id(store: &mut dyn Storage) -> StdResult<QueueId> {
-    let counter = state::QUEUE_COUNTER.load(store)?;
-    state::QUEUE_COUNTER.save(store, &(counter + 1))?;
-    Ok(QueueId(Uint64::new(counter)))
+pub fn get_and_increment_queue_id(store: &mut dyn Storage) -> Result<QueueId> {
+    let current_id = state::QUEUE_ID
+        .may_load(store)?
+        .unwrap_or(QueueId(Uint64::zero()));
+    let next_id = QueueId(current_id.0 + Uint64::one());
+    state::QUEUE_ID.save(store, &next_id)?;
+    Ok(current_id)
 }
