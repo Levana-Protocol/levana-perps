@@ -4,7 +4,7 @@ use cw_storage_plus::{Key, KeyDeserialize, PrimaryKey};
 use perpswap::contracts::vault::Config;
 use serde::{Deserialize, Serialize};
 
-pub(crate) const CONFIG: Item<Config> = Item::new("config");
+pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const TOTAL_PENDING_WITHDRAWALS: Item<Uint128> = Item::new("total_pending_withdrawals");
 
@@ -39,11 +39,13 @@ impl KeyDeserialize for QueueId {
 
 pub const QUEUE_ID: Item<QueueId> = Item::new("queue_id");
 
-pub(crate) const WITHDRAWAL_QUEUE: Map<QueueId, WithdrawalRequest> = Map::new("withdrawal_queue");
+pub const USER_WITHDRAWALS: Map<(&Addr, QueueId), ()> = Map::new("user_withdrawals");
 
-pub(crate) const TOTAL_LP_SUPPLY: Item<Uint128> = Item::new("total_lp_supply");
+pub const WITHDRAWAL_QUEUE: Map<QueueId, WithdrawalRequest> = Map::new("withdrawal_queue");
+
+pub const TOTAL_LP_SUPPLY: Item<Uint128> = Item::new("total_lp_supply");
 
 pub const LP_BALANCES: Map<&Addr, Uint128> = Map::new("lp_balances");
 
 // It will be  a limit of 50 for now
-pub(crate) const MARKET_ALLOCATIONS: Map<&str, Uint128> = Map::new("market_allocations");
+pub const MARKET_ALLOCATIONS: Map<&str, Uint128> = Map::new("market_allocations");

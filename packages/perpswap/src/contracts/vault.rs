@@ -46,16 +46,10 @@ pub enum ExecuteMsg {
     },
 
     /// Redistribute excess funds to markets
-    RedistributeFunds {
-        /// Batch limit
-        batch_limit: Option<u32>,
-    },
+    RedistributeFunds {},
 
     /// Collect yields from markets
-    CollectYield {
-        /// Batch limit
-        batch_limit: Option<u32>,
-    },
+    CollectYield {},
 
     /// Process a pending withdrawal
     ProcessWithdrawal {},
@@ -101,8 +95,6 @@ pub enum QueryMsg {
     GetMarketAllocations {
         /// Start from market
         start_after: Option<String>,
-        /// Limit
-        limit: Option<u32>,
     },
 
     /// Query the vault's configuration

@@ -19,11 +19,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
         ExecuteMsg::RequestWithdrawal { amount } => execute_request_withdrawal(deps, info, amount),
 
-        ExecuteMsg::RedistributeFunds { batch_limit } => {
-            execute_redistribute_funds(deps, env, info, batch_limit)
-        }
+        ExecuteMsg::RedistributeFunds {} => execute_redistribute_funds(deps, env, info),
 
-        ExecuteMsg::CollectYield { batch_limit } => execute_collect_yield(deps, info, batch_limit),
+        ExecuteMsg::CollectYield {} => execute_collect_yield(deps, info),
 
         ExecuteMsg::ProcessWithdrawal {} => execute_process_withdrawal(deps, env, info),
 
@@ -91,7 +89,7 @@ fn execute_request_withdrawal(
         balance
             .unwrap_or_default()
             .checked_sub(amount)
-            .map_err(|e| anyhow!(format!("Error al reducir balance: {}", e)))
+            .map_err(|e| anyhow!(format!("Error reducing balances: {}", e)))
     })?;
 
     let withdrawal_request = WithdrawalRequest {
@@ -101,7 +99,12 @@ fn execute_request_withdrawal(
 
     let queue_id = get_and_increment_queue_id(deps.storage)?;
 
-    state::WITHDRAWAL_QUEUE.save(deps.storage, queue_id, &withdrawal_request)?;
+    if withdrawal_request.amount.is_zero() {
+        return Err(anyhow!("Withdrawal amount cannot be zero"));
+    }
+
+    state::WITHDRAWAL_QUEUE.save(deps.storage, queue_id.clone(), &withdrawal_request)?;
+    state::USER_WITHDRAWALS.save(deps.storage, (&sender, queue_id), &())?;
 
     state::TOTAL_LP_SUPPLY.update(deps.storage, |t| -> Result<Uint128> {
         t.checked_sub(amount)
@@ -115,12 +118,7 @@ fn execute_request_withdrawal(
     ]))
 }
 
-fn execute_redistribute_funds(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    batch_limit: Option<u32>,
-) -> Result<Response> {
+fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response> {
     let config = state::CONFIG.load(deps.storage)?;
 
     check_not_paused(&config)?;
@@ -142,7 +140,6 @@ fn execute_redistribute_funds(
     if excess.is_zero() {
         return Err(anyhow!("No excess to redistribute"));
     }
-    let limit = batch_limit.unwrap_or(20).min(50);
 
     let markets: Vec<String> = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
@@ -165,7 +162,6 @@ fn execute_redistribute_funds(
                 None
             }
         })
-        .take(limit as usize)
         .collect::<StdResult<Vec<String>>>()?;
 
     let mut utilizations: Vec<(String, Uint128)> = markets
@@ -245,19 +241,13 @@ fn execute_redistribute_funds(
     ]))
 }
 
-fn execute_collect_yield(
-    deps: DepsMut,
-    info: MessageInfo,
-    batch_limit: Option<u32>,
-) -> Result<Response> {
+fn execute_collect_yield(deps: DepsMut, info: MessageInfo) -> Result<Response> {
     let config = state::CONFIG.load(deps.storage)?;
 
     check_not_paused(&config)?;
     if config.governance != info.sender {
         return Err(anyhow!("Unauthorized"));
     }
-
-    let limit = batch_limit.unwrap_or(20).min(50);
 
     let markets: Vec<String> = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
@@ -281,7 +271,6 @@ fn execute_collect_yield(
                 None
             }
         })
-        .take(limit as usize)
         .collect::<Result<Vec<String>>>()?;
 
     let messages: Vec<CosmosMsg> = markets
@@ -304,11 +293,11 @@ fn execute_collect_yield(
         .add_attribute("markets_processed", markets.len().to_string()))
 }
 
-pub fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response> {
+fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response> {
     let config = state::CONFIG.load(deps.storage)?;
 
     if config.paused {
-        return Err(anyhow!("El contrato está pausado"));
+        return Err(anyhow!("The contract is paused"));
     }
 
     let vault_balance = deps
@@ -316,10 +305,10 @@ pub fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -
         .query_balance(&env.contract.address, &config.usdc_denom)?
         .amount;
 
-    let mut messages: Vec<CosmosMsg> = vec![];
     let mut processed_amount = Uint128::zero();
     let limit = 20;
-    let mut processed_ids: Vec<QueueId> = vec![];
+    let mut messages: Vec<CosmosMsg> = Vec::with_capacity(limit);
+    let mut processed_entries: Vec<(QueueId, Addr)> = Vec::with_capacity(limit);
 
     for item in state::WITHDRAWAL_QUEUE
         .range(deps.storage, None, None, Order::Ascending)
@@ -327,10 +316,9 @@ pub fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -
     {
         let (id, request) = item?;
 
-        match processed_amount.checked_add(request.amount) {
-            Ok(total) if total > vault_balance => break,
-            Ok(total) => processed_amount = total,
-            Err(e) => return Err(anyhow!("Error al sumar cantidades: {}", e)),
+        processed_amount += request.amount;
+        if processed_amount > vault_balance {
+            break;
         }
 
         messages.push(
@@ -344,18 +332,19 @@ pub fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -
             .into(),
         );
 
-        processed_ids.push(id);
+        processed_entries.push((id, request.user.clone()));
     }
 
-    for id in &processed_ids {
+    for (id, user) in &processed_entries {
         state::WITHDRAWAL_QUEUE.remove(deps.storage, id.clone());
+        state::USER_WITHDRAWALS.remove(deps.storage, (user, id.clone()));
     }
 
     if !processed_amount.is_zero() {
         if let Ok(mut total) = state::TOTAL_PENDING_WITHDRAWALS.load(deps.storage) {
             total = total
                 .checked_sub(processed_amount)
-                .map_err(|e| anyhow!("Error al restar retiros pendientes: {}", e))?;
+                .map_err(|e| anyhow!("Error proccesing pending withdrawals: {}", e))?;
             state::TOTAL_PENDING_WITHDRAWALS.save(deps.storage, &total)?;
         }
     }
@@ -363,9 +352,10 @@ pub fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -
     Ok(Response::new()
         .add_messages(messages)
         .add_attribute("action", "process_withdrawal")
-        .add_attribute("processed", processed_ids.len().to_string())
+        .add_attribute("processed", processed_entries.len().to_string())
         .add_attribute("amount", processed_amount.to_string()))
 }
+
 fn execute_withdraw_from_market(
     deps: DepsMut,
     info: MessageInfo,
@@ -452,7 +442,6 @@ fn execute_update_allocations(
 
     let market_count = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
-        .take(50)
         .count();
 
     if new_allocations.len() != market_count {

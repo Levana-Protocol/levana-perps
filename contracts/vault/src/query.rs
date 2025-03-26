@@ -1,3 +1,4 @@
+use cw_storage_plus::PrefixBound;
 use perpswap::contracts::vault::QueryMsg;
 
 use crate::{
@@ -16,18 +17,20 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
         }
 
         QueryMsg::GetPendingWithdrawal { user } => {
-            let pending = state::WITHDRAWAL_QUEUE
-                .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+            let user_addr = deps.api.addr_validate(&user)?;
+            let pending = state::USER_WITHDRAWALS
+                .prefix_range(
+                    deps.storage,
+                    Some(PrefixBound::inclusive(&user_addr)),
+                    Some(PrefixBound::inclusive(&user_addr)),
+                    cosmwasm_std::Order::Ascending,
+                )
                 .filter_map(|item| {
-                    let (_, req) = item.ok()?;
-                    if req.user.to_string() == user {
-                        Some(req.amount)
-                    } else {
-                        None
-                    }
+                    let ((_, queue_id), _) = item.ok()?;
+                    let req = state::WITHDRAWAL_QUEUE.load(deps.storage, queue_id).ok()?;
+                    Some(req.amount)
                 })
                 .sum::<Uint128>();
-
             let response = PendingWithdrawalResponse { amount: pending };
             Ok(to_json_binary(&response)?)
         }
@@ -37,8 +40,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             Ok(to_json_binary(&response)?)
         }
 
-        QueryMsg::GetMarketAllocations { start_after, limit } => {
-            let response = get_market_allocations(deps, start_after, limit)?;
+        QueryMsg::GetMarketAllocations { start_after } => {
+            let response = get_market_allocations(deps, start_after)?;
             Ok(to_json_binary(&response)?)
         }
 

@@ -19,7 +19,6 @@ pub fn get_total_assets(deps: Deps, env: &Env) -> Result<TotalAssetsResponse> {
 
     let allocated_amount: Uint128 = state::MARKET_ALLOCATIONS
         .range(deps.storage, None, None, Order::Ascending)
-        .take(50)
         .try_fold(Uint128::zero(), |acc, item| -> Result<Uint128> {
             Ok(acc + item?.1)
         })?;
@@ -40,7 +39,6 @@ pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> 
 
     let allocated_amount = state::MARKET_ALLOCATIONS
         .range(deps.storage, None, None, Order::Ascending)
-        .take(50)
         .try_fold(Uint128::zero(), |acc, res| -> Result<Uint128> {
             Ok(acc + res?.1)
         })?;
@@ -64,13 +62,11 @@ pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> 
 pub fn get_market_allocations(
     deps: Deps,
     start_after: Option<String>,
-    limit: Option<u32>,
 ) -> Result<MarketAllocationsResponse> {
     let start: Option<Bound<&str>> = start_after.as_deref().map(Bound::exclusive);
 
     let allocations = state::MARKET_ALLOCATIONS
         .range(deps.storage, start, None, Order::Ascending)
-        .take(limit.unwrap_or(30).min(50) as usize)
         .map(|item| {
             let (market_id, amount) = item?;
             Ok(MarketAllocation {
@@ -84,7 +80,7 @@ pub fn get_market_allocations(
 
 pub fn check_not_paused(config: &Config) -> Result<()> {
     if config.paused {
-        return Err(anyhow!(r"Contract operations are paused"));
+        return Err(anyhow!("Contract operations are paused"));
     }
     Ok(())
 }
