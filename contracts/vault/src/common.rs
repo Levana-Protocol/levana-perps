@@ -1,8 +1,9 @@
+use cosmwasm_std::{Storage, Uint64};
 use perpswap::contracts::vault::Config;
 
 use crate::{
     prelude::*,
-    state,
+    state::{self, QueueId},
     types::{
         MarketAllocation, MarketAllocationsResponse, TotalAssetsResponse, VaultBalanceResponse,
     },
@@ -18,6 +19,7 @@ pub fn get_total_assets(deps: Deps, env: &Env) -> Result<TotalAssetsResponse> {
 
     let allocated_amount: Uint128 = state::MARKET_ALLOCATIONS
         .range(deps.storage, None, None, Order::Ascending)
+        .take(50)
         .try_fold(Uint128::zero(), |acc, item| -> Result<Uint128> {
             Ok(acc + item?.1)
         })?;
@@ -38,6 +40,7 @@ pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> 
 
     let allocated_amount = state::MARKET_ALLOCATIONS
         .range(deps.storage, None, None, Order::Ascending)
+        .take(50)
         .try_fold(Uint128::zero(), |acc, res| -> Result<Uint128> {
             Ok(acc + res?.1)
         })?;
@@ -84,4 +87,10 @@ pub fn check_not_paused(config: &Config) -> Result<()> {
         return Err(anyhow!(r"Contract operations are paused"));
     }
     Ok(())
+}
+
+pub fn get_and_increment_queue_id(store: &mut dyn Storage) -> StdResult<QueueId> {
+    let counter = state::QUEUE_COUNTER.load(store)?;
+    state::QUEUE_COUNTER.save(store, &(counter + 1))?;
+    Ok(QueueId(Uint64::new(counter)))
 }

@@ -6,13 +6,12 @@ use perpswap::{
 };
 
 use crate::{
-    common::{check_not_paused, get_total_assets},
+    common::{check_not_paused, get_and_increment_queue_id, get_total_assets},
     prelude::*,
-    state::{self, LP_BALANCES},
+    state::{self, QueueId, LP_BALANCES},
     types::WithdrawalRequest,
 };
 
-#[allow(dead_code)]
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     match msg {
@@ -100,13 +99,9 @@ fn execute_request_withdrawal(
         amount,
     };
 
-    state::WITHDRAWAL_QUEUE.update(
-        deps.storage,
-        |mut queue| -> Result<Vec<WithdrawalRequest>> {
-            queue.push(withdrawal_request);
-            Ok(queue)
-        },
-    )?;
+    let queue_id = get_and_increment_queue_id(deps.storage)?;
+
+    state::WITHDRAWAL_QUEUE.save(deps.storage, queue_id, &withdrawal_request)?;
 
     state::TOTAL_LP_SUPPLY.update(deps.storage, |t| -> Result<Uint128> {
         t.checked_sub(amount)
@@ -262,7 +257,7 @@ fn execute_collect_yield(
         return Err(anyhow!("Unauthorized"));
     }
 
-    let limit = batch_limit.unwrap_or(20).min(50); // Batch limit, max 50
+    let limit = batch_limit.unwrap_or(20).min(50);
 
     let markets: Vec<String> = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
@@ -309,66 +304,68 @@ fn execute_collect_yield(
         .add_attribute("markets_processed", markets.len().to_string()))
 }
 
-fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response> {
+pub fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -> Result<Response> {
     let config = state::CONFIG.load(deps.storage)?;
-    check_not_paused(&config)?;
-    // No authorization check - open to all users to process pending withdrawals
-    // Load the withdrawal queue
-    let mut queue = state::WITHDRAWAL_QUEUE.load(deps.storage)?;
 
-    // Check if there are any pending withdrawals
-    if queue.is_empty() {
-        return Err(anyhow!("No pending withdrawals to process"));
+    if config.paused {
+        return Err(anyhow!("El contrato está pausado"));
     }
 
     let vault_balance = deps
         .querier
         .query_balance(&env.contract.address, &config.usdc_denom)?
         .amount;
+
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut processed_amount = Uint128::zero();
     let limit = 20;
+    let mut processed_ids: Vec<QueueId> = vec![];
 
-    for _ in 0..limit {
-        if let Some(request) = queue.first() {
-            if processed_amount + request.amount > vault_balance {
-                break;
+    for item in state::WITHDRAWAL_QUEUE
+        .range(deps.storage, None, None, Order::Ascending)
+        .take(limit)
+    {
+        let (id, request) = item?;
+
+        match processed_amount.checked_add(request.amount) {
+            Ok(total) if total > vault_balance => break,
+            Ok(total) => processed_amount = total,
+            Err(e) => return Err(anyhow!("Error al sumar cantidades: {}", e)),
+        }
+
+        messages.push(
+            BankMsg::Send {
+                to_address: request.user.to_string(),
+                amount: vec![Coin {
+                    denom: config.usdc_denom.clone(),
+                    amount: request.amount,
+                }],
             }
+            .into(),
+        );
 
-            messages.push(
-                BankMsg::Send {
-                    to_address: request.user.to_string(),
-                    amount: vec![Coin {
-                        denom: config.usdc_denom.clone(),
-                        amount: request.amount,
-                    }],
-                }
-                .into(),
-            );
+        processed_ids.push(id);
+    }
 
-            processed_amount += request.amount;
-            queue.remove(0);
-        } else {
-            break;
+    for id in &processed_ids {
+        state::WITHDRAWAL_QUEUE.remove(deps.storage, id.clone());
+    }
+
+    if !processed_amount.is_zero() {
+        if let Ok(mut total) = state::TOTAL_PENDING_WITHDRAWALS.load(deps.storage) {
+            total = total
+                .checked_sub(processed_amount)
+                .map_err(|e| anyhow!("Error al restar retiros pendientes: {}", e))?;
+            state::TOTAL_PENDING_WITHDRAWALS.save(deps.storage, &total)?;
         }
     }
 
-    // Update total pending withdrawals
-    state::TOTAL_PENDING_WITHDRAWALS.update(deps.storage, |total| -> Result<Uint128> {
-        total
-            .checked_sub(processed_amount)
-            .map_err(|e| anyhow!(format!("Underflow in total pending withdrawals: {}", e)))
-    })?;
-
-    state::WITHDRAWAL_QUEUE.save(deps.storage, &queue)?;
-
     Ok(Response::new()
-        .add_messages(messages.clone())
+        .add_messages(messages)
         .add_attribute("action", "process_withdrawal")
-        .add_attribute("processed_count", messages.len().to_string())
-        .add_attribute("processed_amount", processed_amount.to_string()))
+        .add_attribute("processed", processed_ids.len().to_string())
+        .add_attribute("amount", processed_amount.to_string()))
 }
-
 fn execute_withdraw_from_market(
     deps: DepsMut,
     info: MessageInfo,
@@ -455,7 +452,9 @@ fn execute_update_allocations(
 
     let market_count = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
+        .take(50)
         .count();
+
     if new_allocations.len() != market_count {
         return Err(anyhow!(format!(
             "Number of allocations ({}) must match number of markets ({})",

@@ -6,7 +6,7 @@ use crate::{
     state,
     types::PendingWithdrawalResponse,
 };
-#[allow(dead_code)]
+
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
     match msg {
@@ -17,11 +17,17 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
 
         QueryMsg::GetPendingWithdrawal { user } => {
             let pending = state::WITHDRAWAL_QUEUE
-                .load(deps.storage)?
-                .iter()
-                .filter(|req| req.user.to_string() == user)
-                .map(|req| req.amount)
+                .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+                .filter_map(|item| {
+                    let (_, req) = item.ok()?;
+                    if req.user.to_string() == user {
+                        Some(req.amount)
+                    } else {
+                        None
+                    }
+                })
                 .sum::<Uint128>();
+
             let response = PendingWithdrawalResponse { amount: pending };
             Ok(to_json_binary(&response)?)
         }
