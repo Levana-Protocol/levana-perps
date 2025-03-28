@@ -8,7 +8,7 @@ pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const TOTAL_PENDING_WITHDRAWALS: Item<Uint128> = Item::new("total_pending_withdrawals");
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Debug)]
 #[serde(transparent)]
 pub struct QueueId(pub Uint64);
 

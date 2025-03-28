@@ -103,8 +103,13 @@ fn execute_request_withdrawal(
         return Err(anyhow!("Withdrawal amount cannot be zero"));
     }
 
-    state::WITHDRAWAL_QUEUE.save(deps.storage, queue_id.clone(), &withdrawal_request)?;
+    state::WITHDRAWAL_QUEUE.save(deps.storage, queue_id, &withdrawal_request)?;
     state::USER_WITHDRAWALS.save(deps.storage, (&sender, queue_id), &())?;
+
+    state::TOTAL_PENDING_WITHDRAWALS.update(deps.storage, |t| -> Result<Uint128> {
+        t.checked_add(amount)
+            .map_err(|e| anyhow!(format!("Error updating total pending withdrawals: {}", e)))
+    })?;
 
     state::TOTAL_LP_SUPPLY.update(deps.storage, |t| -> Result<Uint128> {
         t.checked_sub(amount)
@@ -315,11 +320,11 @@ fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -> Re
         .take(limit)
     {
         let (id, request) = item?;
-
-        processed_amount += request.amount;
-        if processed_amount > vault_balance {
+        let new_total = processed_amount + request.amount;
+        if new_total > vault_balance {
             break;
         }
+        processed_amount = new_total;
 
         messages.push(
             BankMsg::Send {
@@ -336,17 +341,16 @@ fn execute_process_withdrawal(deps: DepsMut, env: Env, _info: MessageInfo) -> Re
     }
 
     for (id, user) in &processed_entries {
-        state::WITHDRAWAL_QUEUE.remove(deps.storage, id.clone());
-        state::USER_WITHDRAWALS.remove(deps.storage, (user, id.clone()));
+        state::WITHDRAWAL_QUEUE.remove(deps.storage, *id);
+        state::USER_WITHDRAWALS.remove(deps.storage, (user, *id));
     }
 
     if !processed_amount.is_zero() {
-        if let Ok(mut total) = state::TOTAL_PENDING_WITHDRAWALS.load(deps.storage) {
-            total = total
-                .checked_sub(processed_amount)
-                .map_err(|e| anyhow!("Error proccesing pending withdrawals: {}", e))?;
-            state::TOTAL_PENDING_WITHDRAWALS.save(deps.storage, &total)?;
-        }
+        let mut total = state::TOTAL_PENDING_WITHDRAWALS.load(deps.storage)?;
+        total = total
+            .checked_sub(processed_amount)
+            .map_err(|e| anyhow!("Error proccesing pending withdrawals: {}", e))?;
+        state::TOTAL_PENDING_WITHDRAWALS.save(deps.storage, &total)?;
     }
 
     Ok(Response::new()

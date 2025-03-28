@@ -34,6 +34,7 @@ pub fn instantiate(
 
     state::CONFIG.save(deps.storage, &config)?;
     state::TOTAL_LP_SUPPLY.save(deps.storage, &Uint128::zero())?;
+    state::TOTAL_PENDING_WITHDRAWALS.save(deps.storage, &Uint128::zero())?;
 
     Ok(Response::new().add_attribute("action", "instantiate_vault"))
 }

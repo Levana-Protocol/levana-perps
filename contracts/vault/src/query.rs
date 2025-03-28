@@ -1,4 +1,3 @@
-use cw_storage_plus::PrefixBound;
 use perpswap::contracts::vault::QueryMsg;
 
 use crate::{
@@ -18,19 +17,19 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
 
         QueryMsg::GetPendingWithdrawal { user } => {
             let user_addr = deps.api.addr_validate(&user)?;
-            let pending = state::USER_WITHDRAWALS
-                .prefix_range(
-                    deps.storage,
-                    Some(PrefixBound::inclusive(&user_addr)),
-                    Some(PrefixBound::inclusive(&user_addr)),
-                    cosmwasm_std::Order::Ascending,
-                )
-                .filter_map(|item| {
-                    let ((_, queue_id), _) = item.ok()?;
-                    let req = state::WITHDRAWAL_QUEUE.load(deps.storage, queue_id).ok()?;
-                    Some(req.amount)
-                })
-                .sum::<Uint128>();
+            let mut pending = Uint128::zero();
+
+            for item in state::USER_WITHDRAWALS.prefix(&user_addr).range(
+                deps.storage,
+                None,
+                None,
+                cosmwasm_std::Order::Ascending,
+            ) {
+                let (queue_id, _) = item?;
+                let req = state::WITHDRAWAL_QUEUE.load(deps.storage, queue_id)?;
+                pending = pending.checked_add(req.amount)?;
+            }
+
             let response = PendingWithdrawalResponse { amount: pending };
             Ok(to_json_binary(&response)?)
         }
