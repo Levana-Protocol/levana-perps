@@ -3296,6 +3296,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "levana_perpswap_cosmos_vault"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "levana_perpswap_cosmos",
+ "serde",
+]
+
+[[package]]
 name = "levana_perpswap_multi_test"
 version = "0.1.0-beta.15"
 dependencies = [
@@ -3316,6 +3327,7 @@ dependencies = [
  "levana_perpswap_cosmos_liquidity_token",
  "levana_perpswap_cosmos_market",
  "levana_perpswap_cosmos_position_token",
+ "levana_perpswap_cosmos_vault",
  "once_cell",
  "proptest",
  "rand",
@@ -6116,17 +6128,6 @@ name = "valuable"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
-
-[[package]]
-name = "vault"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cosmwasm-std",
- "cw-storage-plus",
- "levana_perpswap_cosmos",
- "serde",
-]
 
 [[package]]
 name = "vcpkg"
