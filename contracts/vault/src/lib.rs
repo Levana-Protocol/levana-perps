@@ -3,7 +3,7 @@ mod execute;
 mod prelude;
 mod query;
 mod state;
-mod types;
+pub mod types;
 
 pub use execute::execute;
 use perpswap::contracts::vault::{Config, InstantiateMsg};
