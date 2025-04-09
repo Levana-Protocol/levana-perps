@@ -9,15 +9,28 @@ use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
 use vault;
 
+pub fn setup_standard_vault(initial_balance: Option<Coin>) -> Result<(App, Addr, Addr)> {
+    let (mut app, vault_addr) =
+        setup_vault_contract("governance", "usdc", vec![5000, 5000], initial_balance)?;
+    let market_addr = setup_market_contract(&mut app)?;
+    Ok((app, vault_addr, market_addr))
+}
+
 pub fn setup_vault_contract(
     governance: &str,
     usdc_denom: &str,
     markets_allocation_bps: Vec<u16>,
     initial_balance: Option<Coin>,
-) -> Result<(App, Addr), anyhow::Error> {
+) -> Result<(App, Addr)> {
     let mut app = AppBuilder::new().build(|_, _, _| {});
 
     if let Some(coin) = initial_balance {
+        app.init_modules(|router, _, store| {
+            router
+                .bank
+                .init_balance(store, &Addr::unchecked("sender"), vec![coin.clone()])
+        })?;
+
         app.send_tokens(
             Addr::unchecked("sender"),
             Addr::unchecked(governance),
