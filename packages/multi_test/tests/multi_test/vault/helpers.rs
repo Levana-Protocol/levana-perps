@@ -10,51 +10,51 @@ use perpswap::token::Token;
 use vault;
 
 pub const GOVERNANCE: &str = "cosmwasm1h72z9g4qf2kjrq866zgn78xl32wn0q8aqayp05jkjpgdp2qft5aquanhrh";
+pub const USER: &str = "cosmwasm1qnufjmd8vwm6j6d3q28wxqr4d8408f34fpka4vs365fvskualrasv5ues5";
+pub const USER1: &str = "cosmwasm1vqjarrly327529599rcc4qhzvhwe34pp5uyy4gylvxe5zupeqx3sg08lap";
+pub const USDC: &str = "usdc";
 
 pub fn setup_standard_vault(initial_balance: Option<Coin>) -> Result<(App, Addr, Addr)> {
     let (mut app, vault_addr) =
-        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], initial_balance)?;
+        setup_vault_contract(vec![5000, 5000], initial_balance)?;
     let market_addr = setup_market_contract(&mut app)?;
     Ok((app, vault_addr, market_addr))
 }
 
 pub fn setup_vault_contract(
-    governance: &str,
-    usdc_denom: &str,
     markets_allocation_bps: Vec<u16>,
     initial_balance: Option<Coin>,
 ) -> Result<(App, Addr)> {
     let mut app = AppBuilder::new().build(|_, _, _| {});
 
-    if let Some(coin) = initial_balance {
-        app.init_modules(|router, _, store| {
-            router
-                .bank
-                .init_balance(store, &Addr::unchecked("sender"), vec![coin.clone()])
-        })?;
-
-        app.send_tokens(
-            Addr::unchecked("sender"),
-            Addr::unchecked(governance),
-            &[coin.clone()],
-        )?;
-    }
+    let funds = match initial_balance.clone() {
+        Some(coin) => {
+            app.init_modules(|router, _, store| {
+                router
+                    .bank
+                    .init_balance(store, &Addr::unchecked(GOVERNANCE), vec![coin.clone()])
+            })?;
+            &[coin].to_vec()
+        },
+        None => &vec![],
+    };
 
     let code = ContractWrapper::new(vault::execute, vault::instantiate, vault::query);
     let code_id = app.store_code(Box::new(code));
 
     let instantiate_msg = InstantiateMsg {
-        governance: governance.to_string(),
+        usdc_denom: USDC.to_owned(),
+        governance: GOVERNANCE.to_string(),
         markets_allocation_bps,
-        usdc_denom: usdc_denom.to_string(),
     };
+
     let contract_addr = app.instantiate_contract(
         code_id,
-        Addr::unchecked(governance),
+        Addr::unchecked(GOVERNANCE),
         &instantiate_msg,
-        &[],
+        funds,
         "Vault",
-        None,
+        Some(GOVERNANCE.to_string()),
     )?;
 
     Ok((app, contract_addr))
