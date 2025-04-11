@@ -32,4 +32,5 @@ mod referrer;
 mod sanity;
 mod shutdown;
 mod staleness;
+mod vault;
 mod wrong_token;
