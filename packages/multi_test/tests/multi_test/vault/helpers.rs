@@ -9,9 +9,11 @@ use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
 use vault;
 
+pub const GOVERNANCE: &str = "cosmwasm1h72z9g4qf2kjrq866zgn78xl32wn0q8aqayp05jkjpgdp2qft5aquanhrh";
+
 pub fn setup_standard_vault(initial_balance: Option<Coin>) -> Result<(App, Addr, Addr)> {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], initial_balance)?;
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], initial_balance)?;
     let market_addr = setup_market_contract(&mut app)?;
     Ok((app, vault_addr, market_addr))
 }

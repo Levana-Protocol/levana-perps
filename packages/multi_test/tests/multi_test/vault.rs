@@ -1,7 +1,7 @@
 mod helpers;
 use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_multi_test::Executor;
-use helpers::{setup_standard_vault, setup_vault_contract};
+use helpers::{setup_standard_vault, setup_vault_contract, GOVERNANCE};
 
 use perpswap::{
     contracts::{
@@ -28,7 +28,7 @@ fn test_full_flow() {
     .unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::RedistributeFunds {},
         &[],
@@ -36,7 +36,7 @@ fn test_full_flow() {
     .unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::CollectYield {},
         &[],
@@ -80,13 +80,8 @@ fn test_full_flow() {
 #[test]
 fn test_get_vault_balance() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
-    let (app, vault_addr) = setup_vault_contract(
-        "governance",
-        "usdc",
-        vec![5000, 5000],
-        Some(initial_balance),
-    )
-    .unwrap();
+    let (app, vault_addr) =
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let response: VaultBalanceResponse = app
         .wrap()
@@ -103,7 +98,7 @@ fn test_get_vault_balance() {
 fn test_request_withdrawal_zero_amount() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
     let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
+        GOVERNANCE,
         "usdc",
         vec![5000, 5000],
         Some(initial_balance.clone()),
@@ -134,7 +129,7 @@ fn test_request_withdrawal_zero_amount() {
 fn test_get_pending_withdrawal() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
     let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
+        GOVERNANCE,
         "usdc",
         vec![5000, 5000],
         Some(initial_balance.clone()),
@@ -176,13 +171,8 @@ fn test_get_pending_withdrawal() {
 #[test]
 fn test_get_total_assets() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
-    let (app, vault_addr) = setup_vault_contract(
-        "governance",
-        "usdc",
-        vec![5000, 5000],
-        Some(initial_balance),
-    )
-    .unwrap();
+    let (app, vault_addr) =
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let response: TotalAssetsResponse = app
         .wrap()
@@ -198,7 +188,7 @@ fn test_get_market_allocations() {
         setup_standard_vault(Some(initial_balance.clone())).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::RedistributeFunds {},
         &[],
@@ -221,14 +211,14 @@ fn test_get_market_allocations() {
 #[test]
 fn test_get_config() {
     let (app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     let config: perpswap::contracts::vault::Config = app
         .wrap()
         .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
         .unwrap();
 
-    assert_eq!(config.governance, Addr::unchecked("governance"));
+    assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, "usdc");
     assert_eq!(config.markets_allocation_bps, vec![5000, 5000]);
     assert_eq!(config.paused, false);
@@ -237,13 +227,8 @@ fn test_get_config() {
 #[test]
 fn test_deposit_success() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
-    let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
-        "usdc",
-        vec![5000, 5000],
-        Some(initial_balance),
-    )
-    .unwrap();
+    let (mut app, vault_addr) =
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let user = Addr::unchecked("user");
     let deposit_amount = Coin::new(500 as u128, "usdc");
@@ -276,13 +261,8 @@ fn test_deposit_success() {
 #[test]
 fn test_deposit_invalid_denom() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
-    let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
-        "usdc",
-        vec![5000, 5000],
-        Some(initial_balance),
-    )
-    .unwrap();
+    let (mut app, vault_addr) =
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked("user"),
@@ -297,7 +277,7 @@ fn test_deposit_invalid_denom() {
 fn test_request_withdrawal_success() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
     let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
+        GOVERNANCE,
         "usdc",
         vec![5000, 5000],
         Some(initial_balance.clone()),
@@ -340,7 +320,7 @@ fn test_request_withdrawal_success() {
 fn test_process_withdrawal_success() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
     let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
+        GOVERNANCE,
         "usdc",
         vec![5000, 5000],
         Some(initial_balance.clone()),
@@ -393,13 +373,8 @@ fn test_process_withdrawal_success() {
 #[test]
 fn test_process_multiple_withdrawals() {
     let initial_balance = Coin::new(2000 as u128, "usdc");
-    let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
-        "usdc",
-        vec![5000, 5000],
-        Some(initial_balance),
-    )
-    .unwrap();
+    let (mut app, vault_addr) =
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let user1 = Addr::unchecked("user1");
     let user2 = Addr::unchecked("user2");
@@ -460,7 +435,7 @@ fn test_redistribute_funds_success() {
 
     app.update_block(|block| block.height += 1);
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::RedistributeFunds {},
         &[],
@@ -481,13 +456,8 @@ fn test_redistribute_funds_success() {
 #[test]
 fn test_redistribute_funds_unauthorized() {
     let initial_balance = Coin::new(1000 as u128, "usdc");
-    let (mut app, vault_addr) = setup_vault_contract(
-        "governance",
-        "usdc",
-        vec![5000, 5000],
-        Some(initial_balance),
-    )
-    .unwrap();
+    let (mut app, vault_addr) =
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked("not_governance"),
@@ -501,10 +471,10 @@ fn test_redistribute_funds_unauthorized() {
 #[test]
 fn test_collect_yield_success() {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::CollectYield {},
         &[],
@@ -519,7 +489,7 @@ fn test_withdraw_from_market_success() {
         setup_standard_vault(Some(initial_balance.clone())).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::RedistributeFunds {},
         &[],
@@ -527,7 +497,7 @@ fn test_withdraw_from_market_success() {
     .unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::WithdrawFromMarket {
             market: market_addr.to_string(),
@@ -554,10 +524,10 @@ fn test_withdraw_from_market_success() {
 #[test]
 fn test_emergency_pause_success() {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::EmergencyPause {},
         &[],
@@ -582,10 +552,10 @@ fn test_emergency_pause_success() {
 #[test]
 fn test_resume_operations_success() {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::EmergencyPause {},
         &[],
@@ -593,7 +563,7 @@ fn test_resume_operations_success() {
     .unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::ResumeOperations {},
         &[],
@@ -618,10 +588,10 @@ fn test_resume_operations_success() {
 #[test]
 fn test_update_allocations_success() {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::UpdateAllocations {
             new_allocations: vec![6000, 4000],
@@ -640,10 +610,10 @@ fn test_update_allocations_success() {
 #[test]
 fn test_update_allocations_invalid_count() {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     let result = app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr,
         &ExecuteMsg::UpdateAllocations {
             new_allocations: vec![5000],
@@ -656,14 +626,14 @@ fn test_update_allocations_invalid_count() {
 #[test]
 fn test_instantiate_success() {
     let (app, contract_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 3000, 2000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 3000, 2000], None).unwrap();
 
     let config: Config = app
         .wrap()
         .query_wasm_smart(&contract_addr, &QueryMsg::GetConfig {})
         .unwrap();
 
-    assert_eq!(config.governance, Addr::unchecked("governance"));
+    assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, "usdc");
     assert_eq!(config.markets_allocation_bps, vec![5000, 3000, 2000]);
     assert_eq!(config.paused, false);
@@ -682,7 +652,7 @@ fn test_withdraw_from_market_insufficient_allocation() {
         setup_standard_vault(Some(initial_balance.clone())).unwrap();
 
     app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::RedistributeFunds {},
         &[],
@@ -690,7 +660,7 @@ fn test_withdraw_from_market_insufficient_allocation() {
     .unwrap();
 
     let result = app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::WithdrawFromMarket {
             market: market_addr.to_string(),
@@ -704,10 +674,10 @@ fn test_withdraw_from_market_insufficient_allocation() {
 #[test]
 fn test_redistribute_funds_no_excess() {
     let (mut app, vault_addr) =
-        setup_vault_contract("governance", "usdc", vec![5000, 5000], None).unwrap();
+        setup_vault_contract(GOVERNANCE, "usdc", vec![5000, 5000], None).unwrap();
 
     let result = app.execute_contract(
-        Addr::unchecked("governance"),
+        Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::RedistributeFunds {},
         &[],
@@ -717,6 +687,6 @@ fn test_redistribute_funds_no_excess() {
 
 #[test]
 fn test_instantiate_invalid_bps() {
-    let result = setup_vault_contract("governance", "usdc", vec![6000, 5000], None);
+    let result = setup_vault_contract(GOVERNANCE, "usdc", vec![6000, 5000], None);
     assert!(result.is_err());
 }
