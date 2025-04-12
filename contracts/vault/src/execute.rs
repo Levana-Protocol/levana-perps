@@ -36,6 +36,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::UpdateAllocations { new_allocations } => {
             execute_update_allocations(deps, info, new_allocations)
         }
+
+        ExecuteMsg::AddMarket { market } => execute_add_market(deps, info, market),
     }
 }
 
@@ -465,4 +467,18 @@ fn execute_update_allocations(
     state::CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new().add_attribute("action", "update_allocations"))
+}
+
+fn execute_add_market(deps: DepsMut, info: MessageInfo, market: String) -> Result<Response> {
+    let config = state::CONFIG.load(deps.storage)?;
+    if info.sender != config.governance {
+        return Err(anyhow!("Unauthorized"));
+    }
+
+    let market_addr = deps.api.addr_validate(&market)?;
+    state::MARKET_ALLOCATIONS.save(deps.storage, market_addr.as_str(), &Uint128::zero())?;
+
+    Ok(Response::new()
+        .add_attribute("action", "add_market")
+        .add_attribute("market", market))
 }

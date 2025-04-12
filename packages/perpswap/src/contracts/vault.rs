@@ -73,6 +73,12 @@ pub enum ExecuteMsg {
         /// New allocations for Markets
         new_allocations: Vec<u16>,
     },
+
+    /// Add a new market to the vault
+    AddMarket {
+        /// Market address to add
+        market: String,
+    },
 }
 
 /// Query messages for the contract

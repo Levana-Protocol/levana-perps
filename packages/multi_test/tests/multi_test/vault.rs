@@ -1,24 +1,30 @@
 mod helpers;
 use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_multi_test::Executor;
-use helpers::{setup_standard_vault, setup_vault_contract, GOVERNANCE, USDC, USER, USER1};
+use helpers::{
+    init_user_balance, setup_standard_vault, setup_vault_contract, GOVERNANCE, USDC, USER, USER1,
+};
 
 use perpswap::{
     contracts::{
         market::entry::StatusResp,
         vault::{Config, ExecuteMsg, QueryMsg},
     },
+    number::LpToken,
     storage::MarketQueryMsg,
 };
-use vault::types::{MarketAllocationsResponse, TotalAssetsResponse, VaultBalanceResponse};
+use vault::types::{
+    MarketAllocationsResponse, PendingWithdrawalResponse, TotalAssetsResponse, VaultBalanceResponse,
+};
 
 #[test]
-fn test_full_flow() {                                           // Overflow: Cannot Sub with given operands 28
-    let initial_balance = Coin::new(3000 as u128, USDC);
-    let (mut app, vault_addr, market_addr) =
-        setup_standard_vault(Some(initial_balance.clone())).unwrap();
+fn test_full_flow() {
+    // Error line 68 diff betwene quantity
+    let (mut app, vault_addr, market_addr) = setup_standard_vault(None).unwrap();
 
     let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 2500).unwrap();
+
     app.execute_contract(
         user.clone(),
         vault_addr.clone(),
@@ -44,6 +50,7 @@ fn test_full_flow() {                                           // Overflow: Can
     .unwrap();
 
     let withdrawal_amount = Uint128::new(500);
+
     app.execute_contract(
         user.clone(),
         vault_addr.clone(),
@@ -63,7 +70,8 @@ fn test_full_flow() {                                           // Overflow: Can
     .unwrap();
 
     let user_balance = app.wrap().query_balance(&user, USDC).unwrap().amount;
-    assert_eq!(user_balance, withdrawal_amount);
+
+    assert_eq!(user_balance, Uint128::new(2000));
 
     let response: MarketAllocationsResponse = app
         .wrap()
@@ -72,16 +80,16 @@ fn test_full_flow() {                                           // Overflow: Can
             &QueryMsg::GetMarketAllocations { start_after: None },
         )
         .unwrap();
+
     assert_eq!(response.allocations.len(), 1);
     assert_eq!(response.allocations[0].market_id, market_addr.to_string());
-    assert_eq!(response.allocations[0].amount, Uint128::new(3500));
+    assert_eq!(response.allocations[0].amount, Uint128::new(500));
 }
 
 #[test]
 fn test_get_vault_balance() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+    let (app, vault_addr) = setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let response: VaultBalanceResponse = app
         .wrap()
@@ -95,55 +103,69 @@ fn test_get_vault_balance() {
 }
 
 #[test]
-fn test_request_withdrawal_zero_amount() {                                  // Overflow: Cannot Sub with given operands 113
-    let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) = setup_vault_contract(
-        vec![5000, 5000],
-        Some(initial_balance.clone()),
-    )
-    .unwrap();
+fn test_request_user_withdrawal() {
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
-    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 8237).unwrap();
+
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[initial_balance],
+        &[Coin::new(500 as u128, USDC)],
     )
     .unwrap();
 
     let result = app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::RequestWithdrawal {
             amount: Uint128::zero(),
         },
         &[],
     );
+
     assert!(result.is_err());
+
+    let result = app.execute_contract(
+        Addr::unchecked(USER),
+        vault_addr.clone(),
+        &ExecuteMsg::RequestWithdrawal {
+            amount: Uint128::new(250),
+        },
+        &[],
+    );
+
+    assert!(result.is_ok());
+
+    app.execute_contract(
+        Addr::unchecked("anyone"),
+        vault_addr.clone(),
+        &ExecuteMsg::ProcessWithdrawal {},
+        &[],
+    )
+    .unwrap();
 }
 
 #[test]
-fn test_get_pending_withdrawal() {                                      // Overflow: Cannot Sub with given operands 142
-    let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) = setup_vault_contract(
-        vec![5000, 5000],
-        Some(initial_balance.clone()),
-    )
-    .unwrap();
+fn test_get_pending_withdrawal() {
+    let initial_balance = Coin::new(10000 as u128, USDC);
+    let (mut app, vault_addr) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
-    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 3000).unwrap();
+
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[initial_balance],
+        &[Coin::new(1000 as u128, USDC)],
     )
     .unwrap();
 
     let withdrawal_amount = Uint128::new(500);
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::RequestWithdrawal {
             amount: withdrawal_amount,
@@ -152,23 +174,23 @@ fn test_get_pending_withdrawal() {                                      // Overf
     )
     .unwrap();
 
-    let response: Uint128 = app
+    let response: PendingWithdrawalResponse = app
         .wrap()
         .query_wasm_smart(
             &vault_addr,
             &QueryMsg::GetPendingWithdrawal {
-                user: user.to_string(),
+                user: USER.to_string(),
             },
         )
         .unwrap();
-    assert_eq!(response, withdrawal_amount);
+
+    assert_eq!(response.amount, withdrawal_amount);
 }
 
 #[test]
 fn test_get_total_assets() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+    let (app, vault_addr) = setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let response: TotalAssetsResponse = app
         .wrap()
@@ -178,8 +200,9 @@ fn test_get_total_assets() {
 }
 
 #[test]
-fn test_get_market_allocations() {                                          // Error on assert 202
-    let initial_balance = Coin::new(1000 as u128, USDC);
+fn test_get_market_allocations() {
+    // Fail to create market line 228
+    let initial_balance = Coin::new(10000 as u128, USDC);
     let (mut app, vault_addr, market_addr) =
         setup_standard_vault(Some(initial_balance.clone())).unwrap();
 
@@ -206,8 +229,7 @@ fn test_get_market_allocations() {                                          // E
 
 #[test]
 fn test_get_config() {
-    let (app, vault_addr) =
-        setup_vault_contract( vec![5000, 5000], None).unwrap();
+    let (app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     let config: perpswap::contracts::vault::Config = app
         .wrap()
@@ -221,21 +243,20 @@ fn test_get_config() {
 }
 
 #[test]
-fn test_deposit_success() {                                     // Overflow: Cannot Sub with given operands on 236
-    let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+fn test_deposit_success() {
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
-    let deposit_amount = Coin::new(500 as u128, USDC);
+    init_user_balance(&mut app, USER, 5000).unwrap();
+
     app.execute_contract(
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[deposit_amount.clone()],
+        &[Coin::new(500 as u128, USDC)],
     )
     .unwrap();
 
-    let lp_balance: Uint128 = app
+    let lp_balance: PendingWithdrawalResponse = app
         .wrap()
         .query_wasm_smart(
             &vault_addr,
@@ -245,18 +266,18 @@ fn test_deposit_success() {                                     // Overflow: Can
         )
         .unwrap();
 
-    assert_eq!(lp_balance, Uint128::zero());
+    assert_eq!(lp_balance.amount, Uint128::zero());
 
-    let total_assets: Uint128 = app
+    let total_assets: TotalAssetsResponse = app
         .wrap()
         .query_wasm_smart(&vault_addr, &QueryMsg::GetTotalAssets {})
         .unwrap();
 
-    assert_eq!(total_assets, Uint128::new(500));
+    assert_eq!(total_assets.total_assets, Uint128::new(500));
 }
 
 #[test]
-fn test_deposit_invalid_denom() {                               
+fn test_deposit_invalid_denom() {
     let initial_balance = Coin::new(1000 as u128, USDC);
     let (mut app, vault_addr) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
@@ -271,26 +292,25 @@ fn test_deposit_invalid_denom() {
 }
 
 #[test]
-fn test_request_withdrawal_success() {                                      // Overflow: Cannot Sub with given operands on 289
-    let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) = setup_vault_contract(
-        vec![5000, 5000],
-        Some(initial_balance.clone()),
-    )
-    .unwrap();
+fn test_request_withdrawal_success() {
+    let initial_balance = Coin::new(10000 as u128, USDC);
+    let (mut app, vault_addr) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
-    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 3000).unwrap();
+
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[initial_balance.clone()],
+        &[Coin::new(500 as u128, USDC)],
     )
     .unwrap();
 
-    let withdrawal_amount = Uint128::new(500);
+    let withdrawal_amount = Uint128::new(250);
+
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::RequestWithdrawal {
             amount: withdrawal_amount,
@@ -299,39 +319,38 @@ fn test_request_withdrawal_success() {                                      // O
     )
     .unwrap();
 
-    let pending: Uint128 = app
+    let pending: PendingWithdrawalResponse = app
         .wrap()
         .query_wasm_smart(
             &vault_addr,
             &QueryMsg::GetPendingWithdrawal {
-                user: user.to_string(),
+                user: USER.to_string(),
             },
         )
         .unwrap();
-    assert_eq!(pending, withdrawal_amount);
+    assert_eq!(pending.amount, withdrawal_amount);
 }
 
 #[test]
-fn test_process_withdrawal_success() {                                      // Overflow: Cannot Sub with given operands on 330
+fn test_process_withdrawal_success() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) = setup_vault_contract(
-        vec![5000, 5000],
-        Some(initial_balance.clone()),
-    )
-    .unwrap();
+    let (mut app, vault_addr) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
-    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 7000).unwrap();
+
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[initial_balance.clone()],
+        &[Coin::new(3000 as u128, USDC)],
     )
     .unwrap();
 
-    let withdrawal_amount = Uint128::new(500);
+    let withdrawal_amount = Uint128::new(1000);
+
     app.execute_contract(
-        user.clone(),
+        Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::RequestWithdrawal {
             amount: withdrawal_amount,
@@ -348,27 +367,34 @@ fn test_process_withdrawal_success() {                                      // O
     )
     .unwrap();
 
-    let user_balance = app.wrap().query_balance(&user, USDC).unwrap().amount;
-    assert_eq!(user_balance, withdrawal_amount);
+    let user_balance = app
+        .wrap()
+        .query_balance(&Addr::unchecked(USER), USDC)
+        .unwrap()
+        .amount;
 
-    let pending: Uint128 = app
+    assert_eq!(user_balance, Uint128::new(5000));
+
+    let pending: PendingWithdrawalResponse = app
         .wrap()
         .query_wasm_smart(
             &vault_addr,
             &QueryMsg::GetPendingWithdrawal {
-                user: user.to_string(),
+                user: USER.to_string(),
             },
         )
         .unwrap();
-    assert_eq!(pending, Uint128::zero());
+    assert_eq!(pending.amount, Uint128::zero());
 }
 
 #[test]
-fn test_process_multiple_withdrawals() {                                // Overflow: Cannot Sub with given operands on 381
+fn test_process_multiple_withdrawals() {
     let initial_balance = Coin::new(2000 as u128, USDC);
     let (mut app, vault_addr) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
+    init_user_balance(&mut app, USER, 7000).unwrap();
+    init_user_balance(&mut app, USER1, 2500).unwrap();
     let user = Addr::unchecked(USER);
     let user1 = Addr::unchecked(USER1);
 
@@ -376,14 +402,15 @@ fn test_process_multiple_withdrawals() {                                // Overf
         user.clone(),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(1000 as u128, USDC)],
+        &[Coin::new(4000 as u128, USDC)],
     )
     .unwrap();
+
     app.execute_contract(
         user1.clone(),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(1000 as u128, USDC)],
+        &[Coin::new(2000 as u128, USDC)],
     )
     .unwrap();
 
@@ -391,11 +418,12 @@ fn test_process_multiple_withdrawals() {                                // Overf
         user.clone(),
         vault_addr.clone(),
         &ExecuteMsg::RequestWithdrawal {
-            amount: Uint128::new(500),
+            amount: Uint128::new(1500),
         },
         &[],
     )
     .unwrap();
+
     app.execute_contract(
         user1.clone(),
         vault_addr.clone(),
@@ -416,12 +444,14 @@ fn test_process_multiple_withdrawals() {                                // Overf
 
     let user1_balance = app.wrap().query_balance(&user, USDC).unwrap().amount;
     let user2_balance = app.wrap().query_balance(&user1, USDC).unwrap().amount;
-    assert_eq!(user1_balance, Uint128::new(500));
-    assert_eq!(user2_balance, Uint128::new(500));
+
+    assert_eq!(user1_balance, Uint128::new(4500));
+    assert_eq!(user2_balance, Uint128::new(1000));
 }
 
 #[test]
-fn test_redistribute_funds_success() {                              // Error getting market_lp
+fn test_redistribute_funds_success() {
+    // Error getting market_lp line 479
     let initial_balance = Coin::new(2000 as u128, USDC);
     let (mut app, vault_addr, market_addr) =
         setup_standard_vault(Some(initial_balance.clone())).unwrap();
@@ -436,13 +466,13 @@ fn test_redistribute_funds_success() {                              // Error get
     )
     .unwrap();
 
-    let market_lp = app
+    let market_lp: LpToken = app
         .wrap()
         .query_wasm_smart(&market_addr, &MarketQueryMsg::Status { price: None })
         .map(|resp: StatusResp| resp.liquidity.total_lp)
         .unwrap();
 
-    let market_lp = Uint128::from(market_lp.into_u128().unwrap());
+    let market_lp: Uint128 = Uint128::from(market_lp.into_u128().unwrap());
 
     assert!(market_lp > Uint128::zero());
 }
@@ -464,8 +494,7 @@ fn test_redistribute_funds_unauthorized() {
 
 #[test]
 fn test_collect_yield_success() {
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -477,10 +506,10 @@ fn test_collect_yield_success() {
 }
 
 #[test]
-fn test_withdraw_from_market_success() {                            // Error does not find the market
+fn test_withdraw_from_market_success() {
+    // Error line 539 does not find the market key
     let initial_balance = Coin::new(10000 as u128, USDC);
-    let (mut app, vault_addr, market_addr) =
-        setup_standard_vault(Some(initial_balance)).unwrap();
+    let (mut app, vault_addr, market_addr) = setup_standard_vault(Some(initial_balance)).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -516,9 +545,8 @@ fn test_withdraw_from_market_success() {                            // Error doe
 }
 
 #[test]
-fn test_emergency_pause_success() {                         // Overflow error, should be contract paused error
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], None).unwrap();
+fn test_emergency_pause_success() {
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -532,21 +560,23 @@ fn test_emergency_pause_success() {                         // Overflow error, s
         .wrap()
         .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
         .unwrap();
+
     assert!(config.paused);
+
+    init_user_balance(&mut app, USER, 3420).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(500 as u128, USDC)],
+        &[Coin::new(250 as u128, USDC)],
     );
     assert!(result.is_err());
 }
 
 #[test]
-fn test_resume_operations_success() {                      // Overflow error after resume operations
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], None).unwrap();
+fn test_resume_operations_success() {
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -578,6 +608,8 @@ fn test_resume_operations_success() {                      // Overflow error aft
 
     assert!(!config.paused);
 
+    init_user_balance(&mut app, USER, 1540).unwrap();
+
     app.execute_contract(
         Addr::unchecked(USER),
         vault_addr,
@@ -588,9 +620,8 @@ fn test_resume_operations_success() {                      // Overflow error aft
 }
 
 #[test]
-fn test_update_allocations_success() {                      // Error Numb Allocations != Numb of Markets
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], None).unwrap();
+fn test_update_allocations_success() {
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -606,13 +637,13 @@ fn test_update_allocations_success() {                      // Error Numb Alloca
         .wrap()
         .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
         .unwrap();
+
     assert_eq!(config.markets_allocation_bps, vec![6000, 4000]);
 }
 
 #[test]
 fn test_update_allocations_invalid_count() {
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -627,8 +658,7 @@ fn test_update_allocations_invalid_count() {
 
 #[test]
 fn test_instantiate_success() {
-    let (app, vault_addr) =
-        setup_vault_contract(vec![5000, 3000, 2000], None).unwrap();
+    let (app, vault_addr) = setup_vault_contract(vec![5000, 3000, 2000], None).unwrap();
 
     let config: Config = app
         .wrap()
@@ -675,8 +705,7 @@ fn test_withdraw_from_market_insufficient_allocation() {
 
 #[test]
 fn test_redistribute_funds_no_excess() {
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),

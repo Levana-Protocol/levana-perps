@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppBuilder, ContractWrapper, Executor};
 use cw_storage_plus::Map;
-use perpswap::contracts::vault::InstantiateMsg;
+use perpswap::contracts::vault::{ExecuteMsg, InstantiateMsg};
 use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
 use vault;
@@ -15,10 +15,30 @@ pub const USER1: &str = "cosmwasm1vqjarrly327529599rcc4qhzvhwe34pp5uyy4gylvxe5zu
 pub const USDC: &str = "usdc";
 
 pub fn setup_standard_vault(initial_balance: Option<Coin>) -> Result<(App, Addr, Addr)> {
-    let (mut app, vault_addr) =
-        setup_vault_contract(vec![5000, 5000], initial_balance)?;
+    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], initial_balance)?;
     let market_addr = setup_market_contract(&mut app)?;
+
+    app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::AddMarket {
+            market: market_addr.to_string(),
+        },
+        &[],
+    )
+    .unwrap();
+
     Ok((app, vault_addr, market_addr))
+}
+
+pub fn init_user_balance(app: &mut App, user: &str, amount: u128) -> Result<()> {
+    let coin = Coin::new(amount, USDC);
+    app.init_modules(|router, _, store| {
+        router
+            .bank
+            .init_balance(store, &Addr::unchecked(user), vec![coin.clone()])
+    })?;
+    Ok(())
 }
 
 pub fn setup_vault_contract(
@@ -35,7 +55,7 @@ pub fn setup_vault_contract(
                     .init_balance(store, &Addr::unchecked(GOVERNANCE), vec![coin.clone()])
             })?;
             &[coin].to_vec()
-        },
+        }
         None => &vec![],
     };
 
@@ -45,7 +65,7 @@ pub fn setup_vault_contract(
     let instantiate_msg = InstantiateMsg {
         usdc_denom: USDC.to_owned(),
         governance: GOVERNANCE.to_string(),
-        markets_allocation_bps,
+        markets_allocation_bps: markets_allocation_bps.clone(),
     };
 
     let contract_addr = app.instantiate_contract(
@@ -56,6 +76,20 @@ pub fn setup_vault_contract(
         "Vault",
         Some(GOVERNANCE.to_string()),
     )?;
+
+    for _ in markets_allocation_bps {
+        let market = setup_market_contract(&mut app).unwrap();
+
+        app.execute_contract(
+            Addr::unchecked(GOVERNANCE),
+            contract_addr.clone(),
+            &ExecuteMsg::AddMarket {
+                market: market.to_string(),
+            },
+            &[],
+        )
+        .unwrap();
+    }
 
     Ok((app, contract_addr))
 }
@@ -93,7 +127,7 @@ pub fn setup_market_contract(app: &mut App) -> Result<Addr> {
                         total_xlp,
                     },
                     collateral: Token::Native {
-                        denom: "usdc".to_string(),
+                        denom: USDC.to_string(),
                         decimal_places: 6,
                     },
                 })?)
@@ -113,7 +147,7 @@ pub fn setup_market_contract(app: &mut App) -> Result<Addr> {
                 let amount = info
                     .funds
                     .iter()
-                    .find(|&c| c.denom == "usdc")
+                    .find(|&c| c.denom == USDC)
                     .map(|c| c.amount)
                     .unwrap_or(Uint128::zero());
 
