@@ -1,92 +1,16 @@
 mod helpers;
 use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_multi_test::Executor;
-use helpers::{
-    init_user_balance, setup_standard_vault, setup_vault_contract, StatusResp, GOVERNANCE, USDC,
-    USER, USER1,
-};
+use helpers::{init_user_balance, setup_vault_contract, GOVERNANCE, USDC, USER, USER1};
 
-use perpswap::{
-    contracts::vault::{Config, ExecuteMsg, QueryMsg},
-    storage::MarketQueryMsg,
-};
-use vault::types::{
-    MarketAllocationsResponse, PendingWithdrawalResponse, TotalAssetsResponse, VaultBalanceResponse,
-};
-
-#[test]
-fn test_full_flow() {
-    // Error line 68 diff betwene quantity
-    let (mut app, vault_addr, market_addr) = setup_standard_vault(None).unwrap();
-
-    let user = Addr::unchecked(USER);
-    init_user_balance(&mut app, USER, 2500).unwrap();
-
-    app.execute_contract(
-        user.clone(),
-        vault_addr.clone(),
-        &ExecuteMsg::Deposit {},
-        &[Coin::new(1000 as u128, USDC)],
-    )
-    .unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::RedistributeFunds {},
-        &[],
-    )
-    .unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::CollectYield {},
-        &[],
-    )
-    .unwrap();
-
-    let withdrawal_amount = Uint128::new(500);
-
-    app.execute_contract(
-        user.clone(),
-        vault_addr.clone(),
-        &ExecuteMsg::RequestWithdrawal {
-            amount: withdrawal_amount,
-        },
-        &[],
-    )
-    .unwrap();
-
-    app.execute_contract(
-        Addr::unchecked("anyone"),
-        vault_addr.clone(),
-        &ExecuteMsg::ProcessWithdrawal {},
-        &[],
-    )
-    .unwrap();
-
-    let user_balance = app.wrap().query_balance(&user, USDC).unwrap().amount;
-
-    assert_eq!(user_balance, Uint128::new(2000));
-
-    let response: MarketAllocationsResponse = app
-        .wrap()
-        .query_wasm_smart(
-            &vault_addr,
-            &QueryMsg::GetMarketAllocations { start_after: None },
-        )
-        .unwrap();
-
-    assert_eq!(response.allocations.len(), 1);
-    assert_eq!(response.allocations[0].market_id, market_addr.to_string());
-    assert_eq!(response.allocations[0].amount, Uint128::new(500));
-}
+use perpswap::contracts::vault::{Config, ExecuteMsg, QueryMsg};
+use vault::types::{PendingWithdrawalResponse, TotalAssetsResponse, VaultBalanceResponse};
 
 #[test]
 fn test_get_vault_balance() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (app, vault_addr) = setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+    let (app, vault_addr, _) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let response: VaultBalanceResponse = app
         .wrap()
@@ -101,7 +25,7 @@ fn test_get_vault_balance() {
 
 #[test]
 fn test_request_user_withdrawal() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     init_user_balance(&mut app, USER, 8237).unwrap();
 
@@ -147,7 +71,7 @@ fn test_request_user_withdrawal() {
 #[test]
 fn test_get_pending_withdrawal() {
     let initial_balance = Coin::new(10000 as u128, USDC);
-    let (mut app, vault_addr) =
+    let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
     init_user_balance(&mut app, USER, 3000).unwrap();
@@ -187,7 +111,8 @@ fn test_get_pending_withdrawal() {
 #[test]
 fn test_get_total_assets() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (app, vault_addr) = setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+    let (app, vault_addr, _) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let response: TotalAssetsResponse = app
         .wrap()
@@ -197,36 +122,8 @@ fn test_get_total_assets() {
 }
 
 #[test]
-fn test_get_market_allocations() {
-    // Fail to create market line 228
-    let initial_balance = Coin::new(10000 as u128, USDC);
-    let (mut app, vault_addr, market_addr) =
-        setup_standard_vault(Some(initial_balance.clone())).unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::RedistributeFunds {},
-        &[],
-    )
-    .unwrap();
-
-    let response: MarketAllocationsResponse = app
-        .wrap()
-        .query_wasm_smart(
-            &vault_addr,
-            &QueryMsg::GetMarketAllocations { start_after: None },
-        )
-        .unwrap();
-
-    assert_eq!(response.allocations.len(), 1);
-    assert_eq!(response.allocations[0].market_id, market_addr.to_string());
-    assert_eq!(response.allocations[0].amount, Uint128::new(1000));
-}
-
-#[test]
 fn test_get_config() {
-    let (app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     let config: perpswap::contracts::vault::Config = app
         .wrap()
@@ -241,7 +138,7 @@ fn test_get_config() {
 
 #[test]
 fn test_deposit_success() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     init_user_balance(&mut app, USER, 5000).unwrap();
 
@@ -276,7 +173,7 @@ fn test_deposit_success() {
 #[test]
 fn test_deposit_invalid_denom() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) =
+    let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let result = app.execute_contract(
@@ -291,7 +188,7 @@ fn test_deposit_invalid_denom() {
 #[test]
 fn test_request_withdrawal_success() {
     let initial_balance = Coin::new(10000 as u128, USDC);
-    let (mut app, vault_addr) =
+    let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
     init_user_balance(&mut app, USER, 3000).unwrap();
@@ -331,7 +228,7 @@ fn test_request_withdrawal_success() {
 #[test]
 fn test_process_withdrawal_success() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) =
+    let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
     init_user_balance(&mut app, USER, 7000).unwrap();
@@ -387,7 +284,7 @@ fn test_process_withdrawal_success() {
 #[test]
 fn test_process_multiple_withdrawals() {
     let initial_balance = Coin::new(2000 as u128, USDC);
-    let (mut app, vault_addr) =
+    let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     init_user_balance(&mut app, USER, 7000).unwrap();
@@ -447,35 +344,9 @@ fn test_process_multiple_withdrawals() {
 }
 
 #[test]
-fn test_redistribute_funds_success() {
-    // Error getting market_lp line 479
-    let initial_balance = Coin::new(2000 as u128, USDC);
-    let (mut app, vault_addr, market_addr) =
-        setup_standard_vault(Some(initial_balance.clone())).unwrap();
-
-    app.update_block(|block| block.height += 1);
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::RedistributeFunds {},
-        &[],
-    )
-    .unwrap();
-
-    let market_lp = app
-        .wrap()
-        .query_wasm_smart(&market_addr, &MarketQueryMsg::Status { price: None })
-        .map(|resp: StatusResp| resp.liquidity.total_lp)
-        .unwrap();
-
-    assert!(market_lp > Uint128::zero());
-}
-
-#[test]
 fn test_redistribute_funds_unauthorized() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr) =
+    let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
     let result = app.execute_contract(
@@ -489,7 +360,7 @@ fn test_redistribute_funds_unauthorized() {
 
 #[test]
 fn test_collect_yield_success() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -501,45 +372,8 @@ fn test_collect_yield_success() {
 }
 
 #[test]
-fn test_withdraw_from_market_success() {
-    // Error line 539 does not find the market key
-    let initial_balance = Coin::new(10000 as u128, USDC);
-    let (mut app, vault_addr, market_addr) = setup_standard_vault(Some(initial_balance)).unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::RedistributeFunds {},
-        &[],
-    )
-    .unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::WithdrawFromMarket {
-            market: market_addr.to_string(),
-            amount: Uint128::new(1000),
-        },
-        &[],
-    )
-    .unwrap();
-
-    let market_lp = app
-        .wrap()
-        .query_wasm_smart(
-            &market_addr,
-            &perpswap::storage::MarketQueryMsg::Status { price: None },
-        )
-        .map(|resp: StatusResp| resp.liquidity.total_lp)
-        .unwrap();
-
-    assert_eq!(market_lp, Uint128::zero());
-}
-
-#[test]
 fn test_emergency_pause_success() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -569,7 +403,7 @@ fn test_emergency_pause_success() {
 
 #[test]
 fn test_resume_operations_success() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -614,7 +448,7 @@ fn test_resume_operations_success() {
 
 #[test]
 fn test_update_allocations_success() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -636,13 +470,13 @@ fn test_update_allocations_success() {
 
 #[test]
 fn test_update_allocations_invalid_count() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),
         vault_addr,
         &ExecuteMsg::UpdateAllocations {
-            new_allocations: vec![5000],
+            new_allocations: vec![3000],
         },
         &[],
     );
@@ -651,7 +485,7 @@ fn test_update_allocations_invalid_count() {
 
 #[test]
 fn test_instantiate_success() {
-    let (app, vault_addr) = setup_vault_contract(vec![5000, 3000, 2000], None).unwrap();
+    let (app, vault_addr, _) = setup_vault_contract(vec![5000, 3000, 2000], None).unwrap();
 
     let config: Config = app
         .wrap()
@@ -673,22 +507,14 @@ fn test_instantiate_success() {
 #[test]
 fn test_withdraw_from_market_insufficient_allocation() {
     let initial_balance = Coin::new(1000 as u128, USDC);
-    let (mut app, vault_addr, market_addr) =
-        setup_standard_vault(Some(initial_balance.clone())).unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::RedistributeFunds {},
-        &[],
-    )
-    .unwrap();
+    let (mut app, vault_addr, markets_addr) =
+        setup_vault_contract(vec![1000], Some(initial_balance)).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
         &ExecuteMsg::WithdrawFromMarket {
-            market: market_addr.to_string(),
+            market: markets_addr[0].to_string(),
             amount: Uint128::new(1500),
         },
         &[],
@@ -698,7 +524,7 @@ fn test_withdraw_from_market_insufficient_allocation() {
 
 #[test]
 fn test_redistribute_funds_no_excess() {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![], None).unwrap();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),

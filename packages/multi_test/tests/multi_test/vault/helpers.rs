@@ -26,21 +26,30 @@ pub struct Liquidity {
     pub total_xlp: Uint128,
 }
 
-pub fn setup_standard_vault(initial_balance: Option<Coin>) -> Result<(App, Addr, Addr)> {
-    let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], initial_balance)?;
-    let market_addr = setup_market_contract(&mut app)?;
+fn init_markets(
+    app: &mut App,
+    contract_addr: Addr,
+    markets_allocation_bps: Vec<u16>,
+) -> Result<Vec<Addr>> {
+    let mut markets: Vec<Addr> = Vec::new();
 
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::AddMarket {
-            market: market_addr.to_string(),
-        },
-        &[],
-    )
-    .unwrap();
+    for _ in markets_allocation_bps {
+        let market = setup_market_contract(app).unwrap();
 
-    Ok((app, vault_addr, market_addr))
+        app.execute_contract(
+            Addr::unchecked(GOVERNANCE),
+            contract_addr.clone(),
+            &ExecuteMsg::AddMarket {
+                market: market.to_string(),
+            },
+            &[],
+        )
+        .unwrap();
+
+        markets.push(market);
+    }
+
+    Ok(markets)
 }
 
 pub fn init_user_balance(app: &mut App, user: &str, amount: u128) -> Result<()> {
@@ -56,7 +65,7 @@ pub fn init_user_balance(app: &mut App, user: &str, amount: u128) -> Result<()> 
 pub fn setup_vault_contract(
     markets_allocation_bps: Vec<u16>,
     initial_balance: Option<Coin>,
-) -> Result<(App, Addr)> {
+) -> Result<(App, Addr, Vec<Addr>)> {
     let mut app = AppBuilder::new().build(|_, _, _| {});
 
     let funds = match initial_balance.clone() {
@@ -89,21 +98,9 @@ pub fn setup_vault_contract(
         Some(GOVERNANCE.to_string()),
     )?;
 
-    for _ in markets_allocation_bps {
-        let market = setup_market_contract(&mut app).unwrap();
+    let markets: Vec<Addr> = init_markets(&mut app, contract_addr.clone(), markets_allocation_bps)?;
 
-        app.execute_contract(
-            Addr::unchecked(GOVERNANCE),
-            contract_addr.clone(),
-            &ExecuteMsg::AddMarket {
-                market: market.to_string(),
-            },
-            &[],
-        )
-        .unwrap();
-    }
-
-    Ok((app, contract_addr))
+    Ok((app, contract_addr, markets))
 }
 
 pub fn setup_market_contract(app: &mut App) -> Result<Addr> {
