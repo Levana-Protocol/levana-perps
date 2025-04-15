@@ -2,15 +2,12 @@ mod helpers;
 use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_multi_test::Executor;
 use helpers::{
-    init_user_balance, setup_standard_vault, setup_vault_contract, GOVERNANCE, USDC, USER, USER1,
+    init_user_balance, setup_standard_vault, setup_vault_contract, StatusResp, GOVERNANCE, USDC,
+    USER, USER1,
 };
 
 use perpswap::{
-    contracts::{
-        market::entry::StatusResp,
-        vault::{Config, ExecuteMsg, QueryMsg},
-    },
-    number::LpToken,
+    contracts::vault::{Config, ExecuteMsg, QueryMsg},
     storage::MarketQueryMsg,
 };
 use vault::types::{
@@ -466,13 +463,11 @@ fn test_redistribute_funds_success() {
     )
     .unwrap();
 
-    let market_lp: LpToken = app
+    let market_lp = app
         .wrap()
         .query_wasm_smart(&market_addr, &MarketQueryMsg::Status { price: None })
         .map(|resp: StatusResp| resp.liquidity.total_lp)
         .unwrap();
-
-    let market_lp: Uint128 = Uint128::from(market_lp.into_u128().unwrap());
 
     assert!(market_lp > Uint128::zero());
 }
@@ -536,10 +531,8 @@ fn test_withdraw_from_market_success() {
             &market_addr,
             &perpswap::storage::MarketQueryMsg::Status { price: None },
         )
-        .map(|resp: perpswap::contracts::market::entry::StatusResp| resp.liquidity.total_lp)
+        .map(|resp: StatusResp| resp.liquidity.total_lp)
         .unwrap();
-
-    let market_lp = Uint128::from(market_lp.into_u128().unwrap());
 
     assert_eq!(market_lp, Uint128::zero());
 }

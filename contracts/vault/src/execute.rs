@@ -2,7 +2,6 @@ use perpswap::{
     contracts::{market::entry::StatusResp, vault::ExecuteMsg},
     number::{LpToken, NonZero},
     storage::{MarketExecuteMsg, MarketQueryMsg},
-    token::Token,
 };
 
 use crate::{
@@ -150,30 +149,11 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
 
     let markets: Vec<String> = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
-        .filter_map(|market_id_res| {
-            let market_id = market_id_res.ok()?;
-            let resp: StatusResp = deps
-                .querier
-                .query(&QueryRequest::Wasm(WasmQuery::Smart {
-                    contract_addr: market_id.clone(),
-                    msg: to_json_binary(&MarketQueryMsg::Status { price: None }).ok()?,
-                }))
-                .ok()?;
-            if let Token::Native { denom, .. } = &resp.collateral {
-                if denom == &config.usdc_denom {
-                    Some(Ok(market_id))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
         .collect::<StdResult<Vec<String>>>()?;
 
     let mut utilizations: Vec<(String, Uint128)> = markets
         .into_iter()
-        .filter_map(|market| {
+        .map(|market| {
             let resp: StatusResp = deps
                 .querier
                 .query(&QueryRequest::Wasm(WasmQuery::Smart {
@@ -181,13 +161,13 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
                     msg: to_json_binary(&MarketQueryMsg::Status { price: None })
                         .expect("Serialize Market Query Msg"),
                 }))
-                .ok()?;
+                .unwrap();
 
             let utilization =
                 (resp.liquidity.total_lp + resp.liquidity.total_xlp).unwrap_or_default();
 
             let value = Uint128::from(utilization.into_u128().expect("Error LpToken to Uint128"));
-            Some((market, value))
+            (market, value)
         })
         .collect();
 
@@ -258,39 +238,17 @@ fn execute_collect_yield(deps: DepsMut, info: MessageInfo) -> Result<Response> {
 
     let markets: Vec<String> = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
-        .filter_map(|market_id_res| {
-            let market_id = market_id_res.ok()?;
-
-            let resp: StatusResp = deps
-                .querier
-                .query(&QueryRequest::Wasm(WasmQuery::Smart {
-                    contract_addr: market_id.clone(),
-                    msg: to_json_binary(&MarketQueryMsg::Status { price: None }).ok()?,
-                }))
-                .ok()?;
-            if let Token::Native { denom, .. } = &resp.collateral {
-                if denom == &config.usdc_denom {
-                    Some(Ok(market_id))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect::<Result<Vec<String>>>()?;
+        .collect::<StdResult<Vec<String>>>()?;
 
     let messages: Vec<CosmosMsg> = markets
         .iter()
-        .filter_map(|market| {
-            Some(
-                WasmMsg::Execute {
-                    contract_addr: market.to_string(),
-                    msg: to_json_binary(&MarketExecuteMsg::ClaimYield {}).ok()?,
-                    funds: vec![],
-                }
-                .into(),
-            )
+        .map(|market| {
+            WasmMsg::Execute {
+                contract_addr: market.to_string(),
+                msg: to_json_binary(&MarketExecuteMsg::ClaimYield {}).unwrap(),
+                funds: vec![],
+            }
+            .into()
         })
         .collect();
 

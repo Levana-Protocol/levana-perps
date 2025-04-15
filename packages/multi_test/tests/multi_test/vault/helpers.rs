@@ -14,6 +14,18 @@ pub const USER: &str = "cosmwasm1qnufjmd8vwm6j6d3q28wxqr4d8408f34fpka4vs365fvsku
 pub const USER1: &str = "cosmwasm1vqjarrly327529599rcc4qhzvhwe34pp5uyy4gylvxe5zupeqx3sg08lap";
 pub const USDC: &str = "usdc";
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct StatusResp {
+    pub liquidity: Liquidity,
+    pub collateral: Token,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Liquidity {
+    pub total_lp: Uint128,
+    pub total_xlp: Uint128,
+}
+
 pub fn setup_standard_vault(initial_balance: Option<Coin>) -> Result<(App, Addr, Addr)> {
     let (mut app, vault_addr) = setup_vault_contract(vec![5000, 5000], initial_balance)?;
     let market_addr = setup_market_contract(&mut app)?;
@@ -97,18 +109,6 @@ pub fn setup_vault_contract(
 pub fn setup_market_contract(app: &mut App) -> Result<Addr> {
     static MOCK_MARKET_LP: Map<&Addr, Uint128> = Map::new("lp_balances");
     static MOCK_MARKET_XLP: Map<&Addr, Uint128> = Map::new("xlp_balances");
-
-    #[derive(serde::Serialize, serde::Deserialize)]
-    struct StatusResp {
-        liquidity: Liquidity,
-        collateral: Token,
-    }
-
-    #[derive(serde::Serialize, serde::Deserialize)]
-    struct Liquidity {
-        total_lp: Uint128,
-        total_xlp: Uint128,
-    }
 
     fn query(deps: Deps, _env: Env, msg: MarketQueryMsg) -> Result<Binary> {
         match msg {
