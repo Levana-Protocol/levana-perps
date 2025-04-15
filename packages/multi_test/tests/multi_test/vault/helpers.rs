@@ -7,7 +7,6 @@ use cw_storage_plus::Map;
 use perpswap::contracts::vault::{ExecuteMsg, InstantiateMsg};
 use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
-use vault;
 
 pub const GOVERNANCE: &str = "cosmwasm1h72z9g4qf2kjrq866zgn78xl32wn0q8aqayp05jkjpgdp2qft5aquanhrh";
 pub const USER: &str = "cosmwasm1qnufjmd8vwm6j6d3q28wxqr4d8408f34fpka4vs365fvskualrasv5ues5";

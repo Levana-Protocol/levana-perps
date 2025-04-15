@@ -8,7 +8,7 @@ use vault::types::{PendingWithdrawalResponse, TotalAssetsResponse, VaultBalanceR
 
 #[test]
 fn test_get_vault_balance() {
-    let initial_balance = Coin::new(1000 as u128, USDC);
+    let initial_balance = Coin::new(1000_u128, USDC);
     let (app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
@@ -33,7 +33,7 @@ fn test_request_user_withdrawal() {
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(500 as u128, USDC)],
+        &[Coin::new(500_u128, USDC)],
     )
     .unwrap();
 
@@ -70,7 +70,7 @@ fn test_request_user_withdrawal() {
 
 #[test]
 fn test_get_pending_withdrawal() {
-    let initial_balance = Coin::new(10000 as u128, USDC);
+    let initial_balance = Coin::new(10000_u128, USDC);
     let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
@@ -80,7 +80,7 @@ fn test_get_pending_withdrawal() {
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(1000 as u128, USDC)],
+        &[Coin::new(1000_u128, USDC)],
     )
     .unwrap();
 
@@ -110,7 +110,7 @@ fn test_get_pending_withdrawal() {
 
 #[test]
 fn test_get_total_assets() {
-    let initial_balance = Coin::new(1000 as u128, USDC);
+    let initial_balance = Coin::new(1000_u128, USDC);
     let (app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
@@ -133,7 +133,7 @@ fn test_get_config() {
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, USDC);
     assert_eq!(config.markets_allocation_bps, vec![5000, 5000]);
-    assert_eq!(config.paused, false);
+    assert!(!config.paused);
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn test_deposit_success() {
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(500 as u128, USDC)],
+        &[Coin::new(500_u128, USDC)],
     )
     .unwrap();
 
@@ -172,7 +172,7 @@ fn test_deposit_success() {
 
 #[test]
 fn test_deposit_invalid_denom() {
-    let initial_balance = Coin::new(1000 as u128, USDC);
+    let initial_balance = Coin::new(1000_u128, USDC);
     let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
@@ -180,14 +180,14 @@ fn test_deposit_invalid_denom() {
         Addr::unchecked(USER),
         vault_addr,
         &ExecuteMsg::Deposit {},
-        &[Coin::new(500 as u128, "uluna")],
+        &[Coin::new(500_u128, "uluna")],
     );
     assert!(result.is_err());
 }
 
 #[test]
 fn test_request_withdrawal_success() {
-    let initial_balance = Coin::new(10000 as u128, USDC);
+    let initial_balance = Coin::new(10000_u128, USDC);
     let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
@@ -197,7 +197,7 @@ fn test_request_withdrawal_success() {
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(500 as u128, USDC)],
+        &[Coin::new(500_u128, USDC)],
     )
     .unwrap();
 
@@ -227,7 +227,7 @@ fn test_request_withdrawal_success() {
 
 #[test]
 fn test_process_withdrawal_success() {
-    let initial_balance = Coin::new(1000 as u128, USDC);
+    let initial_balance = Coin::new(1000_u128, USDC);
     let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
 
@@ -237,7 +237,7 @@ fn test_process_withdrawal_success() {
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(3000 as u128, USDC)],
+        &[Coin::new(3000_u128, USDC)],
     )
     .unwrap();
 
@@ -263,7 +263,7 @@ fn test_process_withdrawal_success() {
 
     let user_balance = app
         .wrap()
-        .query_balance(&Addr::unchecked(USER), USDC)
+        .query_balance(Addr::unchecked(USER), USDC)
         .unwrap()
         .amount;
 
@@ -283,7 +283,7 @@ fn test_process_withdrawal_success() {
 
 #[test]
 fn test_process_multiple_withdrawals() {
-    let initial_balance = Coin::new(2000 as u128, USDC);
+    let initial_balance = Coin::new(2000_u128, USDC);
     let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
@@ -296,7 +296,7 @@ fn test_process_multiple_withdrawals() {
         user.clone(),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(4000 as u128, USDC)],
+        &[Coin::new(4000_u128, USDC)],
     )
     .unwrap();
 
@@ -304,7 +304,7 @@ fn test_process_multiple_withdrawals() {
         user1.clone(),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(2000 as u128, USDC)],
+        &[Coin::new(2000_u128, USDC)],
     )
     .unwrap();
 
@@ -345,7 +345,7 @@ fn test_process_multiple_withdrawals() {
 
 #[test]
 fn test_redistribute_funds_unauthorized() {
-    let initial_balance = Coin::new(1000 as u128, USDC);
+    let initial_balance = Coin::new(1000_u128, USDC);
     let (mut app, vault_addr, _) =
         setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
 
@@ -396,7 +396,7 @@ fn test_emergency_pause_success() {
         Addr::unchecked(USER),
         vault_addr.clone(),
         &ExecuteMsg::Deposit {},
-        &[Coin::new(250 as u128, USDC)],
+        &[Coin::new(250_u128, USDC)],
     );
     assert!(result.is_err());
 }
@@ -441,7 +441,7 @@ fn test_resume_operations_success() {
         Addr::unchecked(USER),
         vault_addr,
         &ExecuteMsg::Deposit {},
-        &[Coin::new(500 as u128, USDC)],
+        &[Coin::new(500_u128, USDC)],
     )
     .unwrap();
 }
@@ -495,7 +495,7 @@ fn test_instantiate_success() {
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, USDC);
     assert_eq!(config.markets_allocation_bps, vec![5000, 3000, 2000]);
-    assert_eq!(config.paused, false);
+    assert!(!config.paused);
 
     let total_assets: TotalAssetsResponse = app
         .wrap()
@@ -506,7 +506,7 @@ fn test_instantiate_success() {
 
 #[test]
 fn test_withdraw_from_market_insufficient_allocation() {
-    let initial_balance = Coin::new(1000 as u128, USDC);
+    let initial_balance = Coin::new(1000_u128, USDC);
     let (mut app, vault_addr, markets_addr) =
         setup_vault_contract(vec![1000], Some(initial_balance)).unwrap();
 
