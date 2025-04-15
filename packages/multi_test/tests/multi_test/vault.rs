@@ -1,5 +1,5 @@
 mod helpers;
-use cosmwasm_std::{Addr, Coin, Uint128};
+use cosmwasm_std::{Addr, Attribute, Coin, Uint128};
 use cw_multi_test::Executor;
 use helpers::{init_user_balance, setup_vault_contract, GOVERNANCE, USDC, USER, USER1};
 
@@ -138,7 +138,7 @@ fn test_get_config() {
 
 #[test]
 fn test_deposit_success() {
-    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![], None).unwrap();
 
     init_user_balance(&mut app, USER, 5000).unwrap();
 
@@ -149,6 +149,13 @@ fn test_deposit_success() {
         &[Coin::new(500_u128, USDC)],
     )
     .unwrap();
+
+    let vault_balance: VaultBalanceResponse = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetVaultBalance {})
+        .unwrap();
+
+    assert_eq!(vault_balance.vault_balance, Uint128::new(500));
 
     let lp_balance: PendingWithdrawalResponse = app
         .wrap()
@@ -360,15 +367,47 @@ fn test_redistribute_funds_unauthorized() {
 
 #[test]
 fn test_collect_yield_success() {
-    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, markets_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
 
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::CollectYield {},
-        &[],
-    )
-    .unwrap();
+    let response = app
+        .execute_contract(
+            Addr::unchecked(GOVERNANCE),
+            vault_addr.clone(),
+            &ExecuteMsg::CollectYield {},
+            &[],
+        )
+        .unwrap();
+
+    let wasm_event = response
+        .events
+        .iter()
+        .find(|e| {
+            e.ty == "wasm"
+                && e.attributes
+                    .iter()
+                    .any(|attr| attr.key == "action" && attr.value == "collect_yield")
+        })
+        .expect("WASM event not found");
+
+    println!("{:?}", wasm_event);
+
+    assert_eq!(
+        wasm_event
+            .attributes
+            .iter()
+            .filter(|attr| attr.key != "_contract_address")
+            .collect::<Vec<_>>(),
+        vec![
+            Attribute {
+                key: "action".to_string(),
+                value: "collect_yield".to_string()
+            },
+            Attribute {
+                key: "markets_processed".to_string(),
+                value: markets_addr.len().to_string()
+            },
+        ]
+    );
 }
 
 #[test]
