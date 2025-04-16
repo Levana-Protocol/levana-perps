@@ -20,7 +20,7 @@ pub fn instantiate(
     let governance = deps.api.addr_validate(&msg.governance)?;
 
     // Ensure the sum of allocation percentages does not exceed 100% (10,000 bps)
-    let total_bps: u16 = msg.markets_allocation_bps.iter().sum();
+    let total_bps: u16 = msg.markets_allocation_bps.values().sum();
     if total_bps > 10_000 {
         return Err(anyhow!("Yield allocation exceeds 100%"));
     }

@@ -1,5 +1,6 @@
 //! Vault contract
 use cosmwasm_std::{Addr, Uint128};
+use std::collections::HashMap;
 
 /// Message to instantiate the contract
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -12,7 +13,7 @@ pub struct InstantiateMsg {
     pub governance: String,
 
     /// Initial allocation percentages to markets
-    pub markets_allocation_bps: Vec<u16>,
+    pub markets_allocation_bps: HashMap<String, u16>,
 }
 
 /// Configuration structure for the vault
@@ -26,7 +27,7 @@ pub struct Config {
     pub governance: Addr,
 
     /// Allocation percentages to markets in basis points (100 bps = 1%)
-    pub markets_allocation_bps: Vec<u16>,
+    pub markets_allocation_bps: HashMap<String, u16>,
 
     /// state::PAUSED
     pub paused: bool,
@@ -71,7 +72,7 @@ pub enum ExecuteMsg {
     /// Update allocation percentages
     UpdateAllocations {
         /// New allocations for Markets
-        new_allocations: Vec<u16>,
+        new_allocations: HashMap<String, u16>,
     },
 
     /// Add a new market to the vault

@@ -7,6 +7,7 @@ use cw_storage_plus::Map;
 use perpswap::contracts::vault::{ExecuteMsg, InstantiateMsg};
 use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
+use std::collections::HashMap;
 
 pub const GOVERNANCE: &str = "cosmwasm1h72z9g4qf2kjrq866zgn78xl32wn0q8aqayp05jkjpgdp2qft5aquanhrh";
 pub const USER: &str = "cosmwasm1qnufjmd8vwm6j6d3q28wxqr4d8408f34fpka4vs365fvskualrasv5ues5";
@@ -25,16 +26,8 @@ pub struct Liquidity {
     pub total_xlp: Uint128,
 }
 
-fn init_markets(
-    app: &mut App,
-    contract_addr: Addr,
-    markets_allocation_bps: Vec<u16>,
-) -> Result<Vec<Addr>> {
-    let mut markets: Vec<Addr> = Vec::new();
-
-    for _ in markets_allocation_bps {
-        let market = setup_market_contract(app).unwrap();
-
+fn init_markets(app: &mut App, contract_addr: Addr, markets_allocation_bps: HashMap<String, u16>) {
+    for market in markets_allocation_bps.keys() {
         app.execute_contract(
             Addr::unchecked(GOVERNANCE),
             contract_addr.clone(),
@@ -44,11 +37,20 @@ fn init_markets(
             &[],
         )
         .unwrap();
-
-        markets.push(market);
     }
+}
 
-    Ok(markets)
+fn build_markets_allocations_bps(
+    app: &mut App,
+    markets_allocation_bps: Vec<u16>,
+) -> Result<HashMap<String, u16>> {
+    markets_allocation_bps
+        .into_iter()
+        .map(|bps| {
+            let market = setup_market_contract(app)?;
+            Ok((market.to_string(), bps))
+        })
+        .collect()
 }
 
 pub fn init_user_balance(app: &mut App, user: &str, amount: u128) -> Result<()> {
@@ -82,6 +84,8 @@ pub fn setup_vault_contract(
     let code = ContractWrapper::new(vault::execute, vault::instantiate, vault::query);
     let code_id = app.store_code(Box::new(code));
 
+    let markets_allocation_bps = build_markets_allocations_bps(&mut app, markets_allocation_bps)?;
+
     let instantiate_msg = InstantiateMsg {
         usdc_denom: USDC.to_owned(),
         governance: GOVERNANCE.to_string(),
@@ -97,9 +101,20 @@ pub fn setup_vault_contract(
         Some(GOVERNANCE.to_string()),
     )?;
 
-    let markets: Vec<Addr> = init_markets(&mut app, contract_addr.clone(), markets_allocation_bps)?;
+    init_markets(
+        &mut app,
+        contract_addr.clone(),
+        markets_allocation_bps.clone(),
+    );
 
-    Ok((app, contract_addr, markets))
+    Ok((
+        app,
+        contract_addr,
+        markets_allocation_bps
+            .keys()
+            .map(|f| Addr::unchecked(f))
+            .collect(),
+    ))
 }
 
 pub fn setup_market_contract(app: &mut App) -> Result<Addr> {

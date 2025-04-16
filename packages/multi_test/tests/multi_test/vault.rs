@@ -2,8 +2,8 @@ mod helpers;
 use cosmwasm_std::{Addr, Attribute, Coin, Uint128};
 use cw_multi_test::Executor;
 use helpers::{init_user_balance, setup_vault_contract, GOVERNANCE, USDC, USER, USER1};
-
 use perpswap::contracts::vault::{Config, ExecuteMsg, QueryMsg};
+use std::collections::HashMap;
 use vault::types::{PendingWithdrawalResponse, TotalAssetsResponse, VaultBalanceResponse};
 
 #[test]
@@ -132,7 +132,14 @@ fn test_get_config() {
 
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, USDC);
-    assert_eq!(config.markets_allocation_bps, vec![5000, 5000]);
+    assert_eq!(
+        config
+            .markets_allocation_bps
+            .values()
+            .copied()
+            .collect::<Vec<u16>>(),
+        vec![5000, 5000]
+    );
     assert!(!config.paused);
 }
 
@@ -487,14 +494,20 @@ fn test_resume_operations_success() {
 
 #[test]
 fn test_update_allocations_success() {
-    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, markets_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+
+    let bps = vec![6000, 4000];
+
+    let new_allocations: HashMap<String, u16> = markets_addr
+        .iter()
+        .map(|a| a.to_string())
+        .zip(bps.into_iter())
+        .collect();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
         vault_addr.clone(),
-        &ExecuteMsg::UpdateAllocations {
-            new_allocations: vec![6000, 4000],
-        },
+        &ExecuteMsg::UpdateAllocations { new_allocations },
         &[],
     )
     .unwrap();
@@ -504,19 +517,33 @@ fn test_update_allocations_success() {
         .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
         .unwrap();
 
-    assert_eq!(config.markets_allocation_bps, vec![6000, 4000]);
+    let mut markets_allocation_bps: Vec<u16> = config
+        .markets_allocation_bps
+        .values()
+        .copied()
+        .collect();
+
+    markets_allocation_bps.sort();
+
+    assert_eq!(markets_allocation_bps,vec![4000, 6000]);
 }
 
 #[test]
 fn test_update_allocations_invalid_count() {
-    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+    let (mut app, vault_addr, markets_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+
+    let bps = vec![6000];
+
+    let new_allocations: HashMap<String, u16> = markets_addr
+        .iter()
+        .map(|a| a.to_string())
+        .zip(bps.into_iter())
+        .collect();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),
         vault_addr,
-        &ExecuteMsg::UpdateAllocations {
-            new_allocations: vec![3000],
-        },
+        &ExecuteMsg::UpdateAllocations { new_allocations },
         &[],
     );
     assert!(result.is_err());
@@ -533,7 +560,16 @@ fn test_instantiate_success() {
 
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, USDC);
-    assert_eq!(config.markets_allocation_bps, vec![5000, 3000, 2000]);
+
+    let mut markets_allocation_bps: Vec<u16> = config
+        .markets_allocation_bps
+        .values()
+        .copied()
+        .collect();
+
+    markets_allocation_bps.sort();
+
+    assert_eq!(markets_allocation_bps, vec![2000, 3000, 5000]);
     assert!(!config.paused);
 
     let total_assets: TotalAssetsResponse = app

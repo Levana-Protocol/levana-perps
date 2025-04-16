@@ -11,6 +11,8 @@ use crate::{
     types::WithdrawalRequest,
 };
 
+use std::collections::HashMap;
+
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     match msg {
@@ -147,33 +149,26 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
         return Err(anyhow!("No excess to redistribute"));
     }
 
-    let markets: Vec<String> = state::MARKET_ALLOCATIONS
+    let utilizations: HashMap<String, Uint128> = state::MARKET_ALLOCATIONS
         .keys(deps.storage, None, None, Order::Ascending)
-        .collect::<StdResult<Vec<String>>>()?;
-
-    let mut utilizations: Vec<(String, Uint128)> = markets
-        .into_iter()
         .map(|market| {
-            let resp: StatusResp = deps
-                .querier
-                .query(&QueryRequest::Wasm(WasmQuery::Smart {
-                    contract_addr: market.clone(),
-                    msg: to_json_binary(&MarketQueryMsg::Status { price: None })
-                        .expect("Serialize Market Query Msg"),
-                }))
-                .unwrap();
+            let market = market?;
+            let resp: StatusResp = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                contract_addr: market.to_string(),
+                msg: to_json_binary(&MarketQueryMsg::Status { price: None })
+                    .expect("Serialize Market Query Msg"),
+            }))?;
 
             let utilization =
                 (resp.liquidity.total_lp + resp.liquidity.total_xlp).unwrap_or_default();
 
-            let value = Uint128::from(utilization.into_u128().expect("Error LpToken to Uint128"));
-            (market, value)
+            let value = Uint128::from(utilization.into_u128()?);
+            Ok((market, value))
         })
-        .collect();
+        .collect::<Result<HashMap<String, Uint128>>>()?;
 
-    utilizations.sort_by(|a, b| b.1.cmp(&a.1));
+    let total_bps: u16 = config.markets_allocation_bps.values().sum();
 
-    let total_bps: u16 = config.markets_allocation_bps.iter().sum();
     if total_bps == 0 {
         return Err(anyhow!("No allocation percentages defined"));
     }
@@ -181,9 +176,9 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut remaining = excess;
 
-    for (i, bps) in config.markets_allocation_bps.iter().enumerate() {
-        if let Some((market, _)) = utilizations.get(i) {
-            let amount = excess.multiply_ratio(*bps as u128, total_bps as u128);
+    for (market, _) in config.markets_allocation_bps.iter() {
+        if let Some(market_utilization) = utilizations.get(market) {
+            let amount = excess.multiply_ratio(*market_utilization, total_bps as u128);
             if !amount.is_zero() {
                 let deposit_msg = WasmMsg::Execute {
                     contract_addr: market.clone(),
@@ -195,6 +190,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
                         amount,
                     }],
                 };
+
                 messages.push(deposit_msg.into());
 
                 state::MARKET_ALLOCATIONS.update(
@@ -397,7 +393,7 @@ fn execute_resume_operations(deps: DepsMut, info: MessageInfo) -> Result<Respons
 fn execute_update_allocations(
     deps: DepsMut,
     info: MessageInfo,
-    new_allocations: Vec<u16>,
+    new_allocations: HashMap<String, u16>,
 ) -> Result<Response> {
     let mut config = state::CONFIG.load(deps.storage)?;
     if info.sender != config.governance {
@@ -416,7 +412,7 @@ fn execute_update_allocations(
         )));
     }
 
-    let total_bps: u16 = new_allocations.iter().sum();
+    let total_bps: u16 = new_allocations.values().sum();
     if total_bps > 10_000 {
         return Err(anyhow!("Market allocation exceeds 100%"));
     }
