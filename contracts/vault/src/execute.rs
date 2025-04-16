@@ -1,7 +1,7 @@
 use perpswap::{
-    contracts::{market::entry::StatusResp, vault::ExecuteMsg},
+    contracts::vault::ExecuteMsg,
     number::{LpToken, NonZero},
-    storage::{MarketExecuteMsg, MarketQueryMsg},
+    storage::MarketExecuteMsg,
 };
 
 use crate::{
@@ -144,31 +144,11 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
         .amount;
 
     let excess = vault_balance.saturating_sub(pending);
-
     if excess.is_zero() {
         return Err(anyhow!("No excess to redistribute"));
     }
 
-    let utilizations: HashMap<String, Uint128> = state::MARKET_ALLOCATIONS
-        .keys(deps.storage, None, None, Order::Ascending)
-        .map(|market| {
-            let market = market?;
-            let resp: StatusResp = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: market.to_string(),
-                msg: to_json_binary(&MarketQueryMsg::Status { price: None })
-                    .expect("Serialize Market Query Msg"),
-            }))?;
-
-            let utilization =
-                (resp.liquidity.total_lp + resp.liquidity.total_xlp).unwrap_or_default();
-
-            let value = Uint128::from(utilization.into_u128()?);
-            Ok((market, value))
-        })
-        .collect::<Result<HashMap<String, Uint128>>>()?;
-
     let total_bps: u16 = config.markets_allocation_bps.values().sum();
-
     if total_bps == 0 {
         return Err(anyhow!("No allocation percentages defined"));
     }
@@ -176,31 +156,29 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut remaining = excess;
 
-    for (market, _) in config.markets_allocation_bps.iter() {
-        if let Some(market_utilization) = utilizations.get(market) {
-            let amount = excess.multiply_ratio(*market_utilization, total_bps as u128);
-            if !amount.is_zero() {
-                let deposit_msg = WasmMsg::Execute {
-                    contract_addr: market.clone(),
-                    msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
-                        stake_to_xlp: false,
-                    })?,
-                    funds: vec![Coin {
-                        denom: config.usdc_denom.clone(),
-                        amount,
-                    }],
-                };
+    for (market, allocation_bps) in config.markets_allocation_bps.iter() {
+        let amount = excess.multiply_ratio(*allocation_bps as u128, total_bps as u128);
+        if !amount.is_zero() {
+            let deposit_msg = WasmMsg::Execute {
+                contract_addr: market.clone(),
+                msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
+                    stake_to_xlp: false,
+                })?,
+                funds: vec![Coin {
+                    denom: config.usdc_denom.clone(),
+                    amount,
+                }],
+            };
 
-                messages.push(deposit_msg.into());
+            messages.push(deposit_msg.into());
 
-                state::MARKET_ALLOCATIONS.update(
-                    deps.storage,
-                    market.as_str(),
-                    |a| -> Result<Uint128, StdError> { Ok(a.unwrap_or(Uint128::zero()) + amount) },
-                )?;
+            state::MARKET_ALLOCATIONS.update(
+                deps.storage,
+                market.as_str(),
+                |a| -> Result<Uint128, StdError> { Ok(a.unwrap_or(Uint128::zero()) + amount) },
+            )?;
 
-                remaining = remaining.saturating_sub(amount);
-            }
+            remaining = remaining.saturating_sub(amount);
         }
     }
 
