@@ -110,10 +110,7 @@ pub fn setup_vault_contract(
     Ok((
         app,
         contract_addr,
-        markets_allocation_bps
-            .keys()
-            .map(|f| Addr::unchecked(f))
-            .collect(),
+        markets_allocation_bps.keys().map(Addr::unchecked).collect(),
     ))
 }
 

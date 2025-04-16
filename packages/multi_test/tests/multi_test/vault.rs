@@ -501,7 +501,7 @@ fn test_update_allocations_success() {
     let new_allocations: HashMap<String, u16> = markets_addr
         .iter()
         .map(|a| a.to_string())
-        .zip(bps.into_iter())
+        .zip(bps)
         .collect();
 
     app.execute_contract(
@@ -517,15 +517,12 @@ fn test_update_allocations_success() {
         .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
         .unwrap();
 
-    let mut markets_allocation_bps: Vec<u16> = config
-        .markets_allocation_bps
-        .values()
-        .copied()
-        .collect();
+    let mut markets_allocation_bps: Vec<u16> =
+        config.markets_allocation_bps.values().copied().collect();
 
     markets_allocation_bps.sort();
 
-    assert_eq!(markets_allocation_bps,vec![4000, 6000]);
+    assert_eq!(markets_allocation_bps, vec![4000, 6000]);
 }
 
 #[test]
@@ -537,7 +534,7 @@ fn test_update_allocations_invalid_count() {
     let new_allocations: HashMap<String, u16> = markets_addr
         .iter()
         .map(|a| a.to_string())
-        .zip(bps.into_iter())
+        .zip(bps)
         .collect();
 
     let result = app.execute_contract(
@@ -561,11 +558,8 @@ fn test_instantiate_success() {
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
     assert_eq!(config.usdc_denom, USDC);
 
-    let mut markets_allocation_bps: Vec<u16> = config
-        .markets_allocation_bps
-        .values()
-        .copied()
-        .collect();
+    let mut markets_allocation_bps: Vec<u16> =
+        config.markets_allocation_bps.values().copied().collect();
 
     markets_allocation_bps.sort();
 
