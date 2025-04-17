@@ -715,6 +715,17 @@ impl State<'_> {
 
 #[cfg(test)]
 mod tests {
+    use std::marker::PhantomData;
+
+    use cosmwasm_std::{
+        testing::{mock_env, MockApi, MockQuerier, MockStorage},
+        to_json_string, GrpcQuery, OwnedDeps, Querier, QueryRequest, SystemResult,
+    };
+    use prost::Message;
+    use rujira_rs::proto::types::{QueryPoolRequest, QueryPoolResponse};
+
+    use crate::state::FACTORY_ADDR;
+
     use super::*;
 
     #[test]
@@ -742,5 +753,130 @@ mod tests {
             eth_btc.unwrap(),
             Number::try_from("0.062758112133468261").unwrap()
         );
+    }
+
+    pub struct CustomGrpcQuerier {
+        pub base: MockQuerier,
+    }
+
+    impl Querier for CustomGrpcQuerier {
+        fn raw_query(&self, bin_request: &[u8]) -> cosmwasm_std::QuerierResult {
+            let request: QueryRequest = match cosmwasm_std::from_json(bin_request) {
+                Ok(req) => req,
+                Err(e) => {
+                    return SystemResult::Err(cosmwasm_std::SystemError::InvalidRequest {
+                        error: e.to_string(),
+                        request: Binary::from(bin_request),
+                    })
+                }
+            };
+
+            match request {
+                QueryRequest::Grpc(GrpcQuery { path, data }) => {
+                    if path == "/types.Query/Pool" {
+                        let req = QueryPoolRequest::decode(&*data.to_vec())
+                            .expect("Request body is invalid");
+                        let mock_response = QueryPoolResponse {
+                            asset: req.asset,
+                            asset_tor_price: "0".to_owned(),
+                            status: "Available".to_owned(),
+                            pending_inbound_asset: "1".to_owned(),
+                            pending_inbound_rune: "1".to_owned(),
+                            balance_asset: "1".to_owned(),
+                            balance_rune: "1".to_owned(),
+                            pool_units: "1".to_owned(),
+                            lp_units: "1".to_owned(),
+                            synth_units: "1".to_owned(),
+                            synth_supply: "1".to_owned(),
+                            savers_depth: "1".to_owned(),
+                            savers_units: "1".to_owned(),
+                            savers_fill_bps: "1".to_owned(),
+                            savers_capacity_remaining: "1".to_owned(),
+                            synth_supply_remaining: "1".to_owned(),
+                            loan_collateral: "1".to_owned(),
+                            loan_collateral_remaining: "1".to_owned(),
+                            loan_cr: "1".to_owned(),
+                            derived_depth_bps: "1".to_owned(),
+                            ..Default::default()
+                        };
+
+                        let mut buf = Vec::new();
+                        if mock_response.encode(&mut buf).is_err() {
+                            return SystemResult::Err(cosmwasm_std::SystemError::InvalidResponse {
+                                error: "Response encode error".to_owned(),
+                                response: Binary::new(vec![]),
+                            });
+                        }
+
+                        SystemResult::Ok(cosmwasm_std::ContractResult::Ok(Binary::from(buf)))
+                    } else {
+                        SystemResult::Err(cosmwasm_std::SystemError::UnsupportedRequest {
+                            kind: "Unknown grpc path".to_owned(),
+                        })
+                    }
+                }
+                _ => self.base.raw_query(bin_request),
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_oracle_price() {
+        let rujira_feed = SpotPriceFeed {
+            data: SpotPriceFeedData::Rujira {
+                asset: "ETH.RUNE".to_owned(),
+            },
+            inverted: false,
+            volatile: None,
+        };
+        let spot_config = SpotPriceConfig::Oracle {
+            pyth: None,
+            stride: None,
+            feeds: vec![rujira_feed],
+            feeds_usd: Vec::new(),
+            volatile_diff_seconds: None,
+        };
+
+        let mut deps = OwnedDeps {
+            storage: MockStorage::default(),
+            api: MockApi::default(),
+            querier: CustomGrpcQuerier {
+                base: MockQuerier::default(),
+            },
+            custom_query_type: PhantomData,
+        };
+        let env = mock_env();
+
+        FACTORY_ADDR
+            .save(
+                &mut deps.storage,
+                &Addr::unchecked("random address".to_owned()),
+            )
+            .expect("factory address initialization failed");
+        deps.storage.set(
+            "contract_info".as_ref(),
+            r#"{
+                "contract": "random contract",
+                "version": "random version"
+            }"#
+            .as_bytes(),
+        );
+        deps.storage.set(
+            "e".as_ref(),
+            to_json_string(&Config::new(spot_config))
+                .expect("Spot config is not properly setup")
+                .as_bytes(),
+        );
+
+        let (state, _) = State::new(deps.as_ref(), env).expect("State is not created");
+
+        let result = state.get_oracle_price(false);
+
+        assert!(result.is_err());
+
+        let error = result
+            .err()
+            .expect("Get oracle price should fail with zero price");
+        assert_eq!(format!("{}", error), "price must be > 0");
     }
 }
