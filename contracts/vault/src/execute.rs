@@ -214,20 +214,22 @@ fn execute_collect_yield(deps: DepsMut, info: MessageInfo) -> Result<Response> {
         .keys(deps.storage, None, None, Order::Ascending)
         .collect::<StdResult<Vec<String>>>()?;
 
-    let messages: Vec<CosmosMsg> = markets
+    let messages: Result<Vec<CosmosMsg>, StdError> = markets
         .iter()
         .map(|market| {
-            WasmMsg::Execute {
-                contract_addr: market.to_string(),
-                msg: to_json_binary(&MarketExecuteMsg::ClaimYield {}).unwrap(),
-                funds: vec![],
-            }
-            .into()
+            Ok::<CosmosMsg, StdError>(
+                WasmMsg::Execute {
+                    contract_addr: market.to_string(),
+                    msg: to_json_binary(&MarketExecuteMsg::ClaimYield {})?,
+                    funds: vec![],
+                }
+                .into(),
+            )
         })
         .collect();
 
     Ok(Response::new()
-        .add_messages(messages)
+        .add_messages(messages?)
         .add_attribute("action", "collect_yield")
         .add_attribute("markets_processed", markets.len().to_string()))
 }
