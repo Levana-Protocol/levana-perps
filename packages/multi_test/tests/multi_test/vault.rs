@@ -610,11 +610,18 @@ fn test_resume_operations_success() {
 
     app.execute_contract(
         Addr::unchecked(USER),
-        vault_addr,
+        vault_addr.clone(),
         &ExecuteMsg::Deposit {},
         &[Coin::new(500_u128, USDC)],
     )
     .unwrap();
+
+    let vault: VaultBalanceResponse = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetVaultBalance {})
+        .unwrap();
+
+    assert_eq!(vault.vault_balance, Uint128::new(500));
 }
 
 #[test]
