@@ -198,6 +198,13 @@ fn test_get_vault_balance() {
     assert_eq!(response.allocated_amount, Uint128::zero());
     assert_eq!(response.pending_withdrawals, Uint128::zero());
     assert_eq!(response.total_allocated, Uint128::new(1000));
+
+    let response: TotalAssetsResponse = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetTotalAssets {})
+        .unwrap();
+
+    assert_eq!(response.total_assets, Uint128::new(1000));
 }
 
 #[test]
@@ -236,6 +243,18 @@ fn test_request_user_withdrawal() {
 
     assert!(result.is_ok());
 
+    let pending: PendingWithdrawalResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &vault_addr,
+            &QueryMsg::GetPendingWithdrawal {
+                user: USER.to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(pending.amount, Uint128::new(250));
+
     app.execute_contract(
         Addr::unchecked("anyone"),
         vault_addr.clone(),
@@ -243,6 +262,18 @@ fn test_request_user_withdrawal() {
         &[],
     )
     .unwrap();
+
+    let pending: PendingWithdrawalResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &vault_addr,
+            &QueryMsg::GetPendingWithdrawal {
+                user: USER.to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(pending.amount, Uint128::zero());
 }
 
 #[test]
@@ -283,19 +314,6 @@ fn test_get_pending_withdrawal() {
         .unwrap();
 
     assert_eq!(response.amount, withdrawal_amount);
-}
-
-#[test]
-fn test_get_total_assets() {
-    let initial_balance = Coin::new(1000_u128, USDC);
-    let (app, vault_addr, _) =
-        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
-
-    let response: TotalAssetsResponse = app
-        .wrap()
-        .query_wasm_smart(&vault_addr, &QueryMsg::GetTotalAssets {})
-        .unwrap();
-    assert_eq!(response.total_assets, Uint128::new(1000));
 }
 
 #[test]
@@ -374,46 +392,6 @@ fn test_deposit_invalid_denom() {
         &[Coin::new(500_u128, "uluna")],
     );
     assert!(result.is_err());
-}
-
-#[test]
-fn test_request_withdrawal_success() {
-    let initial_balance = Coin::new(10000_u128, USDC);
-    let (mut app, vault_addr, _) =
-        setup_vault_contract(vec![5000, 5000], Some(initial_balance.clone())).unwrap();
-
-    init_user_balance(&mut app, USER, 3000).unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(USER),
-        vault_addr.clone(),
-        &ExecuteMsg::Deposit {},
-        &[Coin::new(500_u128, USDC)],
-    )
-    .unwrap();
-
-    let withdrawal_amount = Uint128::new(250);
-
-    app.execute_contract(
-        Addr::unchecked(USER),
-        vault_addr.clone(),
-        &ExecuteMsg::RequestWithdrawal {
-            amount: withdrawal_amount,
-        },
-        &[],
-    )
-    .unwrap();
-
-    let pending: PendingWithdrawalResponse = app
-        .wrap()
-        .query_wasm_smart(
-            &vault_addr,
-            &QueryMsg::GetPendingWithdrawal {
-                user: USER.to_string(),
-            },
-        )
-        .unwrap();
-    assert_eq!(pending.amount, withdrawal_amount);
 }
 
 #[test]
@@ -595,36 +573,6 @@ fn test_collect_yield_success() {
 }
 
 #[test]
-fn test_emergency_pause_success() {
-    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
-
-    app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::EmergencyPause {},
-        &[],
-    )
-    .unwrap();
-
-    let config: Config = app
-        .wrap()
-        .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
-        .unwrap();
-
-    assert!(config.paused);
-
-    init_user_balance(&mut app, USER, 3420).unwrap();
-
-    let result = app.execute_contract(
-        Addr::unchecked(USER),
-        vault_addr.clone(),
-        &ExecuteMsg::Deposit {},
-        &[Coin::new(250_u128, USDC)],
-    );
-    assert!(result.is_err());
-}
-
-#[test]
 fn test_resume_operations_success() {
     let (mut app, vault_addr, _) = setup_vault_contract(vec![], None).unwrap();
 
@@ -720,6 +668,7 @@ fn test_update_allocations_invalid_count() {
         &ExecuteMsg::UpdateAllocations { new_allocations },
         &[],
     );
+
     assert!(result.is_err());
 }
 
@@ -747,6 +696,7 @@ fn test_instantiate_success() {
         .wrap()
         .query_wasm_smart(&vault_addr, &QueryMsg::GetTotalAssets {})
         .unwrap();
+
     assert_eq!(total_assets.total_assets, Uint128::zero());
 }
 
@@ -765,19 +715,7 @@ fn test_withdraw_from_market_insufficient_allocation() {
         },
         &[],
     );
-    assert!(result.is_err());
-}
 
-#[test]
-fn test_redistribute_funds_no_excess() {
-    let (mut app, vault_addr, _) = setup_vault_contract(vec![], None).unwrap();
-
-    let result = app.execute_contract(
-        Addr::unchecked(GOVERNANCE),
-        vault_addr.clone(),
-        &ExecuteMsg::RedistributeFunds {},
-        &[],
-    );
     assert!(result.is_err());
 }
 
@@ -785,4 +723,303 @@ fn test_redistribute_funds_no_excess() {
 fn test_instantiate_invalid_bps() {
     let result = setup_vault_contract(vec![6000, 5000], None);
     assert!(result.is_err());
+}
+
+#[test]
+fn deposit_zero_collateral_fails() {
+    let (mut app, vault_addr, _) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+
+    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 1000).unwrap();
+
+    let balance_before = app.wrap().query_balance(&user, USDC).unwrap().amount;
+
+    let vault_balance_before: VaultBalanceResponse = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetVaultBalance {})
+        .unwrap();
+
+    let result = app.execute_contract(
+        user.clone(),
+        vault_addr.clone(),
+        &ExecuteMsg::Deposit {},
+        &[Coin::new(0_u128, USDC)],
+    );
+
+    assert!(result.is_err(), "Deposit with zero collateral should fail");
+
+    let balance_after = app.wrap().query_balance(&user, USDC).unwrap().amount;
+
+    let vault_balance_after: VaultBalanceResponse = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetVaultBalance {})
+        .unwrap();
+
+    assert_eq!(
+        balance_before, balance_after,
+        "User balance should not change"
+    );
+
+    assert_eq!(
+        vault_balance_before.vault_balance, vault_balance_after.vault_balance,
+        "Vault balance should not change"
+    );
+}
+
+#[test]
+fn withdraw_all_from_market_success() {
+    let initial_balance = Coin::new(10000_u128, USDC);
+    let (mut app, vault_addr, market_addr) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::RedistributeFunds {},
+        &[],
+    )
+    .unwrap();
+
+    let allocations_before: MarketAllocationsResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &vault_addr,
+            &QueryMsg::GetMarketAllocations { start_after: None },
+        )
+        .unwrap();
+
+    assert_eq!(allocations_before.allocations[0].amount, Uint128::new(5000));
+
+    app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::WithdrawFromMarket {
+            market: market_addr[0].to_string(),
+            amount: Uint128::new(5000),
+        },
+        &[],
+    )
+    .unwrap();
+
+    let allocations_after: MarketAllocationsResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &vault_addr,
+            &QueryMsg::GetMarketAllocations { start_after: None },
+        )
+        .unwrap();
+
+    let market_allocation = allocations_after
+        .allocations
+        .iter()
+        .find(|alloc| alloc.market_id == market_addr[0].to_string())
+        .unwrap();
+
+    assert_eq!(
+        market_allocation.amount,
+        Uint128::zero(),
+        "Market allocation should be zero"
+    );
+
+    let other_market_allocation = allocations_after
+        .allocations
+        .iter()
+        .find(|alloc| alloc.market_id == market_addr[1].to_string())
+        .unwrap();
+
+    assert_eq!(
+        other_market_allocation.amount,
+        Uint128::new(5000),
+        "Other market allocation should remain unchanged"
+    );
+
+    let vault_balance: VaultBalanceResponse = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetVaultBalance {})
+        .unwrap();
+
+    assert_eq!(
+        vault_balance.total_allocated,
+        Uint128::new(5000),
+        "Total allocated should reflect withdrawal"
+    );
+}
+
+#[test]
+fn emergency_pause_blocks_pending_operations() {
+    let initial_balance = Coin::new(10000_u128, USDC);
+    let (mut app, vault_addr, _) =
+        setup_vault_contract(vec![5000, 5000], Some(initial_balance)).unwrap();
+
+    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 5000).unwrap();
+
+    app.execute_contract(
+        user.clone(),
+        vault_addr.clone(),
+        &ExecuteMsg::Deposit {},
+        &[Coin::new(2000_u128, USDC)],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        user.clone(),
+        vault_addr.clone(),
+        &ExecuteMsg::RequestWithdrawal {
+            amount: Uint128::new(1000),
+        },
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::EmergencyPause {},
+        &[],
+    )
+    .unwrap();
+
+    let config: Config = app
+        .wrap()
+        .query_wasm_smart(&vault_addr, &QueryMsg::GetConfig {})
+        .unwrap();
+
+    assert!(config.paused);
+
+    let result = app.execute_contract(
+        Addr::unchecked(USER),
+        vault_addr.clone(),
+        &ExecuteMsg::Deposit {},
+        &[Coin::new(250_u128, USDC)],
+    );
+
+    assert!(result.is_err());
+
+    let result = app.execute_contract(
+        Addr::unchecked("anyone"),
+        vault_addr.clone(),
+        &ExecuteMsg::ProcessWithdrawal {},
+        &[],
+    );
+
+    assert!(
+        result.is_err(),
+        "ProcessWithdrawal should fail during pause"
+    );
+
+    let pending: PendingWithdrawalResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &vault_addr,
+            &QueryMsg::GetPendingWithdrawal {
+                user: USER.to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        pending.amount,
+        Uint128::new(1000),
+        "User has pending withdrawals"
+    );
+
+    app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::ResumeOperations {},
+        &[],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked("anyone"),
+        vault_addr.clone(),
+        &ExecuteMsg::ProcessWithdrawal {},
+        &[],
+    )
+    .unwrap();
+
+    let user_balance = app.wrap().query_balance(&user, USDC).unwrap().amount;
+    assert_eq!(
+        user_balance,
+        Uint128::new(4000),
+        "User balance should reflect withdrawal"
+    );
+
+    let pending: PendingWithdrawalResponse = app
+        .wrap()
+        .query_wasm_smart(
+            &vault_addr,
+            &QueryMsg::GetPendingWithdrawal {
+                user: USER.to_string(),
+            },
+        )
+        .unwrap();
+
+    assert_eq!(
+        pending.amount,
+        Uint128::zero(),
+        "No pending withdrawals after processing"
+    );
+}
+
+#[test]
+fn redistribute_funds_no_liquidity() {
+    let (mut app, vault_addr, market_addr) = setup_vault_contract(vec![5000, 5000], None).unwrap();
+
+    let result = app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::RedistributeFunds {},
+        &[],
+    );
+
+    assert!(
+        result.is_err(),
+        "RedistributeFunds should fail with no liquidity"
+    );
+
+    let user = Addr::unchecked(USER);
+    init_user_balance(&mut app, USER, 10000).unwrap();
+
+    app.execute_contract(
+        user.clone(),
+        vault_addr.clone(),
+        &ExecuteMsg::Deposit {},
+        &[Coin::new(10000_u128, USDC)],
+    )
+    .unwrap();
+
+    app.execute_contract(
+        Addr::unchecked(GOVERNANCE),
+        vault_addr.clone(),
+        &ExecuteMsg::RedistributeFunds {},
+        &[],
+    )
+    .unwrap();
+
+    let market_lp1 = app
+        .wrap()
+        .query_wasm_smart(&market_addr[0], &MarketQueryMsg::Status { price: None })
+        .map(|resp: StatusResp| resp.liquidity.total_lp)
+        .unwrap();
+
+    let market_lp2 = app
+        .wrap()
+        .query_wasm_smart(&market_addr[1], &MarketQueryMsg::Status { price: None })
+        .map(|resp: StatusResp| resp.liquidity.total_lp)
+        .unwrap();
+
+    assert_eq!(
+        market_lp1,
+        Uint128::new(5000),
+        "Market 1 should have allocated funds"
+    );
+
+    assert_eq!(
+        market_lp2,
+        Uint128::new(5000),
+        "Market 2 should have allocated funds"
+    );
 }
