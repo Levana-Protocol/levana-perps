@@ -20,7 +20,7 @@ pub struct InstantiateMsg {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct Config {
-    /// Denomination of the USDC token (e.g., "usdc")
+    /// Denomination of the USDC token. Varies by chain (e.g., "uusdc" on Osmosis, "usdc" on Noble, ...)
     pub usdc_denom: String,
 
     /// Address authorized for critical actions (like pausing the contract)

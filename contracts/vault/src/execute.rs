@@ -152,12 +152,15 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
     if total_bps == 0 {
         return Err(anyhow!("No allocation percentages defined"));
     }
+    if total_bps > 10_000 {
+        return Err(anyhow!("Market allocation exceeds 100%"));
+    }
 
     let mut messages: Vec<CosmosMsg> = vec![];
     let mut remaining = excess;
 
     for (market, allocation_bps) in config.markets_allocation_bps.iter() {
-        let amount = excess.multiply_ratio(*allocation_bps as u128, total_bps as u128);
+        let amount = excess.multiply_ratio(*allocation_bps, total_bps);
         if !amount.is_zero() {
             let deposit_msg = WasmMsg::Execute {
                 contract_addr: market.clone(),
@@ -393,6 +396,9 @@ fn execute_update_allocations(
     }
 
     let total_bps: u16 = new_allocations.values().sum();
+    if total_bps == 0 {
+        return Err(anyhow!("No allocation percentages defined"));
+    }
     if total_bps > 10_000 {
         return Err(anyhow!("Market allocation exceeds 100%"));
     }
