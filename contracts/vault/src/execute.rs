@@ -163,7 +163,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
         let amount = excess.multiply_ratio(*allocation_bps, total_bps);
         if !amount.is_zero() {
             let deposit_msg = WasmMsg::Execute {
-                contract_addr: market.clone(),
+                contract_addr: market.to_string(),
                 msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
                     stake_to_xlp: false,
                 })?,
@@ -376,7 +376,7 @@ fn execute_resume_operations(deps: DepsMut, info: MessageInfo) -> Result<Respons
 fn execute_update_allocations(
     deps: DepsMut,
     info: MessageInfo,
-    new_allocations: HashMap<String, u16>,
+    new_allocations: HashMap<Addr, u16>,
 ) -> Result<Response> {
     let mut config = state::CONFIG.load(deps.storage)?;
     if info.sender != config.governance {

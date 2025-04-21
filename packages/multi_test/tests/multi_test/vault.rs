@@ -630,11 +630,7 @@ fn test_update_allocations_success() {
 
     let bps = vec![6000, 4000];
 
-    let new_allocations: HashMap<String, u16> = markets_addr
-        .iter()
-        .map(|a| a.to_string())
-        .zip(bps)
-        .collect();
+    let new_allocations: HashMap<Addr, u16> = markets_addr.into_iter().zip(bps).collect();
 
     app.execute_contract(
         Addr::unchecked(GOVERNANCE),
@@ -663,11 +659,7 @@ fn test_update_allocations_invalid_count() {
 
     let bps = vec![6000];
 
-    let new_allocations: HashMap<String, u16> = markets_addr
-        .iter()
-        .map(|a| a.to_string())
-        .zip(bps)
-        .collect();
+    let new_allocations: HashMap<Addr, u16> = markets_addr.into_iter().zip(bps).collect();
 
     let result = app.execute_contract(
         Addr::unchecked(GOVERNANCE),

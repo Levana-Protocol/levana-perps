@@ -26,7 +26,7 @@ pub struct Liquidity {
     pub total_xlp: Uint128,
 }
 
-fn init_markets(app: &mut App, contract_addr: Addr, markets_allocation_bps: HashMap<String, u16>) {
+fn init_markets(app: &mut App, contract_addr: Addr, markets_allocation_bps: HashMap<Addr, u16>) {
     for market in markets_allocation_bps.keys() {
         app.execute_contract(
             Addr::unchecked(GOVERNANCE),
@@ -43,12 +43,12 @@ fn init_markets(app: &mut App, contract_addr: Addr, markets_allocation_bps: Hash
 fn build_markets_allocations_bps(
     app: &mut App,
     markets_allocation_bps: Vec<u16>,
-) -> Result<HashMap<String, u16>> {
+) -> Result<HashMap<Addr, u16>> {
     markets_allocation_bps
         .into_iter()
         .map(|bps| {
             let market = setup_market_contract(app)?;
-            Ok((market.to_string(), bps))
+            Ok((market, bps))
         })
         .collect()
 }
