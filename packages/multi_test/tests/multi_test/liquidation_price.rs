@@ -1,4 +1,3 @@
-use cosmwasm_std::{Binary, GrpcQuery};
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
     return_unless_market_collateral_base, time::TimeJump, PerpsApp,
@@ -341,7 +340,7 @@ fn rujira_zero_price_logic_to_prevent_liquidation_perp_4486() {
         then.pb(res);
     });
 
-    let server = MockServer::new("Rujira grpc server")
+    let _server = MockServer::new("Rujira grpc server")
         .grpc()
         .with_mocks(mocks);
     // server.start().await?;
