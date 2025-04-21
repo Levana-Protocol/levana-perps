@@ -14,8 +14,7 @@ pub struct InstantiateMsg {
     pub governance: String,
 
     /// Initial allocation percentages to markets
-    #[serde(deserialize_with = "deserialize_markets_allocation_bps")]
-    pub markets_allocation_bps: HashMap<Addr, u16>,
+    pub markets_allocation_bps: HashMap<String, u16>,
 }
 
 /// Configuration structure for the vault
@@ -29,7 +28,7 @@ pub struct Config {
     pub governance: Addr,
 
     /// Allocation percentages to markets in basis points (100 bps = 1%)
-    #[serde(deserialize_with = "deserialize_markets_allocation_bps")]
+    //#[serde(deserialize_with = "deserialize_markets_allocation_bps")]
     pub markets_allocation_bps: HashMap<Addr, u16>,
 
     /// state::PAUSED

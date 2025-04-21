@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppBuilder, ContractWrapper, Executor};
 use cw_storage_plus::Map;
-use perpswap::contracts::vault::{ExecuteMsg, InstantiateMsg};
+use perpswap::contracts::vault::InstantiateMsg;
 use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
 use std::collections::HashMap;
@@ -26,29 +26,15 @@ pub struct Liquidity {
     pub total_xlp: Uint128,
 }
 
-fn init_markets(app: &mut App, contract_addr: Addr, markets_allocation_bps: HashMap<Addr, u16>) {
-    for market in markets_allocation_bps.keys() {
-        app.execute_contract(
-            Addr::unchecked(GOVERNANCE),
-            contract_addr.clone(),
-            &ExecuteMsg::AddMarket {
-                market: market.to_string(),
-            },
-            &[],
-        )
-        .unwrap();
-    }
-}
-
 fn build_markets_allocations_bps(
     app: &mut App,
     markets_allocation_bps: Vec<u16>,
-) -> Result<HashMap<Addr, u16>> {
+) -> Result<HashMap<String, u16>> {
     markets_allocation_bps
         .into_iter()
         .map(|bps| {
             let market = setup_market_contract(app)?;
-            Ok((market, bps))
+            Ok((market.to_string(), bps))
         })
         .collect()
 }
@@ -100,12 +86,6 @@ pub fn setup_vault_contract(
         "Vault",
         Some(GOVERNANCE.to_string()),
     )?;
-
-    init_markets(
-        &mut app,
-        contract_addr.clone(),
-        markets_allocation_bps.clone(),
-    );
 
     Ok((
         app,
