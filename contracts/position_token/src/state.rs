@@ -20,7 +20,7 @@ pub(crate) struct StateContext<'a> {
 }
 
 impl<'a> State<'a> {
-    pub(crate) fn new(deps: Deps<'a>, _env: Env) -> Result<(Self, &dyn Storage)> {
+    pub(crate) fn new(deps: Deps<'a>, _env: Env) -> Result<(Self, &'a dyn Storage)> {
         let factory_address = FACTORY_ADDR.load(deps.storage)?;
         Ok((
             State {

@@ -1793,6 +1793,7 @@ fn open_position_no_balance_mismatch_on_failure() {
     let work = market.query_countertrade_work().unwrap();
     assert!(work.is_open_position());
     market.exec_countertrade_do_work().unwrap_err();
+    std::env::remove_var("LEVANA_CONTRACTS_INJECT_FAILURE");
 
     assert_contract_and_on_chain_balances(&market, None);
 }

@@ -1,8 +1,13 @@
+use cosmwasm_std::{Binary, GrpcQuery};
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
     return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
+use mocktail::*;
 use perpswap::{contracts::market::config::ConfigUpdate, prelude::*};
+use prost::Message;
+use rujira_rs::proto::types::{QueryPoolRequest, QueryPoolResponse};
+use server::MockServer;
 
 #[test]
 fn liquidation_price() {
@@ -291,4 +296,53 @@ fn normal_price_trader_gets_something() {
     assert!(closed.active_collateral < pos_after_open.liquidation_margin.total().unwrap());
     assert!(closed.active_collateral > Collateral::zero());
     assert!(closed.pnl_collateral > "-100".parse().unwrap());
+}
+
+#[test]
+fn rujira_zero_price_logic_to_prevent_liquidation_perp_4486() {
+    let mut mocks = MockSet::new();
+    let asset = "ETH.RUNE".to_owned();
+    let req = QueryPoolRequest {
+        asset: asset.clone(),
+        height: "0".to_string(),
+    };
+
+    let mut buf = Vec::new();
+    req.encode(&mut buf)
+        .expect("QueryPoolRequest encoding failed.");
+    let path = "/types.Query/Pool".to_owned();
+
+    let res = QueryPoolResponse {
+        asset,
+        asset_tor_price: "0".to_owned(),
+        status: "Available".to_owned(),
+        pending_inbound_asset: "1".to_owned(),
+        pending_inbound_rune: "1".to_owned(),
+        balance_asset: "1".to_owned(),
+        balance_rune: "1".to_owned(),
+        pool_units: "1".to_owned(),
+        lp_units: "1".to_owned(),
+        synth_units: "1".to_owned(),
+        synth_supply: "1".to_owned(),
+        savers_depth: "1".to_owned(),
+        savers_units: "1".to_owned(),
+        savers_fill_bps: "1".to_owned(),
+        savers_capacity_remaining: "1".to_owned(),
+        synth_supply_remaining: "1".to_owned(),
+        loan_collateral: "1".to_owned(),
+        loan_collateral_remaining: "1".to_owned(),
+        loan_cr: "1".to_owned(),
+        derived_depth_bps: "1".to_owned(),
+        ..Default::default()
+    };
+
+    mocks.mock(|when, then| {
+        when.path(path.as_str()).pb(req);
+        then.pb(res);
+    });
+
+    let server = MockServer::new("Rujira grpc server")
+        .grpc()
+        .with_mocks(mocks);
+    // server.start().await?;
 }

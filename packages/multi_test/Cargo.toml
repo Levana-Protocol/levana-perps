@@ -30,6 +30,11 @@ cw2 = "2.0.0"
 proptest = "1.5.0"
 dotenv = "0.15.0"
 cw-storage-plus = { version = "2.0.0", default-features = false }
+rujira-rs = { git = "https://gitlab.com/thorchain/rujira.git", rev = "acdbaa19836bb9cfa2e62ada6e8a2227373fe9df" }
+
+[dev-dependencies]
+mocktail = "0.2.4-alpha"
+prost = "0.13.5"
 
 [features]
 default = ["sanity"]
