@@ -503,7 +503,7 @@ impl KeyDeserialize for LeaderAddr {
     }
 }
 
-impl<'a> Prefixer<'a> for LeaderAddr {
+impl Prefixer<'_> for LeaderAddr {
     fn prefix(&self) -> Vec<cw_storage_plus::Key> {
         self.0.prefix()
     }
@@ -529,7 +529,7 @@ impl KeyDeserialize for CopyTradingAddr {
         Addr::from_vec(value).map(CopyTradingAddr)
     }
 }
-impl<'a> Prefixer<'a> for CopyTradingAddr {
+impl Prefixer<'_> for CopyTradingAddr {
     fn prefix(&self) -> Vec<cw_storage_plus::Key> {
         self.0.prefix()
     }
@@ -559,7 +559,7 @@ impl KeyDeserialize for CounterTradeAddr {
         Addr::from_vec(value).map(CounterTradeAddr)
     }
 }
-impl<'a> Prefixer<'a> for CounterTradeAddr {
+impl Prefixer<'_> for CounterTradeAddr {
     fn prefix(&self) -> Vec<cw_storage_plus::Key> {
         self.0.prefix()
     }

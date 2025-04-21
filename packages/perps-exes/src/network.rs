@@ -92,7 +92,7 @@ impl<'de> serde::Deserialize<'de> for PerpsNetwork {
 
 struct PerpsNetworkVisitor;
 
-impl<'de> serde::de::Visitor<'de> for PerpsNetworkVisitor {
+impl serde::de::Visitor<'_> for PerpsNetworkVisitor {
     type Value = PerpsNetwork;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

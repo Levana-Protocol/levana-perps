@@ -183,7 +183,7 @@ impl KeyDeserialize for ShutdownImpact {
     }
 }
 
-impl<'a> PrimaryKey<'a> for ShutdownImpact {
+impl PrimaryKey<'_> for ShutdownImpact {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;

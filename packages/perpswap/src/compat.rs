@@ -16,7 +16,7 @@ pub struct BackwardsCompatTakeProfit<'a> {
     pub take_profit: Option<PriceBaseInQuote>,
 }
 
-impl<'a> BackwardsCompatTakeProfit<'a> {
+impl BackwardsCompatTakeProfit<'_> {
     pub fn calc(self) -> Result<TakeProfitTrader> {
         let BackwardsCompatTakeProfit {
             collateral,
@@ -68,7 +68,7 @@ pub struct TakeProfitFromCounterCollateral<'a> {
     pub price_point: &'a PricePoint,
     pub direction: DirectionToBase,
 }
-impl<'a> TakeProfitFromCounterCollateral<'a> {
+impl TakeProfitFromCounterCollateral<'_> {
     pub fn calc(&self) -> Result<TakeProfitTrader> {
         let Self {
             market_type,

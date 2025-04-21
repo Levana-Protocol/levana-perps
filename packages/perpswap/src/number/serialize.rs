@@ -27,7 +27,7 @@ impl<'de, T: UnsignedDecimal> Deserialize<'de> for Signed<T> {
 
 struct SignedVisitor<T>(PhantomData<T>);
 
-impl<'de, T: UnsignedDecimal> de::Visitor<'de> for SignedVisitor<T> {
+impl<T: UnsignedDecimal> de::Visitor<'_> for SignedVisitor<T> {
     type Value = Signed<T>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -68,7 +68,7 @@ impl<'de, T: UnsignedDecimal> Deserialize<'de> for NonZero<T> {
 
 struct NonZeroVisitor<T>(PhantomData<T>);
 
-impl<'de, T: UnsignedDecimal> de::Visitor<'de> for NonZeroVisitor<T> {
+impl<T: UnsignedDecimal> de::Visitor<'_> for NonZeroVisitor<T> {
     type Value = NonZero<T>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

@@ -620,7 +620,7 @@ impl Token {
     }
 }
 
-impl<'a> PrimaryKey<'a> for Token {
+impl PrimaryKey<'_> for Token {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -638,7 +638,7 @@ impl<'a> PrimaryKey<'a> for Token {
     }
 }
 
-impl<'a> Prefixer<'a> for Token {
+impl Prefixer<'_> for Token {
     fn prefix(&self) -> Vec<Key> {
         let (token_type, bytes) = match self {
             Token::Native(native) => (0u8, native.as_bytes()),
@@ -897,7 +897,7 @@ pub enum QueuePositionId {
     DecQueuePositionId(DecQueuePositionId),
 }
 
-impl<'a> PrimaryKey<'a> for QueuePositionId {
+impl PrimaryKey<'_> for QueuePositionId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -935,7 +935,7 @@ impl KeyDeserialize for QueuePositionId {
     }
 }
 
-impl<'a> Prefixer<'a> for QueuePositionId {
+impl Prefixer<'_> for QueuePositionId {
     fn prefix(&self) -> Vec<Key> {
         match self {
             QueuePositionId::IncQueuePositionId(id) => {
@@ -978,7 +978,7 @@ impl IncQueuePositionId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for IncQueuePositionId {
+impl PrimaryKey<'_> for IncQueuePositionId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -989,7 +989,7 @@ impl<'a> PrimaryKey<'a> for IncQueuePositionId {
     }
 }
 
-impl<'a> Prefixer<'a> for IncQueuePositionId {
+impl Prefixer<'_> for IncQueuePositionId {
     fn prefix(&self) -> Vec<Key> {
         vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
@@ -1045,7 +1045,7 @@ impl DecQueuePositionId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for DecQueuePositionId {
+impl PrimaryKey<'_> for DecQueuePositionId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -1056,7 +1056,7 @@ impl<'a> PrimaryKey<'a> for DecQueuePositionId {
     }
 }
 
-impl<'a> Prefixer<'a> for DecQueuePositionId {
+impl Prefixer<'_> for DecQueuePositionId {
     fn prefix(&self) -> Vec<Key> {
         vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }

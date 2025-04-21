@@ -34,7 +34,7 @@ pub mod event {
         pub channel: &'a IbcChannel,
     }
 
-    impl<'a> From<IbcChannelConnectEvent<'a>> for Event {
+    impl From<IbcChannelConnectEvent<'_>> for Event {
         fn from(src: IbcChannelConnectEvent) -> Self {
             mixin_ibc_channel(Event::new("ibc-channel-connect"), src.channel)
         }
@@ -47,7 +47,7 @@ pub mod event {
         pub channel: &'a IbcChannel,
     }
 
-    impl<'a> From<IbcChannelCloseEvent<'a>> for Event {
+    impl From<IbcChannelCloseEvent<'_>> for Event {
         fn from(src: IbcChannelCloseEvent) -> Self {
             mixin_ibc_channel(Event::new("ibc-channel-close"), src.channel)
         }

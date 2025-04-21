@@ -49,7 +49,7 @@ impl CopyTradingId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for CopyTradingId {
+impl PrimaryKey<'_> for CopyTradingId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;

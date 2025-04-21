@@ -47,7 +47,7 @@ impl DeferredExecId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for DeferredExecId {
+impl PrimaryKey<'_> for DeferredExecId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -58,7 +58,7 @@ impl<'a> PrimaryKey<'a> for DeferredExecId {
     }
 }
 
-impl<'a> Prefixer<'a> for DeferredExecId {
+impl Prefixer<'_> for DeferredExecId {
     fn prefix(&self) -> Vec<Key> {
         vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }

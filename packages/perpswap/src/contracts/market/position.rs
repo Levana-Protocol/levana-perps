@@ -815,7 +815,7 @@ impl PositionId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for PositionId {
+impl PrimaryKey<'_> for PositionId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -826,7 +826,7 @@ impl<'a> PrimaryKey<'a> for PositionId {
     }
 }
 
-impl<'a> Prefixer<'a> for PositionId {
+impl Prefixer<'_> for PositionId {
     fn prefix(&self) -> Vec<Key> {
         vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
