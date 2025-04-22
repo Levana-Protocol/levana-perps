@@ -65,7 +65,7 @@ pub fn get_market_allocations(
 ) -> Result<MarketAllocationsResponse> {
     let start: Option<Bound<&str>> = start_after.as_deref().map(Bound::exclusive);
 
-    let allocations = state::MARKET_ALLOCATIONS
+    let allocations: Vec<MarketAllocation> = state::MARKET_ALLOCATIONS
         .range(deps.storage, start, None, Order::Ascending)
         .map(|item| {
             let (market_id, amount) = item?;
@@ -75,6 +75,7 @@ pub fn get_market_allocations(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+
     Ok(MarketAllocationsResponse { allocations })
 }
 
