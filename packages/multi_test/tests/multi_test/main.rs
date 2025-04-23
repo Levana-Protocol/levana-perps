@@ -29,6 +29,7 @@ mod override_price;
 mod position;
 mod proptest;
 mod referrer;
+mod rujira_invalid_price;
 mod sanity;
 mod shutdown;
 mod staleness;
