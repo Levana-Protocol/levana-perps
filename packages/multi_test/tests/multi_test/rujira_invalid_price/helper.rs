@@ -93,10 +93,7 @@ pub async fn setup_test_env(price: Option<&str>) -> (App, Addr, MockServer) {
         .expect("QueryPoolRequest encoding failed.");
     let path = "/types.Query/Pool".to_owned();
 
-    let price = match price {
-        Some(value) => value,
-        None => "NaN",
-    };
+    let price = price.unwrap_or("NaN");
 
     let res = QueryPoolResponse {
         asset,
@@ -137,7 +134,7 @@ pub async fn setup_test_env(price: Option<&str>) -> (App, Addr, MockServer) {
     let app = AppBuilder::new().build(|_, _, _| {});
 
     // We need store and instantiate the market contract
-    
+
     // here is a general example
     // https://github.com/Levana-Protocol/levana-perps/blob/main/packages/multi_test/tests/multi_test/vault/helpers.rs
 

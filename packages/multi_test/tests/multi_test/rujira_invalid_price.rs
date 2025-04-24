@@ -4,13 +4,73 @@ use cosmwasm_std::{
     to_json_string, Addr, OwnedDeps, Storage,
 };
 use helper::{setup_test_env, CustomGrpcQuerier, FACTORY_ADDR};
-use perpswap::contracts::market::{
-    config::Config,
-    spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
+use levana_perpswap_multi_test::{config::SpotPriceKind, market_wrapper::PerpsMarket, PerpsApp};
+use perpswap::{
+    contracts::market::{
+        config::Config,
+        spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData, SpotPriceFeedInit},
+    },
+    storage::MarketId,
 };
-#[warn(unused_imports)]
-use std::marker::PhantomData;
+use perpswap::{
+    contracts::market::{entry::NewMarketParams, spot_price::SpotPriceConfigInit},
+    prelude::*,
+};
 
+#[test]
+fn test_rujira() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let eth_rune = MarketId::new(
+        "ETH",
+        "RUNE",
+        perpswap::storage::MarketType::CollateralIsQuote,
+    );
+    let rujira_feed = SpotPriceFeed {
+        data: SpotPriceFeedData::Rujira {
+            asset: "ETH.RUNE".to_owned(),
+        },
+        inverted: false,
+        volatile: None,
+    };
+    let market_addr = market
+        .exec_factory(&FactoryExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                market_id: eth_rune.clone(),
+                token: market.token.clone().into(),
+                config: None,
+                spot_price: SpotPriceConfigInit::Oracle {
+                    pyth: None,
+                    stride: None,
+                    feeds: vec![rujira_feed.clone().into()],
+                    feeds_usd: vec![rujira_feed.clone().into()],
+                    volatile_diff_seconds: None,
+                },
+                initial_borrow_fee_rate: "0.01".parse().unwrap(),
+                initial_price: None,
+            },
+        })
+        .unwrap()
+        .events
+        .iter()
+        .find(|e| e.ty == "instantiate")
+        .context("could not instantiate")
+        .unwrap()
+        .attributes
+        .iter()
+        .find(|a| a.key == "_contract_address")
+        .context("could not find contract_address")
+        .unwrap()
+        .value
+        .clone();
+
+    market.addr = Addr::unchecked(market_addr);
+    market.id = eth_rune;
+
+    market.exec_refresh_price().unwrap();
+
+    let price = market.query_current_price().unwrap();
+    println!("{:?}", price);
+}
 #[test]
 fn test_get_oracle_price() {
     let rujira_feed = SpotPriceFeed {
@@ -89,7 +149,7 @@ async fn testing_basic_zero_functionability() {
 #[test_log::test(tokio::test)]
 async fn testing_basic_nan_functionability() {
     let (_app, _market, server) = setup_test_env(None).await;
-    
+
     // Same here
 
     assert!(server.is_running(), "Server should be running...");
