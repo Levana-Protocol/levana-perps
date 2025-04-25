@@ -10,6 +10,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
 cosmwasm-std = { workspace = true, features = ["abort"] }
+cw20 = "2.0.0"
+cw20-base = "2.0.0"
 anyhow = "1.0.97"
 cw-storage-plus = "2.0.0"
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }

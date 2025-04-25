@@ -3,6 +3,8 @@ use cosmwasm_std::{Addr, Uint128};
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
+use super::cw20::Cw20ReceiveMsg;
+
 /// Message to instantiate the contract
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -41,6 +43,9 @@ pub struct Config {
 pub enum ExecuteMsg {
     /// Deposit USDC and receive USDCLP
     Deposit {},
+
+    /// Receive CW20
+    Receive(Cw20ReceiveMsg),
 
     /// Request withdrawal by burning USDCLP
     RequestWithdrawal {

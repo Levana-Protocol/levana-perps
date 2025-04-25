@@ -1,5 +1,7 @@
+use cosmwasm_std::{QueryRequest, WasmQuery};
+use cw20::Cw20ExecuteMsg;
 use perpswap::{
-    contracts::vault::ExecuteMsg,
+    contracts::{cw20::Cw20ReceiveMsg, vault::ExecuteMsg},
     number::{LpToken, NonZero},
     storage::MarketExecuteMsg,
 };
@@ -8,7 +10,7 @@ use crate::{
     common::{check_not_paused, get_and_increment_queue_id, get_total_assets},
     prelude::*,
     state::{self, QueueId, LP_BALANCES},
-    types::WithdrawalRequest,
+    types::{VaultBalanceResponse, WithdrawalRequest},
 };
 
 use std::collections::HashMap;
@@ -17,6 +19,30 @@ use std::collections::HashMap;
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     match msg {
         ExecuteMsg::Deposit {} => execute_deposit(deps, env, info),
+
+        ExecuteMsg::Receive(Cw20ReceiveMsg {
+            sender,
+            amount,
+            msg: _,
+        }) => {
+            let config = state::CONFIG.load(deps.storage)?;
+            if info.sender.to_string() != config.usdc_denom {
+                return Err(anyhow!("Invalid CW20 token"));
+            }
+            check_not_paused(&config)?;
+
+            let sender_addr = deps.api.addr_validate(&sender)?;
+            LP_BALANCES.update(deps.storage, &sender_addr, |balance| -> Result<Uint128> {
+                Ok(balance.unwrap_or_default() + amount)
+            })?;
+            state::TOTAL_LP_SUPPLY
+                .update(deps.storage, |t| -> Result<Uint128> { Ok(t + amount) })?;
+            Ok(Response::new().add_attributes(vec![
+                ("action", "deposit_cw20"),
+                ("user", sender.as_str()),
+                ("amount", &amount.to_string()),
+            ]))
+        }
 
         ExecuteMsg::RequestWithdrawal { amount } => execute_request_withdrawal(deps, info, amount),
 
@@ -138,10 +164,20 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
         .load(deps.storage)
         .unwrap_or(Uint128::zero());
 
-    let vault_balance = deps
-        .querier
-        .query_balance(&env.contract.address, &config.usdc_denom)?
-        .amount;
+    let vault_balance = if config.usdc_denom.starts_with("osmo1") {
+        let res: VaultBalanceResponse =
+            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                contract_addr: config.usdc_denom.clone(),
+                msg: to_json_binary(&cw20::Cw20QueryMsg::Balance {
+                    address: env.contract.address.to_string(),
+                })?,
+            }))?;
+        res.vault_balance
+    } else {
+        deps.querier
+            .query_balance(&env.contract.address, &config.usdc_denom)?
+            .amount
+    };
 
     let excess = vault_balance.saturating_sub(pending);
     if excess.is_zero() {
@@ -162,18 +198,35 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
     for (market, allocation_bps) in config.markets_allocation_bps.iter() {
         let amount = excess.multiply_ratio(*allocation_bps, total_bps);
         if !amount.is_zero() {
-            let deposit_msg = WasmMsg::Execute {
-                contract_addr: market.to_string(),
-                msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
-                    stake_to_xlp: false,
-                })?,
-                funds: vec![Coin {
-                    denom: config.usdc_denom.clone(),
-                    amount,
-                }],
-            };
+            if config.usdc_denom.starts_with("osmo1") {
+                messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: config.usdc_denom.clone(),
+                    msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
+                        recipient: market.to_string(),
+                        amount,
+                    })?,
+                    funds: vec![],
+                }));
 
-            messages.push(deposit_msg.into());
+                messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: market.to_string(),
+                    msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
+                        stake_to_xlp: false,
+                    })?,
+                    funds: vec![],
+                }));
+            } else {
+                messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: market.to_string(),
+                    msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
+                        stake_to_xlp: false,
+                    })?,
+                    funds: vec![Coin {
+                        denom: config.usdc_denom.clone(),
+                        amount,
+                    }],
+                }));
+            }
 
             state::MARKET_ALLOCATIONS.update(
                 deps.storage,
@@ -186,7 +239,16 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
     }
 
     if !remaining.is_zero() {
-        messages.push(
+        let send_msg = if config.usdc_denom.starts_with("osmo1") {
+            CosmosMsg::Wasm(WasmMsg::Execute {
+                contract_addr: config.usdc_denom.clone(),
+                msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
+                    recipient: config.governance.to_string(),
+                    amount: remaining,
+                })?,
+                funds: vec![],
+            })
+        } else {
             BankMsg::Send {
                 to_address: config.governance.to_string(),
                 amount: vec![Coin {
@@ -194,8 +256,9 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
                     amount: remaining,
                 }],
             }
-            .into(),
-        );
+            .into()
+        };
+        messages.push(send_msg);
     }
 
     Ok(Response::new().add_messages(messages).add_attributes(vec![
