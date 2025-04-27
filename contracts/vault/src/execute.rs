@@ -204,34 +204,32 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
     for (market, allocation_bps) in config.markets_allocation_bps.iter() {
         let amount = excess.multiply_ratio(*allocation_bps, total_bps);
         if !amount.is_zero() {
-            if config.usdc_denom.to_string().starts_with("osmo1") {
-                messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: config.usdc_denom.to_string().clone(),
+            let msg = match config.usdc_denom {
+                UsdcDenom::CW20(ref addr) => CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: addr.to_string(),
                     msg: to_json_binary(&Cw20ExecuteMsg::Send {
                         contract: market.to_string(),
                         amount,
-                        msg: to_json_binary(&Cw20ReceiveMsg {
-                            sender: env.contract.address.to_string(),
-                            amount,
-                            msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
-                                stake_to_xlp: false,
-                            })?,
+                        msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
+                            stake_to_xlp: false,
                         })?,
                     })?,
                     funds: vec![],
-                }));
-            } else {
-                messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: market.to_string(),
-                    msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
-                        stake_to_xlp: false,
-                    })?,
-                    funds: vec![Coin {
-                        denom: config.usdc_denom.to_string(),
-                        amount,
-                    }],
-                }));
-            }
+                }),
+                UsdcDenom::IBC(ref denom) | UsdcDenom::Native(ref denom) => {
+                    CosmosMsg::Wasm(WasmMsg::Execute {
+                        contract_addr: market.to_string(),
+                        msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
+                            stake_to_xlp: false,
+                        })?,
+                        funds: vec![Coin {
+                            denom: denom.to_string(),
+                            amount,
+                        }],
+                    })
+                }
+            };
+            messages.push(msg);
 
             state::MARKET_ALLOCATIONS.update(
                 deps.storage,
