@@ -3,7 +3,7 @@ use cw20::Cw20ExecuteMsg;
 use perpswap::{
     contracts::{
         cw20::Cw20ReceiveMsg,
-        vault::{ExecuteMsg, UsdcDenom},
+        vault::{ExecuteMsg, UsdcAsset},
     },
     number::{LpToken, NonZero},
     storage::MarketExecuteMsg,
@@ -168,7 +168,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
         .unwrap_or(Uint128::zero());
 
     let vault_balance = match &config.usdc_denom {
-        UsdcDenom::CW20(addr) => {
+        UsdcAsset::CW20(addr) => {
             let res: VaultBalanceResponse =
                 deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                     contract_addr: addr.to_string(),
@@ -178,7 +178,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
                 }))?;
             res.vault_balance
         }
-        UsdcDenom::IBC(denom) | UsdcDenom::Native(denom) => {
+        UsdcAsset::Native(denom) => {
             deps.querier
                 .query_balance(&env.contract.address, denom.to_string())?
                 .amount
@@ -205,7 +205,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
         let amount = excess.multiply_ratio(*allocation_bps, total_bps);
         if !amount.is_zero() {
             let msg = match config.usdc_denom {
-                UsdcDenom::CW20(ref addr) => CosmosMsg::Wasm(WasmMsg::Execute {
+                UsdcAsset::CW20(ref addr) => CosmosMsg::Wasm(WasmMsg::Execute {
                     contract_addr: addr.to_string(),
                     msg: to_json_binary(&Cw20ExecuteMsg::Send {
                         contract: market.to_string(),
@@ -216,18 +216,16 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
                     })?,
                     funds: vec![],
                 }),
-                UsdcDenom::IBC(ref denom) | UsdcDenom::Native(ref denom) => {
-                    CosmosMsg::Wasm(WasmMsg::Execute {
-                        contract_addr: market.to_string(),
-                        msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
-                            stake_to_xlp: false,
-                        })?,
-                        funds: vec![Coin {
-                            denom: denom.to_string(),
-                            amount,
-                        }],
-                    })
-                }
+                UsdcAsset::Native(ref denom) => CosmosMsg::Wasm(WasmMsg::Execute {
+                    contract_addr: market.to_string(),
+                    msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
+                        stake_to_xlp: false,
+                    })?,
+                    funds: vec![Coin {
+                        denom: denom.to_string(),
+                        amount,
+                    }],
+                }),
             };
             messages.push(msg);
 
@@ -243,7 +241,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
 
     if !remaining.is_zero() {
         let send_msg = match &config.usdc_denom {
-            UsdcDenom::CW20(addr) => CosmosMsg::Wasm(WasmMsg::Execute {
+            UsdcAsset::CW20(addr) => CosmosMsg::Wasm(WasmMsg::Execute {
                 contract_addr: addr.to_string(),
                 msg: to_json_binary(&Cw20ExecuteMsg::Transfer {
                     recipient: config.governance.to_string(),
@@ -251,7 +249,7 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
                 })?,
                 funds: vec![],
             }),
-            UsdcDenom::IBC(denom) | UsdcDenom::Native(denom) => BankMsg::Send {
+            UsdcAsset::Native(denom) => BankMsg::Send {
                 to_address: config.governance.to_string(),
                 amount: vec![Coin {
                     denom: denom.to_string(),

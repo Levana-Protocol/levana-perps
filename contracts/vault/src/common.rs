@@ -1,5 +1,5 @@
 use cosmwasm_std::{QueryRequest, Storage, Uint64, WasmQuery};
-use perpswap::contracts::vault::{Config, UsdcDenom};
+use perpswap::contracts::vault::{Config, UsdcAsset};
 
 use crate::{
     prelude::*,
@@ -33,7 +33,7 @@ pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> 
     let config = state::CONFIG.load(deps.storage)?;
 
     let vault_balance = match &config.usdc_denom {
-        UsdcDenom::CW20(addr) => {
+        UsdcAsset::CW20(addr) => {
             let res: VaultBalanceResponse =
                 deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                     contract_addr: addr.to_string(),
@@ -43,7 +43,7 @@ pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> 
                 }))?;
             res.vault_balance
         }
-        UsdcDenom::IBC(denom) | UsdcDenom::Native(denom) => {
+        UsdcAsset::Native(denom) => {
             deps.querier
                 .query_balance(&env.contract.address, denom)?
                 .amount

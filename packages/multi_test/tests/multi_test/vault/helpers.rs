@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppBuilder, ContractWrapper, Executor};
 use cw_storage_plus::Map;
-use perpswap::contracts::vault::InstantiateMsg;
+use perpswap::contracts::vault::{InstantiateMsg, UsdcAssetInit};
 use perpswap::storage::{MarketExecuteMsg, MarketQueryMsg};
 use perpswap::token::Token;
 use std::collections::HashMap;
@@ -73,7 +73,9 @@ pub fn setup_vault_contract(
     let markets_allocation_bps = build_markets_allocations_bps(&mut app, markets_allocation_bps)?;
 
     let instantiate_msg = InstantiateMsg {
-        usdc_denom: USDC.to_owned(),
+        usdc_denom: UsdcAssetInit::Native {
+            denom: (USDC.to_owned()),
+        },
         governance: GOVERNANCE.to_string(),
         markets_allocation_bps: markets_allocation_bps.clone(),
     };
