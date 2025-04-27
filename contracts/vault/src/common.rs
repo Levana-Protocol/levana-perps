@@ -1,5 +1,5 @@
 use cosmwasm_std::{QueryRequest, Storage, Uint64, WasmQuery};
-use perpswap::contracts::vault::Config;
+use perpswap::contracts::vault::{Config, UsdcDenom};
 
 use crate::{
     prelude::*,
@@ -14,7 +14,7 @@ pub fn get_total_assets(deps: Deps, env: &Env) -> Result<TotalAssetsResponse> {
 
     let vault_balance = deps
         .querier
-        .query_balance(&env.contract.address, &config.usdc_denom)?
+        .query_balance(&env.contract.address, config.usdc_denom.to_string())?
         .amount;
 
     let allocated_amount: Uint128 = state::MARKET_ALLOCATIONS
@@ -32,19 +32,22 @@ pub fn get_total_assets(deps: Deps, env: &Env) -> Result<TotalAssetsResponse> {
 pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> {
     let config = state::CONFIG.load(deps.storage)?;
 
-    let vault_balance = if config.usdc_denom.starts_with("osmo1") {
-        let res: VaultBalanceResponse =
-            deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
-                contract_addr: config.usdc_denom.clone(),
-                msg: to_json_binary(&cw20::Cw20QueryMsg::Balance {
-                    address: env.contract.address.to_string(),
-                })?,
-            }))?;
-        res.vault_balance
-    } else {
-        deps.querier
-            .query_balance(&env.contract.address, &config.usdc_denom)?
-            .amount
+    let vault_balance = match &config.usdc_denom {
+        UsdcDenom::CW20(addr) => {
+            let res: VaultBalanceResponse =
+                deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                    contract_addr: addr.to_string(),
+                    msg: to_json_binary(&cw20::Cw20QueryMsg::Balance {
+                        address: env.contract.address.to_string(),
+                    })?,
+                }))?;
+            res.vault_balance
+        }
+        UsdcDenom::IBC(denom) | UsdcDenom::Native(denom) => {
+            deps.querier
+                .query_balance(&env.contract.address, denom)?
+                .amount
+        }
     };
 
     let allocated_amount = state::MARKET_ALLOCATIONS

@@ -7,7 +7,7 @@ pub mod types;
 
 use anyhow::Context;
 pub use execute::execute;
-use perpswap::contracts::vault::{Config, InstantiateMsg};
+use perpswap::contracts::vault::{Config, InstantiateMsg, UsdcDenom};
 use prelude::*;
 pub use query::query;
 use std::collections::HashMap;
@@ -39,10 +39,12 @@ pub fn instantiate(
         })
         .collect::<Result<HashMap<Addr, u16>>>()?;
 
+    let usdc_denom = UsdcDenom::from(msg.usdc_denom);
+
     let config = Config {
         governance,
         markets_allocation_bps,
-        usdc_denom: msg.usdc_denom,
+        usdc_denom,
         paused: false,
     };
 

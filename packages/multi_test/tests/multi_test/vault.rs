@@ -3,7 +3,7 @@ use cosmwasm_std::{Addr, Attribute, Coin, Uint128};
 use cw_multi_test::Executor;
 use helpers::{init_user_balance, setup_vault_contract, StatusResp, GOVERNANCE, USDC, USER, USER1};
 use perpswap::{
-    contracts::vault::{Config, ExecuteMsg, QueryMsg},
+    contracts::vault::{Config, ExecuteMsg, QueryMsg, UsdcDenom},
     storage::MarketQueryMsg,
 };
 use std::collections::HashMap;
@@ -326,7 +326,7 @@ fn test_get_config() {
         .unwrap();
 
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
-    assert_eq!(config.usdc_denom, USDC);
+    assert_eq!(config.usdc_denom, UsdcDenom::Native(USDC.to_owned()));
     assert_eq!(
         config
             .markets_allocation_bps
@@ -681,7 +681,7 @@ fn test_instantiate_success() {
         .unwrap();
 
     assert_eq!(config.governance, Addr::unchecked(GOVERNANCE));
-    assert_eq!(config.usdc_denom, USDC);
+    assert_eq!(config.usdc_denom, UsdcDenom::Native(USDC.to_owned()));
 
     let mut markets_allocation_bps: Vec<u16> =
         config.markets_allocation_bps.values().copied().collect();

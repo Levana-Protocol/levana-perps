@@ -1,7 +1,7 @@
 //! Vault contract
 use cosmwasm_std::{Addr, Uint128};
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use super::cw20::Cw20ReceiveMsg;
 
@@ -19,12 +19,45 @@ pub struct InstantiateMsg {
     pub markets_allocation_bps: HashMap<String, u16>,
 }
 
+/// Denomination of USDC token
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum UsdcDenom {
+    /// CW20 USDC
+    CW20(Addr),
+    /// IBC USDC
+    IBC(String),
+    /// Native USDC
+    Native(String),
+}
+impl fmt::Display for UsdcDenom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UsdcDenom::CW20(addr) => write!(f, "{}", addr),
+            UsdcDenom::IBC(path) => write!(f, "{}", path),
+            UsdcDenom::Native(denom) => write!(f, "{}", denom),
+        }
+    }
+}
+
+impl From<String> for UsdcDenom {
+    fn from(s: String) -> Self {
+        if s.starts_with("osmo1") {
+            UsdcDenom::CW20(Addr::unchecked(s))
+        } else if s.starts_with("ibc/") {
+            UsdcDenom::IBC(s)
+        } else {
+            UsdcDenom::Native(s)
+        }
+    }
+}
+
 /// Configuration structure for the vault
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct Config {
     /// Denomination of the USDC token
-    pub usdc_denom: String,
+    pub usdc_denom: UsdcDenom,
 
     /// Address authorized for critical actions (like pausing the contract)
     pub governance: Addr,
