@@ -92,9 +92,15 @@ pub fn execute_receive(
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response> {
     let config = state::CONFIG.load(deps.storage)?;
-    if info.sender.to_string() != config.usdc_denom.to_string() {
-        return Err(anyhow!("Invalid CW20 token"));
+
+    if let UsdcAsset::CW20(cw20_addr) = &config.usdc_denom {
+        if info.sender != *cw20_addr {
+            return Err(anyhow!("Invalid CW20 token"));
+        }
+    } else {
+        return Err(anyhow!("USDC denomination is not a CW20 token"));
     }
+
     check_not_paused(&config)?;
 
     let msg: Cw20HookMsg =
