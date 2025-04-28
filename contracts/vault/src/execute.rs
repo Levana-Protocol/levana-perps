@@ -1,4 +1,4 @@
-use cosmwasm_std::{QueryRequest, WasmQuery};
+use cosmwasm_std::{from_json, QueryRequest, WasmQuery};
 use cw20::Cw20ExecuteMsg;
 use perpswap::{
     contracts::{
@@ -13,7 +13,7 @@ use crate::{
     common::{check_not_paused, get_and_increment_queue_id, get_total_assets},
     prelude::*,
     state::{self, QueueId, LP_BALANCES},
-    types::{VaultBalanceResponse, WithdrawalRequest},
+    types::{Cw20HookMsg, VaultBalanceResponse, WithdrawalRequest},
 };
 
 use std::collections::HashMap;
@@ -23,29 +23,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     match msg {
         ExecuteMsg::Deposit {} => execute_deposit(deps, env, info),
 
-        ExecuteMsg::Receive(Cw20ReceiveMsg {
-            sender,
-            amount,
-            msg: _,
-        }) => {
-            let config = state::CONFIG.load(deps.storage)?;
-            if info.sender.to_string() != config.usdc_denom.to_string() {
-                return Err(anyhow!("Invalid CW20 token"));
-            }
-            check_not_paused(&config)?;
-
-            let sender_addr = deps.api.addr_validate(&sender)?;
-            LP_BALANCES.update(deps.storage, &sender_addr, |balance| -> Result<Uint128> {
-                Ok(balance.unwrap_or_default() + amount)
-            })?;
-            state::TOTAL_LP_SUPPLY
-                .update(deps.storage, |t| -> Result<Uint128> { Ok(t + amount) })?;
-            Ok(Response::new().add_attributes(vec![
-                ("action", "deposit_cw20"),
-                ("user", sender.as_str()),
-                ("amount", &amount.to_string()),
-            ]))
-        }
+        ExecuteMsg::Receive(cw20_msg) => execute_receive(deps, env, info, cw20_msg),
 
         ExecuteMsg::RequestWithdrawal { amount } => execute_request_withdrawal(deps, info, amount),
 
@@ -105,6 +83,39 @@ fn execute_deposit(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Respons
         ("amount", &amount.to_string()),
         ("lp_minted", &lp_amount.to_string()),
     ]))
+}
+
+pub fn execute_receive(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    cw20_msg: Cw20ReceiveMsg,
+) -> Result<Response> {
+    let config = state::CONFIG.load(deps.storage)?;
+    if info.sender.to_string() != config.usdc_denom.to_string() {
+        return Err(anyhow!("Invalid CW20 token"));
+    }
+    check_not_paused(&config)?;
+
+    let msg: Cw20HookMsg =
+        from_json(&cw20_msg.msg).map_err(|_| anyhow!("Invalid CW20 hook message"))?;
+
+    match msg {
+        Cw20HookMsg::Deposit {} => {
+            let sender_addr = deps.api.addr_validate(&cw20_msg.sender)?;
+            LP_BALANCES.update(deps.storage, &sender_addr, |balance| -> Result<Uint128> {
+                Ok(balance.unwrap_or_default() + cw20_msg.amount)
+            })?;
+            state::TOTAL_LP_SUPPLY.update(deps.storage, |t| -> Result<Uint128> {
+                Ok(t + cw20_msg.amount)
+            })?;
+            Ok(Response::new().add_attributes(vec![
+                ("action", "deposit_cw20"),
+                ("user", cw20_msg.sender.as_str()),
+                ("amount", &cw20_msg.amount.to_string()),
+            ]))
+        }
+    }
 }
 
 fn execute_request_withdrawal(
