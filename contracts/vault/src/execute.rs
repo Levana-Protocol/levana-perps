@@ -2,7 +2,7 @@ use cosmwasm_std::{from_json, QueryRequest, WasmQuery};
 use cw20::Cw20ExecuteMsg;
 use perpswap::{
     contracts::{
-        cw20::Cw20ReceiveMsg,
+        cw20::{entry::BalanceResponse, Cw20ReceiveMsg},
         vault::{ExecuteMsg, UsdcAsset},
     },
     number::{LpToken, NonZero},
@@ -13,7 +13,7 @@ use crate::{
     common::{check_not_paused, get_and_increment_queue_id, get_total_assets},
     prelude::*,
     state::{self, QueueId, LP_BALANCES},
-    types::{Cw20HookMsg, VaultBalanceResponse, WithdrawalRequest},
+    types::{Cw20HookMsg, WithdrawalRequest},
 };
 
 use std::collections::HashMap;
@@ -186,14 +186,14 @@ fn execute_redistribute_funds(deps: DepsMut, env: Env, info: MessageInfo) -> Res
 
     let vault_balance = match &config.usdc_denom {
         UsdcAsset::CW20(addr) => {
-            let res: VaultBalanceResponse =
+            let res: BalanceResponse =
                 deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
                     contract_addr: addr.to_string(),
                     msg: to_json_binary(&cw20::Cw20QueryMsg::Balance {
                         address: env.contract.address.to_string(),
                     })?,
                 }))?;
-            res.vault_balance
+            res.balance
         }
         UsdcAsset::Native(denom) => {
             deps.querier
