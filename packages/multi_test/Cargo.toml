@@ -37,7 +37,6 @@ test-log = { version = "0.2", features = ["trace"] }
 pyth-sdk-cw = { workspace = true}
 
 [dev-dependencies]
-mocktail = "0.2.4-alpha"
 prost = "0.13.5"
 
 [features]

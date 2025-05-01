@@ -3,7 +3,6 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppBuilder};
 use cw_storage_plus::Item;
-use mocktail::{server::MockServer, MockSet};
 use perpswap::namespace;
 use prost::Message;
 use rujira_rs::proto::types::{QueryPoolRequest, QueryPoolResponse};
@@ -80,8 +79,7 @@ impl Querier for CustomGrpcQuerier {
     }
 }
 
-pub async fn setup_test_env(price: Option<&str>) -> (App, Addr, MockServer) {
-    let mut mocks = MockSet::new();
+pub async fn setup_test_env(price: Option<&str>) -> (App, Addr) {
     let asset = "ETH.RUNE".to_owned();
     let req = QueryPoolRequest {
         asset: asset.clone(),
@@ -118,13 +116,6 @@ pub async fn setup_test_env(price: Option<&str>) -> (App, Addr, MockServer) {
         derived_depth_bps: "1".to_owned(),
         ..Default::default()
     };
-
-    mocks.mock(|when, then| {
-        when.path(path.as_str()).pb(req.clone());
-        then.pb(res);
-    });
-
-    let server = MockServer::new("Rujira GRPC").grpc().with_mocks(mocks);
 
     server
         .start()
