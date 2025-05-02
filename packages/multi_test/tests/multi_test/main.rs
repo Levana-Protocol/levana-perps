@@ -33,4 +33,5 @@ mod rujira_invalid_price;
 mod sanity;
 mod shutdown;
 mod staleness;
+mod vault;
 mod wrong_token;

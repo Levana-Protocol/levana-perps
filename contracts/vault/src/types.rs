@@ -63,3 +63,8 @@ pub(crate) struct WithdrawalRequest {
     /// Amount of USDCLP to withdraw
     pub(crate) amount: Uint128,
 }
+
+#[derive(serde::Deserialize, serde::Serialize)]
+pub enum Cw20HookMsg {
+    Deposit {},
+}

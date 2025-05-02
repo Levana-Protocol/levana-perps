@@ -1,5 +1,8 @@
-use cosmwasm_std::{Storage, Uint64};
-use perpswap::contracts::vault::Config;
+use cosmwasm_std::{QueryRequest, Storage, Uint64, WasmQuery};
+use perpswap::contracts::{
+    cw20::entry::BalanceResponse,
+    vault::{Config, UsdcAsset},
+};
 
 use crate::{
     prelude::*,
@@ -14,7 +17,7 @@ pub fn get_total_assets(deps: Deps, env: &Env) -> Result<TotalAssetsResponse> {
 
     let vault_balance = deps
         .querier
-        .query_balance(&env.contract.address, &config.usdc_denom)?
+        .query_balance(&env.contract.address, config.usdc_denom.to_string())?
         .amount;
 
     let allocated_amount: Uint128 = state::MARKET_ALLOCATIONS
@@ -32,10 +35,23 @@ pub fn get_total_assets(deps: Deps, env: &Env) -> Result<TotalAssetsResponse> {
 pub fn get_vault_balance(deps: Deps, env: &Env) -> Result<VaultBalanceResponse> {
     let config = state::CONFIG.load(deps.storage)?;
 
-    let vault_balance = deps
-        .querier
-        .query_balance(&env.contract.address, &config.usdc_denom)?
-        .amount;
+    let vault_balance = match &config.usdc_denom {
+        UsdcAsset::CW20(addr) => {
+            let res: BalanceResponse =
+                deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart {
+                    contract_addr: addr.to_string(),
+                    msg: to_json_binary(&cw20::Cw20QueryMsg::Balance {
+                        address: env.contract.address.to_string(),
+                    })?,
+                }))?;
+            res.balance
+        }
+        UsdcAsset::Native(denom) => {
+            deps.querier
+                .query_balance(&env.contract.address, denom)?
+                .amount
+        }
+    };
 
     let allocated_amount = state::MARKET_ALLOCATIONS
         .range(deps.storage, None, None, Order::Ascending)
@@ -65,7 +81,7 @@ pub fn get_market_allocations(
 ) -> Result<MarketAllocationsResponse> {
     let start: Option<Bound<&str>> = start_after.as_deref().map(Bound::exclusive);
 
-    let allocations = state::MARKET_ALLOCATIONS
+    let allocations: Vec<MarketAllocation> = state::MARKET_ALLOCATIONS
         .range(deps.storage, start, None, Order::Ascending)
         .map(|item| {
             let (market_id, amount) = item?;
@@ -75,6 +91,7 @@ pub fn get_market_allocations(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+
     Ok(MarketAllocationsResponse { allocations })
 }
 
