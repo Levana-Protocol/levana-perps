@@ -62,7 +62,7 @@ impl HasAddressHrp for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.get_address_hrp(),
             PerpsNetwork::DymensionTestnet => AddressHrp::from_static("rol"),
             PerpsNetwork::NibiruTestnet => AddressHrp::from_static("nibi"),
-            PerpsNetwork::RujiraTestnet => AddressHrp::from_static("sthor"),
+            PerpsNetwork::RujiraTestnet => AddressHrp::from_static("thor"),
         }
     }
 }

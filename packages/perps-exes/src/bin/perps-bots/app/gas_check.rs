@@ -178,7 +178,7 @@ impl GasCheck {
                     });
 
                     // Temporary limitation: only a single Send can be sent in a tx.
-                    if address.hrp().as_str() == "sthor" {
+                    if address.hrp().as_str() == "thor" {
                         break;
                     }
                 }
