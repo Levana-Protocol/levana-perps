@@ -245,8 +245,8 @@ rpc-nodes = ["https://rpc.testnet-1.nibiru.fi"]
 gas-decimals = 6
 
 [rujira-testnet]
-tracker = "thor18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6n9a6r"
-faucet = "thor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s72crxj"
+tracker = "sthor18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3qrhfwda"
+faucet = "sthor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s8w5s3v"
 rpc-nodes = ["https://thornode-devnet-rpc.bryanlabs.net"]
 gas-decimals = 8
 spot-price = {}
