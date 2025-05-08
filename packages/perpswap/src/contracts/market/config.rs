@@ -9,7 +9,7 @@ use super::spot_price::{SpotPriceConfig, SpotPriceConfigInit};
 
 /// Configuration info for the vAMM
 /// Set by admin-only
-
+///
 /// Since this tends to cross the message boundary
 /// all the numeric types are u32 or lower
 /// helper functions are available where more bits are needed

@@ -38,3 +38,4 @@ rujira-rs = { git = "https://gitlab.com/thorchain/rujira.git", rev = "acdbaa1983
 [dev-dependencies]
 cosmwasm-schema = { workspace = true }
 proptest = "1.0.0"
+prost = "0.13.5"

@@ -522,7 +522,7 @@ impl<'a> arbitrary::Arbitrary<'a> for NonZero<Collateral> {
 /// A special case of [NonZero] which stores a big endian array of data.
 ///
 /// Purpose: this is intended to be used as a key in a cw-storage-plus `Map`. This wouldn't be necessary if cw-storage-plus allowed non-reference
-
+///
 /// A [Number] which is always greater than zero.
 ///
 /// This is useful for representing things like price.
