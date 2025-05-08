@@ -70,7 +70,7 @@ impl OrderId {
     }
 }
 
-impl PrimaryKey<'_> for OrderId {
+impl<'a> PrimaryKey<'a> for OrderId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -81,7 +81,7 @@ impl PrimaryKey<'_> for OrderId {
     }
 }
 
-impl Prefixer<'_> for OrderId {
+impl<'a> Prefixer<'a> for OrderId {
     fn prefix(&self) -> Vec<Key> {
         vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }

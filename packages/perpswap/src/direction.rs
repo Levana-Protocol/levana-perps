@@ -109,7 +109,7 @@ impl From<&str> for DirectionToNotional {
     }
 }
 
-impl PrimaryKey<'_> for DirectionToNotional {
+impl<'a> PrimaryKey<'a> for DirectionToNotional {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -123,7 +123,7 @@ impl PrimaryKey<'_> for DirectionToNotional {
     }
 }
 
-impl Prefixer<'_> for DirectionToNotional {
+impl<'a> Prefixer<'a> for DirectionToNotional {
     fn prefix(&self) -> Vec<Key> {
         let val: u8 = u8::from(*self);
         let key = Key::Val8(val.to_cw_bytes());

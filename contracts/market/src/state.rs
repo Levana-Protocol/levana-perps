@@ -80,7 +80,7 @@ impl<'a> State<'a> {
         })
     }
 
-    pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &'a dyn Storage)> {
+    pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &dyn Storage)> {
         let state = State::new_inner(deps.api, deps.querier, env, deps.storage)?;
         Ok((state, deps.storage))
     }

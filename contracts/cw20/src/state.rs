@@ -16,7 +16,7 @@ pub(crate) struct StateContext<'a> {
 }
 
 impl<'a> State<'a> {
-    pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &'a dyn Storage)> {
+    pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &dyn Storage)> {
         Ok((State { api: deps.api, env }, deps.storage))
     }
 }

@@ -174,7 +174,7 @@ pub struct LogoChangeEvent<'a> {
     pub logo: &'a Logo,
 }
 
-impl From<LogoChangeEvent<'_>> for Event {
+impl<'a> From<LogoChangeEvent<'a>> for Event {
     fn from(src: LogoChangeEvent) -> Self {
         let event = Event::new("logo-change");
 

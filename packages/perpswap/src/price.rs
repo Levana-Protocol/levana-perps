@@ -397,7 +397,7 @@ impl Price {
 #[derive(Clone)]
 pub struct PriceKey([u8; 32]);
 
-impl PrimaryKey<'_> for PriceKey {
+impl<'a> PrimaryKey<'a> for PriceKey {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -408,7 +408,7 @@ impl PrimaryKey<'_> for PriceKey {
     }
 }
 
-impl Prefixer<'_> for PriceKey {
+impl<'a> Prefixer<'a> for PriceKey {
     fn prefix(&self) -> Vec<Key> {
         self.key()
     }
@@ -602,7 +602,7 @@ impl JsonSchema for TakeProfitTrader {
 
 struct TakeProfitPriceVisitor;
 
-impl serde::de::Visitor<'_> for TakeProfitPriceVisitor {
+impl<'de> serde::de::Visitor<'de> for TakeProfitPriceVisitor {
     type Value = TakeProfitTrader;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

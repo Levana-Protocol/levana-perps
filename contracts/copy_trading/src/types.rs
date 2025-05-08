@@ -357,7 +357,7 @@ pub(crate) struct WalletInfo {
     pub(crate) wallet: Addr,
 }
 
-impl PrimaryKey<'_> for WalletInfo {
+impl<'a> PrimaryKey<'a> for WalletInfo {
     type Prefix = Addr;
     type SubPrefix = ();
     type Suffix = Token;

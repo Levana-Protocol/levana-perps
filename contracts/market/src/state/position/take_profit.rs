@@ -13,7 +13,7 @@ pub(crate) struct TakeProfitToCounterCollateral<'a> {
     pub(crate) price_point: &'a PricePoint,
 }
 
-impl TakeProfitToCounterCollateral<'_> {
+impl<'a> TakeProfitToCounterCollateral<'a> {
     pub(crate) fn calc(&self) -> Result<NonZero<Collateral>> {
         // minimum allowed counter-collateral
         let min_counter_collateral = self

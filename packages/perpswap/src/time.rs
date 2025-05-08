@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for Timestamp {
 
 struct NanoVisitor;
 
-impl Visitor<'_> for NanoVisitor {
+impl<'de> Visitor<'de> for NanoVisitor {
     type Value = Timestamp;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -148,7 +148,7 @@ impl From<CWTimestamp> for Timestamp {
     }
 }
 
-impl PrimaryKey<'_> for Timestamp {
+impl<'a> PrimaryKey<'a> for Timestamp {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Timestamp;
@@ -169,7 +169,7 @@ impl KeyDeserialize for Timestamp {
     }
 }
 
-impl Prefixer<'_> for Timestamp {
+impl<'a> Prefixer<'a> for Timestamp {
     fn prefix(&self) -> Vec<cw_storage_plus::Key> {
         self.0.prefix()
     }

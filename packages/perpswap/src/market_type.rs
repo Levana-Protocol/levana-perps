@@ -219,7 +219,7 @@ impl<'de> serde::Deserialize<'de> for MarketId {
 
 struct MarketIdVisitor;
 
-impl Visitor<'_> for MarketIdVisitor {
+impl<'de> Visitor<'de> for MarketIdVisitor {
     type Value = MarketId;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -249,7 +249,7 @@ impl JsonSchema for MarketId {
     }
 }
 
-impl PrimaryKey<'_> for MarketId {
+impl<'a> PrimaryKey<'a> for MarketId {
     type Prefix = ();
     type SubPrefix = ();
     type Suffix = Self;
@@ -262,7 +262,7 @@ impl PrimaryKey<'_> for MarketId {
     }
 }
 
-impl Prefixer<'_> for MarketId {
+impl<'a> Prefixer<'a> for MarketId {
     fn prefix(&self) -> Vec<Key> {
         let key = Key::Ref(self.encoded.as_bytes());
         vec![key]

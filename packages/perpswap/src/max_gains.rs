@@ -97,7 +97,7 @@ impl JsonSchema for MaxGainsInQuote {
 
 struct MaxGainsInQuoteVisitor;
 
-impl serde::de::Visitor<'_> for MaxGainsInQuoteVisitor {
+impl<'de> serde::de::Visitor<'de> for MaxGainsInQuoteVisitor {
     type Value = MaxGainsInQuote;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
