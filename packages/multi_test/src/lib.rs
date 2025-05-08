@@ -162,6 +162,15 @@ impl PerpsApp {
         Ok(_self)
     }
 
+    pub fn new_with_custom_app(app: App) -> Result<Rc<RefCell<Self>>> {
+        let perps_app = PerpsApp {
+            app,
+            ..PerpsApp::new()?
+        };
+
+        Ok(Rc::new(RefCell::new(perps_app)))
+    }
+
     // returned bool is true iff it's a newly created user
     pub fn get_user(&mut self, name: &str, token: &Token, funds: Number) -> Result<(Addr, bool)> {
         let name = MockApi::default().addr_make(name);

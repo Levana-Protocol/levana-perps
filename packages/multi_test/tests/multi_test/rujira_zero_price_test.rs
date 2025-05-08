@@ -38,10 +38,10 @@ fn test_rujira_zero_price_handling() {
     assert!(parse_result.is_err());
 
     // Try to create a zero Decimal
-    let zero_decimal = Decimal::zero();
+    let zero_decimal = Decimal256::zero();
 
     // Try to create a PriceBaseInQuote from a zero Decimal
-    let result = PriceBaseInQuote::try_from(zero_decimal);
+    let result = PriceBaseInQuote::try_from_number(zero_decimal.into());
 
     // This should fail because the price must be > 0
     assert!(result.is_err());
@@ -195,9 +195,7 @@ pub fn create_perps_app_with_custom_price(price_value: String) -> Result<Rc<RefC
     let app = create_app_with_custom_price(price_value);
 
     // Create a PerpsApp with the custom App
-    let perps_app = PerpsApp::new_with_custom_app(app)?;
-
-    Ok(Rc::new(RefCell::new(perps_app)))
+    PerpsApp::new_with_custom_app(app)
 }
 
 #[test]
