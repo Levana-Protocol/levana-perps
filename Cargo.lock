@@ -3309,7 +3309,6 @@ dependencies = [
  "levana_perpswap_cosmos",
  "once_cell",
  "proptest",
- "prost",
  "pyth-sdk-cw",
  "rujira-rs",
  "semver",
