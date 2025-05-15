@@ -49,7 +49,7 @@ impl PerpsNetwork {
                 "https://thornode-devnet-grpc.bryanlabs.net",
             )),
             PerpsNetwork::ThorchainStagenet => Ok(CosmosBuilder::new(
-                "thorchain-stagenet-2",
+                "thorchain-stagenet-v2",
                 "tthor",
                 Self::ThorchainStagenet.get_address_hrp(),
                 "https://stagenet.thorchain.net",
