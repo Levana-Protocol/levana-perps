@@ -50,7 +50,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 perps_exes::PerpsNetwork::RujiraTestnet => {
                     Err(anyhow!("Unsupported Rujira testnet"))
                 }
-                perps_exes::PerpsNetwork::ThorchainStagenet => {
+                perps_exes::PerpsNetwork::RujiraStagenet => {
                     Err(anyhow!("Unsupported Thorchain stagenet"))
                 }
             };
