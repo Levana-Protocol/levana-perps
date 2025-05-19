@@ -48,25 +48,11 @@ impl PerpsNetwork {
                 Self::RujiraTestnet.get_address_hrp(),
                 "https://thornode-devnet-grpc.bryanlabs.net",
             )),
-            // https://ops.ninerealms.com/links
             PerpsNetwork::RujiraStagenet => Ok(CosmosBuilder::new(
                 "thorchain-stagenet-v2",
                 "rune",
                 Self::RujiraStagenet.get_address_hrp(),
-              "https://thornode-mainnet-grpc.bryanlabs.net:443",
-              /*
-                ✅ thornode-devnet-grpc.bryanlabs.net:443 - Latency: 12.00ms
-                ✅ thornode-mainnet-grpc.bryanlabs.net:443 - Latency: 10.00ms
-                ✅ gaia-grpc.bryanlabs.net:443 - Latency: 118.00ms
-                ✅ noble-grpc.bryanlabs.net:443 - Latency: 194.00ms
-                ✅ kujira-grpc.bryanlabs.net:443 - Latency: 11.00ms
-                ✅ osmosis-grpc.bryanlabs.net:443 - Latency: 12.00ms
-               */
-                // "https://thornode-devnet-grpc.defiantlabs.net",
-                // "https://thornode-grpc.defiantlabs.net",
-                //"https://stagenet-thornode.ninerealms.com",
-                // "https://stagenet-thornode.ninerealms.com",
-                // "https://thornode-devnet-grpc.defiantlabs.net",
+              "https://stagenet-grpc.ninerealms.com:443",
             )),
         }
     }
@@ -85,7 +71,7 @@ impl HasAddressHrp for PerpsNetwork {
             PerpsNetwork::DymensionTestnet => AddressHrp::from_static("rol"),
             PerpsNetwork::NibiruTestnet => AddressHrp::from_static("nibi"),
             PerpsNetwork::RujiraTestnet => AddressHrp::from_static("sthor"),
-            PerpsNetwork::RujiraStagenet => AddressHrp::from_static("thor"),
+            PerpsNetwork::RujiraStagenet => AddressHrp::from_static("sthor"),
         }
     }
 }
