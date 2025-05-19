@@ -52,7 +52,7 @@ impl PerpsNetwork {
                 "thorchain-stagenet-v2",
                 "rune",
                 Self::RujiraStagenet.get_address_hrp(),
-              "https://stagenet-grpc.ninerealms.com:443",
+                "https://stagenet-grpc.ninerealms.com:443",
             )),
         }
     }
