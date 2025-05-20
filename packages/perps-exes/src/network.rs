@@ -49,7 +49,7 @@ impl PerpsNetwork {
                 "https://thornode-devnet-grpc.bryanlabs.net",
             )),
             PerpsNetwork::RujiraStagenet => Ok(CosmosBuilder::new(
-                "thorchain-stagenet-v2",
+                "thorchain-stagenet-2",
                 "rune",
                 Self::RujiraStagenet.get_address_hrp(),
                 "https://stagenet-grpc.ninerealms.com:443",
