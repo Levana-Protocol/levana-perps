@@ -468,3 +468,43 @@ hash = "ee0c7221f0192e9a8668cffe6a081cbc72994971f17e0d5607340e7205a3783b"
 
 [hashes.code-ids]
 osmosis-mainnet = 1337
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "1a56430a038bea22128fe5002aa6dcba62a5f940"
+hash = "223d1bd3afaee3baef45ce493604817a1d73120ca94ee4f0898560c3097c8cda"
+
+[hashes.code-ids]
+rujira-stagenet = 39
+
+[[hashes]]
+contract-type = "market"
+gitrev = "1a56430a038bea22128fe5002aa6dcba62a5f940"
+hash = "1af3bac72ba3829b79ddbc2797e8d3ef04a90c6d5d5d1c4866e7e96843a7f631"
+
+[hashes.code-ids]
+rujira-stagenet = 40
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "1a56430a038bea22128fe5002aa6dcba62a5f940"
+hash = "04b1b6239e870f4bd460b69cf6b1272e4517fd045c9c19b5402cb8600b47c2c0"
+
+[hashes.code-ids]
+rujira-stagenet = 41
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "1a56430a038bea22128fe5002aa6dcba62a5f940"
+hash = "27c3a7d6ea5bd42ea8a10c96dc1cedc2c93135604a49351e735d5843f5a56e33"
+
+[hashes.code-ids]
+rujira-stagenet = 42
+
+[[hashes]]
+contract-type = "countertrade"
+gitrev = "1a56430a038bea22128fe5002aa6dcba62a5f940"
+hash = "6da0cdf4563ea7d0c0071cff17be14d33ef3f47d329ae10140b5697e93b74de5"
+
+[hashes.code-ids]
+rujira-stagenet = 43
