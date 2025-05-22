@@ -2089,3 +2089,27 @@ inverted = false
 [networks.rujira-testnet.ATOM_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
+
+[[networks.rujira-testnet.ATOM_USD.feeds]]
+
+[networks.rujira-testnet.ATOM_USD.feeds.rujira]
+asset = "ATOM_USD"
+inverted = false
+
+[[networks.rujira-testnet.ATOM_USD.feeds-usd]]
+
+[networks.rujira-testnet.ATOM_USD.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-testnet.BTC_USD.feeds]]
+
+[networks.rujira-testnet.BTC_USD.feeds.rujira]
+asset = "BTC_USD"
+inverted = false
+
+[[networks.rujira-testnet.BTC_USD.feeds-usd]]
+
+[networks.rujira-testnet.BTC_USD.feeds-usd.constant]
+price = "1"
+inverted = false

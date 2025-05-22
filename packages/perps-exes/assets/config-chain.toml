@@ -245,9 +245,9 @@ rpc-nodes = ["https://rpc.testnet-1.nibiru.fi"]
 gas-decimals = 6
 
 [rujira-testnet]
-tracker = "sthor18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3qrhfwda"
-faucet = "sthor1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s8w5s3v"
-rpc-nodes = ["https://thornode-devnet-rpc.bryanlabs.net"]
+tracker = "sthor1pqj8w5c8aygg8jns6zlq24ltyjha0zd7yfsjq2ahnzdpe4zhtd8q4evugs"
+faucet = "sthor1r85reqy6h0lu02vyz0hnzhv5whsns55gdt4w0d7ft87utzk7u0wq590hsm"
+rpc-nodes = ["https://stagenet-thornode.ninerealms.com"]
 gas-decimals = 8
 spot-price = {}
-explorer = "https://explore.bryanlabs.net/thornode/tx/"
+explorer = "https://stagenet.thorchain.net"
