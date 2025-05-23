@@ -66,8 +66,8 @@ impl App {
                     decimal_places: 0,
                 },
                 "BTC_USDC" => CollateralSource::Native {
-                    denom: "BTC.BTC".to_string(),
-                    decimal_places: 0,
+                    denom: "BTC.USDC".to_string(),
+                    decimal_places: 6,
                 },
                 "DOGE_USDC" => CollateralSource::Native {
                     denom: "DOGE.DOGE".to_string(),
