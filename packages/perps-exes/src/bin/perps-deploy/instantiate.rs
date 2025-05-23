@@ -5,6 +5,7 @@ use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
 use perps_exes::config::{ConfigTestnet, ConfigUpdateAndBorrowFee, MarketConfigUpdates};
 use perps_exes::contracts::{Factory, MarketInfo};
 use perps_exes::prelude::MarketContract;
+use perps_exes::PerpsNetwork;
 use perpswap::contracts::market::spot_price::{
     PythConfigInit, SpotPriceConfigInit, StrideConfigInit,
 };
@@ -50,9 +51,41 @@ impl App {
         if self.dev_settings {
             config.unstake_period_seconds = Some(60 * 60);
         }
-        Ok(InstantiateMarket {
-            // TODO - maybe make this configurable via yaml files
-            collateral: match market_id.as_str() {
+        let collateral = match self.basic.network {
+            PerpsNetwork::RujiraTestnet => match market_id.as_str() {
+                "ATOM_USDC" => CollateralSource::Native {
+                    denom: "GAIA.ATOM".to_string(),
+                    decimal_places: 6,
+                },
+                "AVAX_USDC" => CollateralSource::Native {
+                    denom: "AVAX.AVAX".to_string(),
+                    decimal_places: 0,
+                },
+                "BNB_USDC" => CollateralSource::Native {
+                    denom: "BSC.BNB".to_string(),
+                    decimal_places: 0,
+                },
+                "BTC_USDC" => CollateralSource::Native {
+                    denom: "BTC.BTC".to_string(),
+                    decimal_places: 0,
+                },
+                "DOGE_USDC" => CollateralSource::Native {
+                    denom: "DOGE.DOGE".to_string(),
+                    decimal_places: 0,
+                },
+                "THOR_RUJI" => CollateralSource::Native {
+                    denom: "THOR.RUJI".to_string(),
+                    decimal_places: 0,
+                },
+                "THOR_TCY" => CollateralSource::Native {
+                    denom: "THOR.TCY".to_string(),
+                    decimal_places: 0,
+                },
+                _ => {
+                    anyhow::bail!("Unsupported market id {market_id} for RujiraTestnet");
+                }
+            },
+            _ => match market_id.as_str() {
                 "nBTC_USD" => CollateralSource::Native {
                     denom: "ibc/5946AD5E947FF47B521103044C74B6FC3DD242227433EE9278F2B044B2AA2DF0"
                         .to_string(),
@@ -60,6 +93,10 @@ impl App {
                 },
                 _ => CollateralSource::Cw20(Cw20Source::Faucet(self.faucet.clone())),
             },
+        };
+        Ok(InstantiateMarket {
+            // TODO - maybe make this configurable via yaml files
+            collateral,
             config,
             initial_borrow_fee_rate,
             spot_price: match &self.price_source {

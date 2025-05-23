@@ -2090,26 +2090,74 @@ inverted = false
 price = "1"
 inverted = false
 
-[[networks.rujira-testnet.ATOM_USD.feeds]]
+[[networks.rujira-testnet.AVAX_USDC.feeds]]
 
-[networks.rujira-testnet.ATOM_USD.feeds.rujira]
-asset = "ATOM_USD"
+[networks.rujira-testnet.AVAX_USDC.feeds.rujira]
+asset = "AVAX.AVAX"
 inverted = false
 
-[[networks.rujira-testnet.ATOM_USD.feeds-usd]]
+[[networks.rujira-testnet.AVAX_USDC.feeds-usd]]
 
-[networks.rujira-testnet.ATOM_USD.feeds-usd.constant]
+[networks.rujira-testnet.AVAX_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
 
-[[networks.rujira-testnet.BTC_USD.feeds]]
+[[networks.rujira-testnet.BTC_USDC.feeds]]
 
-[networks.rujira-testnet.BTC_USD.feeds.rujira]
-asset = "BTC_USD"
+[networks.rujira-testnet.BTC_USDC.feeds.rujira]
+asset = "BTC.BTC"
 inverted = false
 
-[[networks.rujira-testnet.BTC_USD.feeds-usd]]
+[[networks.rujira-testnet.BTC_USDC.feeds-usd]]
 
-[networks.rujira-testnet.BTC_USD.feeds-usd.constant]
+[networks.rujira-testnet.BTC_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-testnet.BNB_USDC.feeds]]
+
+[networks.rujira-testnet.BNB_USDC.feeds.rujira]
+asset = "BSC.BNB"
+inverted = false
+
+[[networks.rujira-testnet.BNB_USDC.feeds-usd]]
+
+[networks.rujira-testnet.BNB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-testnet.DOGE_USDC.feeds]]
+
+[networks.rujira-testnet.DOGE_USDC.feeds.rujira]
+asset = "DOGE.DOGE"
+inverted = false
+
+[[networks.rujira-testnet.DOGE_USDC.feeds-usd]]
+
+[networks.rujira-testnet.DOGE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-testnet.THOR_RUJI.feeds]]
+
+[networks.rujira-testnet.THOR_RUJI.feeds.rujira]
+asset = "THOR.RUJI"
+inverted = false
+
+[[networks.rujira-testnet.THOR_RUJI.feeds-usd]]
+
+[networks.rujira-testnet.THOR_RUJI.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-testnet.THOR_TCY.feeds]]
+
+[networks.rujira-testnet.THOR_TCY.feeds.rujira]
+asset = "THOR.TCY"
+inverted = false
+
+[[networks.rujira-testnet.THOR_TCY.feeds-usd]]
+
+[networks.rujira-testnet.THOR_TCY.feeds-usd.constant]
 price = "1"
 inverted = false
