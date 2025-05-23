@@ -170,7 +170,7 @@ migrate-osmoci:
 # At this momment KUJI_USDC is not supported
 deploy-rujira-testnet:
 	cargo run --bin perps-deploy testnet store-code
-    cargo run --bin perps-deploy testnet instantiate --family rujibeta \
+	cargo run --bin perps-deploy testnet instantiate --family rujibeta \
 		--market-id ATOM_USDC \
 		--market-id BTC_USDC \
 		--market-id AVAX_USDC \
