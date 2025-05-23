@@ -175,7 +175,7 @@ impl HttpApp {
 
         let total_exchanges = result.data.num_market_pairs;
         // Ceiled division
-        let iterations = (total_exchanges + limit - 1) / limit;
+        let iterations = total_exchanges.div_ceil(limit);
 
         tracing::debug!("total iterations: {iterations}");
 
