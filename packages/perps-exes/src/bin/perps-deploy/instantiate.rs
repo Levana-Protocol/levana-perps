@@ -53,33 +53,9 @@ impl App {
         }
         let collateral = match self.basic.network {
             PerpsNetwork::RujiraTestnet => match market_id.as_str() {
-                "ATOM_USDC" => CollateralSource::Native {
-                    denom: "GAIA.ATOM".to_string(),
-                    decimal_places: 6,
-                },
-                "AVAX_USDC" => CollateralSource::Native {
-                    denom: "AVAX.AVAX".to_string(),
-                    decimal_places: 0,
-                },
-                "BNB_USDC" => CollateralSource::Native {
-                    denom: "BSC.BNB".to_string(),
-                    decimal_places: 0,
-                },
-                "BTC_USDC" => CollateralSource::Native {
-                    denom: "BTC.USDC".to_string(),
-                    decimal_places: 6,
-                },
-                "DOGE_USDC" => CollateralSource::Native {
-                    denom: "DOGE.DOGE".to_string(),
-                    decimal_places: 0,
-                },
-                "THOR_RUJI" => CollateralSource::Native {
-                    denom: "THOR.RUJI".to_string(),
-                    decimal_places: 0,
-                },
-                "THOR_TCY" => CollateralSource::Native {
-                    denom: "THOR.TCY".to_string(),
-                    decimal_places: 0,
+                "BTC_USDT" => CollateralSource::Native {
+                    denom: "eth-usdt-0xdac17f958d2ee523a2206206994597c13d831ec7".to_string(),
+                    decimal_places: 8,
                 },
                 _ => {
                     anyhow::bail!("Unsupported market id {market_id} for RujiraTestnet");

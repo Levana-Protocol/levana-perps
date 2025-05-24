@@ -167,10 +167,9 @@ migrate-osmoci:
 	cargo run --bin perps-deploy testnet migrate --family osmoci
 
 # Deploy to Rujira testnet Thorchain Stagenet
-# At this momment KUJI_USDC is not supported
 deploy-rujira-testnet:
 	cargo run --bin perps-deploy testnet store-code
-	cargo run --bin perps-deploy testnet instantiate --family rujibeta --market-id BTC_USDC
+	cargo run --bin perps-deploy testnet instantiate --family rujibeta --market-id BTC_USDT
 
 # Build documentations
 build-docs:
