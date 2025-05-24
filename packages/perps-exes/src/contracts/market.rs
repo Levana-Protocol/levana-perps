@@ -1,6 +1,6 @@
 use cosmos::{
     proto::{cosmos::base::abci::v1beta1::TxResponse, cosmwasm::wasm::v1::MsgExecuteContract},
-    Address, Contract, HasAddress, HasAddressHrp, HasContract, HasCosmos, TxBuilder, Wallet,
+    Address, Coin, Contract, HasAddress, HasAddressHrp, HasContract, HasCosmos, TxBuilder, Wallet,
 };
 
 use backon::{ConstantBuilder, Retryable};
@@ -109,25 +109,38 @@ impl MarketContract {
             .collateral
             .into_u128(funds.into_decimal256())?
             .context("exec_with_funds: no funds")?;
-        let cw20 = match &status.collateral {
-            perpswap::token::Token::Cw20 {
-                addr,
-                decimal_places: _,
-            } => addr.as_str().parse()?,
-            perpswap::token::Token::Native { .. } => anyhow::bail!("No support for native"),
-        };
-        let cw20 = self.0.get_cosmos().make_contract(cw20);
-        cw20.execute(
-            wallet,
-            vec![],
-            perpswap::contracts::cw20::entry::ExecuteMsg::Send {
-                contract: self.0.get_address_string().into(),
-                amount: funds.into(),
-                msg: to_json_binary(msg)?,
-            },
-        )
-        .await
-        .map_err(|e| e.into())
+
+        match &status.collateral {
+            perpswap::token::Token::Cw20 { addr, .. } => {
+                let cw20 = addr.as_str().parse()?;
+                let cw20 = self.0.get_cosmos().make_contract(cw20);
+                cw20.execute(
+                    wallet,
+                    vec![],
+                    perpswap::contracts::cw20::entry::ExecuteMsg::Send {
+                        contract: self.0.get_address_string().into(),
+                        amount: funds.into(),
+                        msg: to_json_binary(msg)?,
+                    },
+                )
+                .await
+                .map_err(|e| e.into())
+            }
+            perpswap::token::Token::Native { denom, .. } => {
+                let contract = self.0.get_cosmos().make_contract(self.0.get_address());
+                contract
+                    .execute(
+                        wallet,
+                        vec![Coin {
+                            denom: denom.clone(),
+                            amount: funds.to_string(),
+                        }],
+                        msg,
+                    )
+                    .await
+                    .map_err(|e| e.into())
+            }
+        }
     }
 
     pub async fn deposit(
