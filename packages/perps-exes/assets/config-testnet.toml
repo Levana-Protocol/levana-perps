@@ -1567,6 +1567,8 @@ out-of-date = 20
 constant = 20
 
 [overrides.rujibeta]
+price = true
+wallet-manager-address = "levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9"
 default-market-ids = [
     "BTC_USDT",
 ]
