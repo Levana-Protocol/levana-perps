@@ -1641,5 +1641,5 @@ price = "8"
 price_usd = "8"
 
 [initial-prices.BTC_USDT]
-price = "85000"
-price_usd = "85000"
+price = "1"
+price_usd = "1"
