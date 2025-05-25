@@ -1639,3 +1639,7 @@ price_usd = "1"
 [initial-prices.stATOM_USD]
 price = "8"
 price_usd = "8"
+
+[initial-prices.BTC_USDT]
+price = "85000"
+price_usd = "85000"
