@@ -166,6 +166,11 @@ migrate-osmoci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet migrate --family osmoci
 
+# Deploy to Rujira testnet Thorchain Stagenet
+deploy-rujira-testnet:
+	cargo run --bin perps-deploy testnet store-code
+	cargo run --bin perps-deploy testnet instantiate --family rujibeta --market-id BTC_USDT
+
 # Build documentations
 build-docs:
 	mkdir -p ./.output/temp/schema/cosmos
