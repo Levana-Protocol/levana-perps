@@ -1566,6 +1566,15 @@ out-of-date = 20
 [overrides.seidev.watcher.block-lag.delay]
 constant = 20
 
+[overrides.rujibeta]
+default-market-ids = [
+    "BTC_USDT",
+]
+min-gas = "1"
+min-gas-high-gas-wallet = "1"
+min-gas-in-faucet = "1"
+min-gas-in-gas-wallet = "10"
+
 [liquidity]
 min-util-delta = "-0.05"
 max-util-delta = "0.02"
