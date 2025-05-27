@@ -41,7 +41,7 @@ use perpswap::contracts::{
             AddrIsContractResp, ContractType, CopyTradingAddr, CopyTradingInfo, CopyTradingResp,
             CounterTradeAddr, CounterTradeInfo, CounterTradeResp, ExecuteMsg, FactoryOwnerResp,
             GetReferrerResp, InstantiateMsg, LeaderAddr, ListRefereeCountStartAfter,
-            MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount, QUERY_LIMIT_DEFAULT,
+            MarketInfoResponse, MigrateMsg, QueryMsg, RefereeCount, VaultResp, QUERY_LIMIT_DEFAULT,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -280,6 +280,11 @@ fn execute_msg(
         ExecuteMsg::SetCounterTradeCodeId { code_id } => {
             let code_id: u64 = code_id.parse()?;
             crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(ctx.storage, &code_id)?;
+        }
+
+        ExecuteMsg::SetVaultCodeId { code_id } => {
+            let code_id: u64 = code_id.parse()?;
+            // crate::state::vault::COUNTER_TRADE_CODE_ID.save(ctx.storage, &code_id)?;
         }
 
         ExecuteMsg::SetOwner { owner } => {
@@ -604,6 +609,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let response = CounterTradeResp { addresses: result };
+            let response = to_json_binary(&response)?;
+            Ok(response)
+        }
+
+        QueryMsg::Vault { start_after, limit } => {
+            let result: Vec<perpswap::contracts::factory::entry::VaultInfo> = vec![];
+            let response = VaultResp { addresses: result };
             let response = to_json_binary(&response)?;
             Ok(response)
         }

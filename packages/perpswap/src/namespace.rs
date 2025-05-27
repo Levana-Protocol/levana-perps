@@ -169,3 +169,4 @@ pub const COPY_TRADING_LAST_ADDED: &str = "fj";
 pub const COUNTERTRADE_CODE_ID: &str = "fk";
 pub const REPLY_INSTANTIATE_COUNTER_TRADE: &str = "fl";
 pub const COUNTER_TRADE_ADDRS: &str = "fm";
+pub const VAULT_CODE_ID: &str = "fn";

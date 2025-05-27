@@ -229,12 +229,20 @@ enum ContractType {
     LiquidityToken,
     PositionToken,
     Countertrade,
+    Vault,
 }
 
 impl ContractType {
     fn all_required() -> [ContractType; 5] {
         use ContractType::*;
-        [Factory, Market, LiquidityToken, PositionToken, Countertrade]
+        [
+            Factory,
+            Market,
+            LiquidityToken,
+            PositionToken,
+            Countertrade,
+            Vault,
+        ]
     }
 
     fn as_str(self) -> &'static str {
@@ -244,6 +252,7 @@ impl ContractType {
             ContractType::LiquidityToken => "liquidity_token",
             ContractType::PositionToken => "position_token",
             ContractType::Countertrade => "countertrade",
+            ContractType::Vault => "vault",
         }
     }
 }
@@ -258,6 +267,7 @@ impl FromStr for ContractType {
             "liquidity_token" => Ok(ContractType::LiquidityToken),
             "position_token" => Ok(ContractType::PositionToken),
             "countertrade" => Ok(ContractType::Countertrade),
+            "vault" => Ok(ContractType::Vault),
             _ => Err(anyhow::anyhow!("Invalid contract type: {s}")),
         }
     }

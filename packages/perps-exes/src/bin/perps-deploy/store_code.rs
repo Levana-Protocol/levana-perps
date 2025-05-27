@@ -59,6 +59,7 @@ impl Contracts {
                 POSITION_TOKEN,
                 COUNTER_TRADE,
                 COPY_TRADING,
+                VAULT,
             ],
             Contracts::Hatching => &[HATCHING],
             Contracts::IbcExecuteProxy => &[IBC_EXECUTE_PROXY],
@@ -77,6 +78,7 @@ pub(crate) const IBC_EXECUTE_PROXY: &str = "ibc_execute_proxy";
 pub(crate) const LVN_REWARDS: &str = "rewards";
 pub(crate) const COUNTER_TRADE: &str = "countertrade";
 pub(crate) const COPY_TRADING: &str = "copy_trading";
+pub(crate) const VAULT: &str = "vault";
 
 pub(crate) async fn go(
     opt: Opt,

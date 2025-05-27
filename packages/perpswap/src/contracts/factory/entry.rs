@@ -132,6 +132,11 @@ pub enum ExecuteMsg {
         /// Code ID to use for future countertrade contracts
         code_id: String,
     },
+    /// Set the vault code id, i.e. if it's been migrated
+    SetVaultCodeId {
+        /// Code ID to use for future vault contract
+        code_id: String,
+    },
     /// Remove the owner from factory
     RemoveOwner {},
 }
@@ -163,6 +168,15 @@ pub struct CounterTradeResp {
     pub addresses: Vec<CounterTradeInfo>,
 }
 
+/// Response from [QueryMsg::Markets]
+///
+/// Use [QueryMsg::Vault] for details on vault contract.
+#[cw_serde]
+pub struct VaultResp {
+    /// Vault contract maintained by this factory
+    pub addresses: Vec<VaultInfo>,
+}
+
 /// Response from [QueryMsg::AddrIsContract]
 #[cw_serde]
 pub struct AddrIsContractResp {
@@ -187,6 +201,8 @@ pub enum ContractType {
     CopyTrading,
     /// Countertrade contract
     CounterTrade,
+    /// Vault contract
+    Vault,
 }
 
 /// Default limit for [QueryMsg::Markets]
@@ -312,6 +328,14 @@ pub enum QueryMsg {
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
     },
+    /// Fetch vault contract
+    #[returns(VaultResp)]
+    Vault {
+        /// Last seen [MarketId] in a [VaultResp] for enumeration
+        start_after: Option<MarketId>,
+        /// Defaults to [QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -362,6 +386,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetPositionTokenCodeId { .. } => true,
             ExecuteMsg::SetLiquidityTokenCodeId { .. } => true,
             ExecuteMsg::SetCounterTradeCodeId { .. } => true,
+            ExecuteMsg::SetVaultCodeId { .. } => true,
             ExecuteMsg::SetOwner { .. } => true,
             ExecuteMsg::SetMigrationAdmin { .. } => true,
             ExecuteMsg::SetDao { .. } => true,
@@ -390,6 +415,8 @@ pub struct CodeIds {
     pub liquidity_token: Uint64,
     /// Countertrade code ID
     pub counter_trade: Option<Uint64>,
+    /// Vault code ID
+    pub vault: Option<Uint64>,
 }
 
 /// Response from [QueryMsg::GetReferrer]
@@ -493,6 +520,15 @@ pub struct CopyTradingInfoRaw {
     pub contract: RawAddr,
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Vault contract information
+pub struct VaultInfo {
+    /// Address of the vault contract
+    pub contract: VaultAddr,
+    /// Associated market id of the vault contract
+    pub market_id: MarketId,
+}
+
 impl KeyDeserialize for LeaderAddr {
     type Output = LeaderAddr;
 
@@ -566,6 +602,37 @@ impl<'a> Prefixer<'a> for CounterTradeAddr {
 }
 
 impl<'a> PrimaryKey<'a> for CounterTradeAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
+    }
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Vault contract address
+pub struct VaultAddr(pub Addr);
+
+impl KeyDeserialize for VaultAddr {
+    type Output = VaultAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(VaultAddr)
+    }
+}
+
+impl<'a> Prefixer<'a> for VaultAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for VaultAddr {
     type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
     type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
     type Suffix = <Addr as PrimaryKey<'a>>::Suffix;

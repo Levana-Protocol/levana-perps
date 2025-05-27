@@ -4,6 +4,7 @@ pub(crate) mod auth;
 pub(crate) mod code_ids;
 pub(crate) mod copy_trading;
 pub(crate) mod countertrade;
+//pub(crate) mod vault;
 pub(crate) mod label;
 pub(crate) mod liquidity_token;
 pub(crate) mod market;
