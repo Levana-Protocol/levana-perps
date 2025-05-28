@@ -233,7 +233,7 @@ enum ContractType {
 }
 
 impl ContractType {
-    fn all_required() -> [ContractType; 5] {
+    fn all_required() -> [ContractType; 6] {
         use ContractType::*;
         [
             Factory,
@@ -439,6 +439,7 @@ async fn instantiate_factory(
                 label_suffix,
                 copy_trading_code_id: None,
                 counter_trade_code_id: None,
+                vault_code_id: None,
             },
             ContractAdmin::Addr(migration_admin),
         )

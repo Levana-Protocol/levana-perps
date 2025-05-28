@@ -23,6 +23,8 @@ pub struct InstantiateMsg {
     pub copy_trading_code_id: Option<String>,
     /// The code id for the countertrade contract
     pub counter_trade_code_id: Option<String>,
+    /// The code id for the vault contract
+    pub vault_code_id: Option<String>,
     /// Migration admin, needed for instantiating/migrating sub-contracts
     pub migration_admin: RawAddr,
     /// Perpetual swap admin address
@@ -166,15 +168,6 @@ pub struct CopyTradingResp {
 pub struct CounterTradeResp {
     /// Copy trading contracts maintained by this factory
     pub addresses: Vec<CounterTradeInfo>,
-}
-
-/// Response from [QueryMsg::Markets]
-///
-/// Use [QueryMsg::Vault] for details on vault contract.
-#[cw_serde]
-pub struct VaultResp {
-    /// Vault contract maintained by this factory
-    pub addresses: Vec<VaultInfo>,
 }
 
 /// Response from [QueryMsg::AddrIsContract]
@@ -324,14 +317,6 @@ pub enum QueryMsg {
     #[returns(CounterTradeResp)]
     CounterTrade {
         /// Last seen [MarketId] in a [CounterTradeResp] for enumeration
-        start_after: Option<MarketId>,
-        /// Defaults to [QUERY_LIMIT_DEFAULT]
-        limit: Option<u32>,
-    },
-    /// Fetch vault contract
-    #[returns(VaultResp)]
-    Vault {
-        /// Last seen [MarketId] in a [VaultResp] for enumeration
         start_after: Option<MarketId>,
         /// Defaults to [QUERY_LIMIT_DEFAULT]
         limit: Option<u32>,
@@ -518,15 +503,6 @@ pub struct CopyTradingInfoRaw {
     pub leader: RawAddr,
     /// Address of the copy trading contract
     pub contract: RawAddr,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
-/// Vault contract information
-pub struct VaultInfo {
-    /// Address of the vault contract
-    pub contract: VaultAddr,
-    /// Associated market id of the vault contract
-    pub market_id: MarketId,
 }
 
 impl KeyDeserialize for LeaderAddr {

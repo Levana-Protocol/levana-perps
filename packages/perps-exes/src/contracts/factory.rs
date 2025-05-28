@@ -5,7 +5,6 @@ use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, CodeId, Contract, HasAddress, HasAddressHrp, HasCosmos, Wallet};
 use perpswap::contracts::factory::entry::{
     CodeIds, CounterTradeInfo, CounterTradeResp, FactoryOwnerResp, MarketsResp, QueryMsg,
-    VaultInfo, VaultResp,
 };
 use perpswap::contracts::market::entry::NewMarketParams;
 use perpswap::prelude::*;
@@ -131,32 +130,6 @@ impl Factory {
                 limit: None,
             };
             for CounterTradeInfo {
-                contract,
-                market_id,
-            } in response.addresses
-            {
-                result.insert(market_id, contract.0);
-            }
-        }
-        Ok(result)
-    }
-
-    pub async fn get_vault_address(&self) -> Result<HashMap<MarketId, Addr>> {
-        let mut result = HashMap::new();
-        let mut query_msg = perpswap::contracts::factory::entry::QueryMsg::Vault {
-            start_after: None,
-            limit: None,
-        };
-        loop {
-            let response: VaultResp = self.0.query(query_msg).await?;
-            if response.addresses.is_empty() {
-                break;
-            }
-            query_msg = perpswap::contracts::factory::entry::QueryMsg::Vault {
-                start_after: response.addresses.last().map(|item| item.market_id.clone()),
-                limit: None,
-            };
-            for VaultInfo {
                 contract,
                 market_id,
             } in response.addresses

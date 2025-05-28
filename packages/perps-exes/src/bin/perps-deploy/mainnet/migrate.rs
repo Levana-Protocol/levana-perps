@@ -67,6 +67,7 @@ async fn go(
         position_token: current_position_token_code_id,
         liquidity_token: current_liquidity_token_code_id,
         counter_trade: current_counter_trade_code_id,
+        ..
     } = factory.query_code_ids().await?;
 
     let mut factory_msgs = vec![];

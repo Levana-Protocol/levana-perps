@@ -174,7 +174,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         }
     }
 
-    if code_ids.counter_trade.map(|code_id| code_id.u64()) == Some(vault_code_id.get_code_id()) {
+    if code_ids.vault.map(|code_id| code_id.u64()) == Some(vault_code_id.get_code_id()) {
         tracing::info!("Vault code ID in factory is already {vault_code_id}, skipping")
     } else {
         let res = factory
@@ -187,24 +187,6 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             )
             .await?;
         tracing::info!("Updated vault code ID in factory: {}", res.txhash);
-
-        if code_ids.counter_trade.is_some() {
-            // No need for migration if this was the first version
-            let factory = Factory::from_contract(factory.clone());
-            for (market_id, counter_trade) in factory.get_vault_address().await? {
-                tracing::info!("Performing migration for vault ({market_id})");
-                let vault = Address::from_str(counter_trade.as_str())?;
-                let contract = app.basic.cosmos.make_contract(counter_trade);
-                contract
-                    .migrate(
-                        wallet,
-                        vault_code_id.get_code_id(),
-                        perpswap::contracts::countertrade::MigrateMsg {},
-                    )
-                    .await?;
-                tracing::info!("Vault contract for {market_id} migrated");
-            }
-        }
     }
 
     let factory = Factory::from_contract(factory);
