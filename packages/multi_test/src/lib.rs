@@ -94,7 +94,6 @@ impl PerpsApp {
         let simple_oracle_code_id = app.store_code(contract_simple_oracle());
         let countertrade_code_id = app.store_code(contract_countertrade());
         let copy_trading_code_id = app.store_code(contract_copy_trading());
-        let vault_code_id = app.store_code(contract_vault());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -111,7 +110,6 @@ impl PerpsApp {
                 label_suffix: Some(" - MULTITEST".to_owned()),
                 copy_trading_code_id: Some(copy_trading_code_id.to_string()),
                 counter_trade_code_id: Some(countertrade_code_id.to_string()),
-                vault_code_id: Some(vault_code_id.to_string()),
             },
             &[],
             "factory",
@@ -367,14 +365,6 @@ pub(crate) fn contract_copy_trading() -> Box<dyn Contract<Empty>> {
         )
         .with_reply(copy_trading::reply),
     )
-}
-
-pub(crate) fn contract_vault() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        vault::instantiate,
-        vault::execute,
-        vault::query,
-    ))
 }
 
 // struct to satisfy the `Contract` trait

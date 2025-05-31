@@ -23,8 +23,6 @@ pub struct InstantiateMsg {
     pub copy_trading_code_id: Option<String>,
     /// The code id for the countertrade contract
     pub counter_trade_code_id: Option<String>,
-    /// The code id for the vault contract
-    pub vault_code_id: Option<String>,
     /// Migration admin, needed for instantiating/migrating sub-contracts
     pub migration_admin: RawAddr,
     /// Perpetual swap admin address
@@ -132,11 +130,6 @@ pub enum ExecuteMsg {
     /// Set the counter trade code id, i.e. if it's been migrated
     SetCounterTradeCodeId {
         /// Code ID to use for future countertrade contracts
-        code_id: String,
-    },
-    /// Set the vault code id, i.e. if it's been migrated
-    SetVaultCodeId {
-        /// Code ID to use for future vault contract
         code_id: String,
     },
     /// Remove the owner from factory
@@ -371,7 +364,6 @@ impl ExecuteMsg {
             ExecuteMsg::SetPositionTokenCodeId { .. } => true,
             ExecuteMsg::SetLiquidityTokenCodeId { .. } => true,
             ExecuteMsg::SetCounterTradeCodeId { .. } => true,
-            ExecuteMsg::SetVaultCodeId { .. } => true,
             ExecuteMsg::SetOwner { .. } => true,
             ExecuteMsg::SetMigrationAdmin { .. } => true,
             ExecuteMsg::SetDao { .. } => true,
@@ -400,8 +392,6 @@ pub struct CodeIds {
     pub liquidity_token: Uint64,
     /// Countertrade code ID
     pub counter_trade: Option<Uint64>,
-    /// Vault code ID
-    pub vault: Option<Uint64>,
 }
 
 /// Response from [QueryMsg::GetReferrer]

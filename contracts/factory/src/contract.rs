@@ -76,7 +76,6 @@ pub fn instantiate(
         label_suffix,
         copy_trading_code_id,
         counter_trade_code_id,
-        vault_code_id,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -97,10 +96,6 @@ pub fn instantiate(
     if let Some(counter_trade_code_id) = counter_trade_code_id {
         let code_id: u64 = counter_trade_code_id.parse()?;
         crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(deps.storage, &code_id)?;
-    }
-    if let Some(vault_code_id) = vault_code_id {
-        let code_id: u64 = vault_code_id.parse()?;
-        crate::state::vault::VAULT_CODE_ID.save(deps.storage, &code_id)?;
     }
 
     ALL_CONTRACTS.save(deps.storage, &env.contract.address, &ContractType::Factory)?;
@@ -285,11 +280,6 @@ fn execute_msg(
         ExecuteMsg::SetCounterTradeCodeId { code_id } => {
             let code_id: u64 = code_id.parse()?;
             crate::state::countertrade::COUNTER_TRADE_CODE_ID.save(ctx.storage, &code_id)?;
-        }
-
-        ExecuteMsg::SetVaultCodeId { code_id } => {
-            let code_id: u64 = code_id.parse()?;
-            crate::state::vault::VAULT_CODE_ID.save(ctx.storage, &code_id)?;
         }
 
         ExecuteMsg::SetOwner { owner } => {
@@ -617,6 +607,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let response = to_json_binary(&response)?;
             Ok(response)
         }
+
         QueryMsg::CopyTrading { start_after, limit } => {
             let limit = limit.map_or(QUERY_LIMIT_DEFAULT, |limit| limit.min(QUERY_LIMIT_DEFAULT));
             let start_after = match start_after {

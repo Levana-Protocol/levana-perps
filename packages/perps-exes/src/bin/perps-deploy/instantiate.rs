@@ -257,7 +257,6 @@ pub(crate) async fn instantiate(
                 label_suffix: Some(label_suffix),
                 copy_trading_code_id: None,
                 counter_trade_code_id: None,
-                vault_code_id: None,
             },
             ContractAdmin::Sender,
         )

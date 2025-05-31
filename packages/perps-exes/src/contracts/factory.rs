@@ -18,7 +18,6 @@ pub struct ConfiguredCodeIds {
     pub position_token: CodeId,
     pub liquidity_token: CodeId,
     pub counter_trade: Option<CodeId>,
-    pub vault: Option<CodeId>,
 }
 
 impl std::fmt::Debug for Factory {
@@ -242,7 +241,6 @@ impl Factory {
             position_token,
             liquidity_token,
             counter_trade,
-            vault,
         } = self.0.query(FactoryQueryMsg::CodeIds {}).await?;
         Ok(ConfiguredCodeIds {
             market: self.0.get_cosmos().make_code_id(market.u64()),
@@ -250,7 +248,6 @@ impl Factory {
             liquidity_token: self.0.get_cosmos().make_code_id(liquidity_token.u64()),
             counter_trade: counter_trade
                 .map(|code_id| self.0.get_cosmos().make_code_id(code_id.u64())),
-            vault: vault.map(|code_id| self.0.get_cosmos().make_code_id(code_id.u64())),
         })
     }
 

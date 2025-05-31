@@ -7,7 +7,7 @@ use perpswap::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp}
 
 use crate::{
     cli::Opt,
-    store_code::{COUNTER_TRADE, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, VAULT},
+    store_code::{COUNTER_TRADE, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };
 
 #[derive(clap::Parser)]
@@ -38,7 +38,6 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         .tracker
         .require_code_by_type(&opt, COUNTER_TRADE)
         .await?;
-    let vault_code_id = app.tracker.require_code_by_type(&opt, VAULT).await?;
 
     let factory = match app
         .tracker
@@ -172,21 +171,6 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 tracing::info!("Countertrade contract for {market_id} migrated");
             }
         }
-    }
-
-    if code_ids.vault.map(|code_id| code_id.u64()) == Some(vault_code_id.get_code_id()) {
-        tracing::info!("Vault code ID in factory is already {vault_code_id}, skipping")
-    } else {
-        let res = factory
-            .execute(
-                wallet,
-                vec![],
-                perpswap::contracts::factory::entry::ExecuteMsg::SetVaultCodeId {
-                    code_id: vault_code_id.get_code_id().to_string(),
-                },
-            )
-            .await?;
-        tracing::info!("Updated vault code ID in factory: {}", res.txhash);
     }
 
     let factory = Factory::from_contract(factory);
