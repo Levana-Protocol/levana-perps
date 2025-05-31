@@ -172,7 +172,6 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             }
         }
     }
-
     let factory = Factory::from_contract(factory);
 
     for MarketInfo {
