@@ -9,6 +9,7 @@ mod cli;
 mod faucet;
 mod init_chain;
 mod instantiate;
+mod instantiate_vault;
 mod local_deploy;
 mod localtest;
 mod mainnet;
@@ -41,6 +42,7 @@ async fn main_inner() -> anyhow::Result<()> {
         Subcommand::Testnet { inner } => match inner {
             TestnetSub::StoreCode { inner } => store_code::go(opt, inner).await?,
             TestnetSub::Instantiate { inner } => instantiate::go(opt, inner).await?,
+            TestnetSub::InstantiateVault { inner } => instantiate_vault::go(opt, inner).await?,
             TestnetSub::Migrate { inner } => migrate::go(opt, inner).await?,
             TestnetSub::InitChain { inner } => init_chain::go(opt, inner).await?,
             TestnetSub::Deposit { inner } => inner.go(opt).await?,
