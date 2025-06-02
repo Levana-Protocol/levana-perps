@@ -2,8 +2,11 @@ use crate::cli::Opt;
 use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use cosmos::{ContractAdmin, HasAddress};
-use perpswap::contracts::vault::{InstantiateMsg, UsdcAssetInit};
-use std::collections::HashMap;
+use perpswap::{
+    contracts::vault::{InstantiateMsg, UsdcAssetInit},
+    storage::MarketId,
+};
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(clap::Parser)]
 pub(crate) struct InstantiateVaultOpt {
@@ -49,10 +52,19 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateVaultOpt) -> Result<()> {
         }
     };
 
+    tracing::info!("Retrieving vault code id for family: {}", inst_opt.family);
     let code_id = tracker
         .require_code_by_type(&opt, "vault")
         .await
         .context("Failed to retrieve vault code ID from tracker")?;
+    tracing::info!("Vault code ID: {}", code_id);
+
+    tracing::info!("Retrieving factory for family: {}", inst_opt.family);
+    let factory = tracker
+        .get_factory(&inst_opt.family)
+        .await
+        .context("Failed to retrieve factory contract")?;
+    tracing::info!("Factory contract: {:?}", factory);
 
     let mut markets_allocation_bps = HashMap::new();
     let total_bps: u16 = inst_opt
@@ -91,17 +103,18 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateVaultOpt) -> Result<()> {
             market_id, parts[1]
         ))?;
 
-        let contract_resp = tracker
-            .get_contract_by_family("market", market_id, None)
+        let market_id =
+            MarketId::from_str(market_id).context(format!("Invalid market ID: {}", market_id))?;
+
+        tracing::info!("Market ID: {}, BPS: {}", market_id, bps);
+
+        let market_info = factory
+            .get_market(market_id)
             .await
-            .context(format!("Failed to query tracker for market {}", market_id))?;
-        println!("Found market {:?}", contract_resp);
-        let market_addr = match contract_resp {
-            perpswap::contracts::tracker::entry::ContractResp::NotFound {} => {
-                return Err(anyhow!("No market found for market_id: {}", market_id));
-            }
-            perpswap::contracts::tracker::entry::ContractResp::Found { address, .. } => address,
-        };
+            .context("Failed to get market {} from factory: {}")?;
+
+        let market_addr = market_info.market.get_address_string();
+        tracing::info!("Resolved market {} address: {}", market_str, market_addr);
 
         markets_allocation_bps.insert(market_addr, bps);
     }
