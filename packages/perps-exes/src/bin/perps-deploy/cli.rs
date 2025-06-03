@@ -30,6 +30,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::instantiate::InstantiateOpt,
     },
+    /// Instantiate vault contract
+    InstantiateVault {
+        #[clap(flatten)]
+        inner: crate::instantiate_vault::InstantiateVaultOpt,
+    },
     /// Add a market to an existing contract
     AddMarket {
         #[clap(flatten)]

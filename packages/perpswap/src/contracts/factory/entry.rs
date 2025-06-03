@@ -187,6 +187,8 @@ pub enum ContractType {
     CopyTrading,
     /// Countertrade contract
     CounterTrade,
+    /// Vault contract
+    Vault,
 }
 
 /// Default limit for [QueryMsg::Markets]
@@ -566,6 +568,37 @@ impl<'a> Prefixer<'a> for CounterTradeAddr {
 }
 
 impl<'a> PrimaryKey<'a> for CounterTradeAddr {
+    type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
+    type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
+    type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
+    type SuperSuffix = <Addr as PrimaryKey<'a>>::SuperSuffix;
+
+    fn key(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.key()
+    }
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, JsonSchema, PartialEq, Debug)]
+/// Vault contract address
+pub struct VaultAddr(pub Addr);
+
+impl KeyDeserialize for VaultAddr {
+    type Output = VaultAddr;
+
+    const KEY_ELEMS: u16 = Addr::KEY_ELEMS;
+
+    fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
+        Addr::from_vec(value).map(VaultAddr)
+    }
+}
+
+impl<'a> Prefixer<'a> for VaultAddr {
+    fn prefix(&self) -> Vec<cw_storage_plus::Key> {
+        self.0.prefix()
+    }
+}
+
+impl<'a> PrimaryKey<'a> for VaultAddr {
     type Prefix = <Addr as PrimaryKey<'a>>::Prefix;
     type SubPrefix = <Addr as PrimaryKey<'a>>::SubPrefix;
     type Suffix = <Addr as PrimaryKey<'a>>::Suffix;
