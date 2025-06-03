@@ -1,0 +1,7 @@
+[package.metadata.thorchain]
+version = "v0.1"
+audits = ["https://docs.levana.finance/audits"]
+auditors = ["FYEO"]
+docs = "https://docs.levana.finance"
+repo = "https://github.com/Levana-Protocol/levana-perps"
+artifact = "https://github.com/Levana-Protocol/levana-perps/releases/download/rujira-v0.1/checksums.txt"

@@ -4,8 +4,22 @@ version = "0.1.0"
 authors = ["Levana Team"]
 edition = "2021"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.thorchain]
+# See more about format in https://doc.rust-lang.org/cargo/reference/manifest.html#the-metadata-table
+audits = ["https://docs.levana.finance/audits"]
+auditors = ["FYEO"]
+docs = "https://docs.levana.finance"
+commit = "ff8a96960f5a22835d1c4262ba01e7cb4bb7e7f8"
+deployers = ["sthor12r8l6zc05ed7r5em50qy24vfy03pcsdr7hprsr"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[features]
+# use library feature to disable all instantiate/execute/query exports
+library = []
 
 [dependencies]
 perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
