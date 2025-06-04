@@ -1,0 +1,13 @@
+[package.metadata.thorchain]
+version = "v0.1"
+audits = [
+  "https://docs.levana.finance/audits",
+  "https://github.com/fyeo-io/public-audit-reports/blob/main/Code%20Audit%20Reports/2025/Levana/Levana%20-%20Security%20Code%20Review%20of%20Ruji%20Perps%20v1.0.pdf"
+]
+auditors = ["FYEO"]
+docs = [
+  "https://docs.levana.finance",
+  "https://docs.rujira.network/products/ruji-perps"
+]
+repo = "https://github.com/Levana-Protocol/levana-perps"
+artifact = "https://github.com/Levana-Protocol/levana-perps/releases/download/rujira-v0.1/checksums.txt"

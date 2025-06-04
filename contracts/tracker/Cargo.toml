@@ -11,10 +11,27 @@ exclude = [
   "hash.txt",
 ]
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.thorchain]
+# See more about format in https://doc.rust-lang.org/cargo/reference/manifest.html#the-metadata-table
+audits = [
+  "https://docs.levana.finance/audits",
+  "https://github.com/fyeo-io/public-audit-reports/blob/main/Code%20Audit%20Reports/2025/Levana/Levana%20-%20Security%20Code%20Review%20of%20Ruji%20Perps%20v1.0.pdf"
+]
+auditors = ["FYEO"]
+docs = [
+  "https://docs.levana.finance",
+  "https://docs.rujira.network/products/ruji-perps"
+]
+commit = "ff8a96960f5a22835d1c4262ba01e7cb4bb7e7f8"
+deployers = ["thor1440jp0ukj8ew3z2fd4zmdqgxhn5ghd7ghg2kmr"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
+# use library feature to disable all instantiate/execute/query exports
 library = []
 
 [dependencies]
