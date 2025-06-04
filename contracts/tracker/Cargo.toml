@@ -19,7 +19,7 @@ audits = ["https://docs.levana.finance/audits"]
 auditors = ["FYEO"]
 docs = "https://docs.levana.finance"
 commit = "ff8a96960f5a22835d1c4262ba01e7cb4bb7e7f8"
-deployers = ["sthor12r8l6zc05ed7r5em50qy24vfy03pcsdr7hprsr"]
+deployers = ["thor1440jp0ukj8ew3z2fd4zmdqgxhn5ghd7ghg2kmr"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
