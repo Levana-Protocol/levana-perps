@@ -23,10 +23,6 @@ deployers = ["thor1440jp0ukj8ew3z2fd4zmdqgxhn5ghd7ghg2kmr"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-# use library feature to disable all instantiate/execute/query exports
-library = []
-
 [dependencies]
 perpswap = {package = "levana_perpswap_cosmos", path = "../../packages/perpswap" }
 cosmwasm-std = { workspace = true, features = ["abort"] }
