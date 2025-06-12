@@ -59,9 +59,18 @@ pub(crate) struct Opt {
         long,
         env = "LEVANA_COMPANION_RUJIRA_TESTNET_GRPC",
         value_delimiter = ',',
-        default_value = "https://thornode-devnet-grpc.bryanlabs.net"
+        default_value = "https://stagenet-grpc.ninerealms.com:443"
     )]
     pub(crate) rujira_testnet_primary: String,
+
+    /// Primary GRPC endpoints for Rujira mainnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_RUJIRA_MAINNET_GRPC",
+        value_delimiter = ',',
+        default_value = "https://thornode-mainnet-grpc.bryanlabs.net:443"
+    )]
+    pub(crate) rujira_mainnet_primary: String,
 
     /// Fallback GRPC endpoints for Injective mainnet.
     #[clap(
@@ -97,6 +106,14 @@ pub(crate) struct Opt {
         value_delimiter = ','
     )]
     pub(crate) rujira_testnet_fallbacks: Vec<String>,
+
+    /// Fallback GRPC endpoints for Rujira mainnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_RUJIRA_MAINNET_FALLBACKS_GRPC",
+        value_delimiter = ','
+    )]
+    pub(crate) rujira_mainnet_fallbacks: Vec<String>,
 
     /// Reqests timeout in seconds
     #[clap(long, env = "LEVANA_COMPANION_REQUEST_TIMEOUT", default_value_t = 5)]

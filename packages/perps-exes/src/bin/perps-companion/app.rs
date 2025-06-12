@@ -49,6 +49,9 @@ impl App {
                 ChainId::RujiraTestnet => {
                     Some((&opt.rujira_testnet_primary, &opt.rujira_testnet_fallbacks))
                 }
+                ChainId::RujiraMainnet => {
+                    Some((&opt.rujira_mainnet_primary, &opt.rujira_mainnet_fallbacks))
+                }
             };
 
             if let Some((primary, fallbacks)) = grpc {

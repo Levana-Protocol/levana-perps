@@ -251,3 +251,15 @@ rpc-nodes = ["https://stagenet-thornode.ninerealms.com"]
 gas-decimals = 8
 spot-price = {}
 explorer = "https://stagenet.thorchain.net"
+
+[rujira-mainnet]
+explorer = "https://thorchain.net"
+rpc-nodes = ["https://thornode-mainnet-rpc.bryanlabs.net"]
+gas-decimals = 8
+
+[rujira-mainnet.spot-price.thorchain]
+contract = "thorxxxx"
+
+[rujira-mainnet.assets.USDT]
+denom = "eth-usdt-0xdac17f958d2ee523a2206206994597c13d831ec7"
+decimal-places = 8
