@@ -9,7 +9,7 @@ pub enum PerpsNetwork {
     DymensionTestnet,
     NibiruTestnet,
     RujiraTestnet,
-    RujiraStagenet,
+    RujiraMainnet,
 }
 
 impl FromStr for PerpsNetwork {
@@ -20,7 +20,7 @@ impl FromStr for PerpsNetwork {
             "dymension-testnet" => PerpsNetwork::DymensionTestnet,
             "nibiru-testnet" => PerpsNetwork::NibiruTestnet,
             "rujira-testnet" => PerpsNetwork::RujiraTestnet,
-            "rujira-stagenet" => PerpsNetwork::RujiraStagenet,
+            "rujira-mainnet" => PerpsNetwork::RujiraMainnet,
             _ => PerpsNetwork::Regular(s.parse()?),
         })
     }
@@ -48,11 +48,11 @@ impl PerpsNetwork {
                 Self::RujiraTestnet.get_address_hrp(),
                 "https://stagenet-grpc.ninerealms.com:443",
             )),
-            PerpsNetwork::RujiraStagenet => Ok(CosmosBuilder::new(
-                "thorchain-stagenet-2",
+            PerpsNetwork::RujiraMainnet => Ok(CosmosBuilder::new(
+                "thorchain-1",
                 "rune",
-                Self::RujiraStagenet.get_address_hrp(),
-                "https://stagenet-grpc.ninerealms.com:443",
+                Self::RujiraMainnet.get_address_hrp(),
+                "https://thornode-mainnet-grpc.bryanlabs.net:443",
             )),
         }
     }
@@ -71,7 +71,7 @@ impl HasAddressHrp for PerpsNetwork {
             PerpsNetwork::DymensionTestnet => AddressHrp::from_static("rol"),
             PerpsNetwork::NibiruTestnet => AddressHrp::from_static("nibi"),
             PerpsNetwork::RujiraTestnet => AddressHrp::from_static("sthor"),
-            PerpsNetwork::RujiraStagenet => AddressHrp::from_static("sthor"),
+            PerpsNetwork::RujiraMainnet => AddressHrp::from_static("thor"),
         }
     }
 }
@@ -86,7 +86,7 @@ impl serde::Serialize for PerpsNetwork {
             PerpsNetwork::DymensionTestnet => serializer.serialize_str("dymension-testnet"),
             PerpsNetwork::NibiruTestnet => serializer.serialize_str("nibiru-testnet"),
             PerpsNetwork::RujiraTestnet => serializer.serialize_str("rujira-testnet"),
-            PerpsNetwork::RujiraStagenet => serializer.serialize_str("rujira-stagenet"),
+            PerpsNetwork::RujiraMainnet => serializer.serialize_str("rujira-mainnet"),
         }
     }
 }
@@ -124,7 +124,7 @@ impl Display for PerpsNetwork {
             PerpsNetwork::DymensionTestnet => f.write_str("dymension-testnet"),
             PerpsNetwork::NibiruTestnet => f.write_str("nibiru-testnet"),
             PerpsNetwork::RujiraTestnet => f.write_str("rujira-testnet"),
-            PerpsNetwork::RujiraStagenet => f.write_str("rujira-stagenet"),
+            PerpsNetwork::RujiraMainnet => f.write_str("rujira-mainnet"),
         }
     }
 }
