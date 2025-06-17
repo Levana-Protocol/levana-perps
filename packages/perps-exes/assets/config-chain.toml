@@ -257,9 +257,6 @@ explorer = "https://thorchain.net"
 rpc-nodes = ["https://thornode-mainnet-rpc.bryanlabs.net"]
 gas-decimals = 8
 
-[rujira-mainnet.spot-price.thorchain]
-contract = "thorxxxx"
-
-[rujira-mainnet.assets.USDT]
-denom = "eth-usdt-0xdac17f958d2ee523a2206206994597c13d831ec7"
+[rujira-mainnet.assets.USDC]
+denom = "eth-usdc-0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 decimal-places = 8

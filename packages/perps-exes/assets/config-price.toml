@@ -2102,26 +2102,14 @@ inverted = false
 price = "1"
 inverted = false
 
-[[networks.rujira-mainnet.ATOM_USDC.feeds]]
+[[networks.rujira-mainnet.BTC_USDC.feeds]]
 
-[networks.rujira-mainnet.ATOM_USDC.feeds.rujira]
-asset = "GAIA.ATOM"
-inverted = false
-
-[[networks.rujira-mainnet.ATOM_USDC.feeds-usd]]
-
-[networks.rujira-mainnet.ATOM_USDC.feeds-usd.constant]
-price = "1"
-inverted = false
-
-[[networks.rujira-mainnet.BTC_USDT.feeds]]
-
-[networks.rujira-mainnet.BTC_USDT.feeds.rujira]
+[networks.rujira-mainnet.BTC_USDC.feeds.rujira]
 asset = "BTC.BTC"
 inverted = false
 
-[[networks.rujira-mainnet.BTC_USDT.feeds-usd]]
+[[networks.rujira-mainnet.BTC_USDC.feeds-usd]]
 
-[networks.rujira-mainnet.BTC_USDT.feeds-usd.constant]
+[networks.rujira-mainnet.BTC_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
