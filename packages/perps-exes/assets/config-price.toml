@@ -2101,3 +2101,15 @@ inverted = false
 [networks.rujira-testnet.BTC_USDT.feeds-usd.constant]
 price = "1"
 inverted = false
+
+[[networks.rujira-mainnet.BTC_USDC.feeds]]
+
+[networks.rujira-mainnet.BTC_USDC.feeds.rujira]
+asset = "BTC.BTC"
+inverted = false
+
+[[networks.rujira-mainnet.BTC_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.BTC_USDC.feeds-usd.constant]
+price = "1"
+inverted = false

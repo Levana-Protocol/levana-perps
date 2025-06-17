@@ -41,8 +41,10 @@ pub(crate) enum ChainId {
     Neutron1 = 12,
     #[serde(rename = "pion-1")]
     Pion1 = 13,
-    #[serde(rename = "dev-1")]
+    #[serde(rename = "thorchain-stagenet-2")]
     RujiraTestnet = 14,
+    #[serde(rename = "thorchain-1")]
+    RujiraMainnet = 15,
 }
 
 impl From<ChainId> for i32 {
@@ -62,6 +64,7 @@ impl From<ChainId> for i32 {
             ChainId::Neutron1 => 12,
             ChainId::Pion1 => 13,
             ChainId::RujiraTestnet => 14,
+            ChainId::RujiraMainnet => 15,
         }
     }
 }
@@ -85,7 +88,8 @@ impl TryFrom<&str> for ChainId {
             "injective-888" => Ok(ChainId::Injective888),
             "neutron-1" => Ok(ChainId::Neutron1),
             "pion-1" => Ok(ChainId::Pion1),
-            "dev-1" => Ok(ChainId::RujiraTestnet),
+            "thorchain-stagenet-2" => Ok(ChainId::RujiraTestnet),
+            "thorchain-1" => Ok(ChainId::RujiraMainnet),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
     }
@@ -116,7 +120,8 @@ impl Display for ChainId {
             ChainId::Injective888 => "injective-888",
             ChainId::Neutron1 => "neutron-1",
             ChainId::Pion1 => "pion-1",
-            ChainId::RujiraTestnet => "dev-1",
+            ChainId::RujiraTestnet => "thorchain-stagenet-2",
+            ChainId::RujiraMainnet => "thorchain-1",
         })
     }
 }
@@ -130,7 +135,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 13] {
+    pub(crate) fn all() -> [ChainId; 14] {
         [
             ChainId::Atlantic2,
             ChainId::Elgafar1,
@@ -145,6 +150,7 @@ impl ChainId {
             ChainId::Neutron1,
             ChainId::Pion1,
             ChainId::RujiraTestnet,
+            ChainId::RujiraMainnet,
         ]
     }
 
@@ -180,14 +186,12 @@ impl ChainId {
         match network {
             PerpsNetwork::Regular(network) => Self::from_cosmos_network(network),
             PerpsNetwork::RujiraTestnet => Ok(ChainId::RujiraTestnet),
+            PerpsNetwork::RujiraMainnet => Ok(ChainId::RujiraMainnet),
             PerpsNetwork::DymensionTestnet => Err(anyhow::anyhow!(
                 "Cannot run companion server for Dymension testnet"
             )),
             PerpsNetwork::NibiruTestnet => Err(anyhow::anyhow!(
                 "Cannot run companion server for Nibiru testnet"
-            )),
-            PerpsNetwork::RujiraStagenet => Err(anyhow::anyhow!(
-                "Cannot run companion server for Rujira stagenet"
             )),
         }
     }
@@ -226,6 +230,7 @@ impl ChainId {
             ChainId::Neutron1 => true,
             ChainId::Pion1 => false,
             ChainId::RujiraTestnet => false,
+            ChainId::RujiraMainnet => true,
         }
     }
 }
@@ -370,7 +375,7 @@ pub(crate) fn is_rujira_chain(chain_id: &str) -> bool {
     match chain_id.parse::<ChainId>() {
         // If it's an invalid chain ID, treat it as non-Rujira
         Err(_) => false,
-        Ok(ChainId::RujiraTestnet) => true,
+        Ok(ChainId::RujiraTestnet | ChainId::RujiraMainnet) => true,
         // Keep an explicit list here so that, when adding new chains,
         // the compiler forces us to decide if the chain should use
         // Rujira styling or not.
