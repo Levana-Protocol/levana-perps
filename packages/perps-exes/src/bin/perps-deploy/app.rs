@@ -175,10 +175,7 @@ impl Opt {
         global_price_config: &PriceConfig,
         network: PerpsNetwork,
     ) -> Result<OracleInfo> {
-        let chain_spot_price_config = chain_config
-            .spot_price
-            .as_ref()
-            .with_context(|| format!("No spot price config found for {:?}", network))?;
+        let chain_spot_price_config = &chain_config.spot_price;
 
         let mut markets = HashMap::new();
 

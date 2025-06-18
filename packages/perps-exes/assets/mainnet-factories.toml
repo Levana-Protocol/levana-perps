@@ -71,3 +71,14 @@ gitrev = "ab41b7d1bf6507cb5880ce267298d31ecd04c980"
 hash = "3259db9d8932efbf53de7a5d39819c2cb3baffa21384e3270e3aa2b5d8bbc03e"
 ident = "ntrnmainnet1"
 canonical = true
+
+[[factories]]
+address = "thor1gclfrvam6a33yhpw3ut3arajyqs06esdvt9pfvluzwsslap9p6uqt4rzxs"
+network = "rujira-mainnet"
+label = "RUJI Perps"
+instantiate-code-id = 13
+instantiate-at = "2025-06-18T10:32:33Z"
+gitrev = "eefb0f15764f376cb180eccdd6faf539a7bfd4df"
+hash = "67db51fd0f33477090239930d3e6e4dc29a4175abc59cd2569f515e573083d83"
+ident = "rujimainnet1"
+canonical = true
