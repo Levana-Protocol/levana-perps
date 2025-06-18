@@ -31,7 +31,8 @@ use crate::PerpsNetwork;
 pub struct ChainConfig {
     pub tracker: Option<Address>,
     pub faucet: Option<Address>,
-    pub spot_price: Option<ChainSpotPriceConfig>,
+    #[serde(default)]
+    pub spot_price: ChainSpotPriceConfig,
     pub explorer: Option<String>,
     /// Potential RPC endpoints to use
     #[serde(default)]
@@ -67,7 +68,7 @@ impl From<&NativeAsset> for TokenInit {
 }
 
 /// Spot price config for a given chain
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainSpotPriceConfig {
     /// Pyth configuration, required on chains that use pyth feeds

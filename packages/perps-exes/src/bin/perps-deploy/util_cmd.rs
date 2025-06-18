@@ -177,7 +177,7 @@ async fn update_pyth(
     let chain = ChainConfig::load_from_opt(config_chain.as_deref(), network)?;
     let pyth = chain
         .spot_price
-        .and_then(|spot_price| spot_price.pyth)
+        .pyth
         .with_context(|| format!("No Pyth oracle found for network {network}"))?;
     let basic = opt.load_basic_app(network).await?;
     let wallet = basic.get_wallet()?;

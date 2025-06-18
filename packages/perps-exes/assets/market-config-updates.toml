@@ -1128,3 +1128,8 @@ reward = "0.045"
 charged = "0.05"
 surcharge = "0.025"
 reward = "0.045"
+
+[crank-fees.rujira-mainnet]
+charged = "0.02"
+surcharge = "0.01"
+reward = "0.018"
