@@ -444,6 +444,7 @@ hash = "f48d1c4c4bd4c129f421b7026f82614f3ed30759066185f678da7854f61e820a"
 
 [hashes.code-ids]
 osmosis-mainnet = 1329
+rujira-mainnet = 14
 
 [[hashes]]
 contract-type = "countertrade"
@@ -460,6 +461,7 @@ hash = "67db51fd0f33477090239930d3e6e4dc29a4175abc59cd2569f515e573083d83"
 
 [hashes.code-ids]
 osmosis-mainnet = 1332
+rujira-mainnet = 13
 
 [[hashes]]
 contract-type = "countertrade"
@@ -508,3 +510,27 @@ hash = "6da0cdf4563ea7d0c0071cff17be14d33ef3f47d329ae10140b5697e93b74de5"
 
 [hashes.code-ids]
 rujira-testnet = 43
+
+[[hashes]]
+contract-type = "countertrade"
+gitrev = "ff8a96960f5a22835d1c4262ba01e7cb4bb7e7f8"
+hash = "7b2a303549b6e96cdeecaaabb40f862faae7d6f7c079fe28e12da2576caae856"
+
+[hashes.code-ids]
+rujira-mainnet = 10
+
+[[hashes]]
+contract-type = "market"
+gitrev = "ff8a96960f5a22835d1c4262ba01e7cb4bb7e7f8"
+hash = "fe632b2fde3771d2774ab4df619920ea14df3a99a05e4b09420229cb56c33701"
+
+[hashes.code-ids]
+rujira-mainnet = 15
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "ff8a96960f5a22835d1c4262ba01e7cb4bb7e7f8"
+hash = "c654a041bb05201afa7a973a1cfc5a1dc8bfc6f9af1f0f614ac8478a47f61ea5"
+
+[hashes.code-ids]
+rujira-mainnet = 16
