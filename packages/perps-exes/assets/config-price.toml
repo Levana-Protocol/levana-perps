@@ -2113,3 +2113,27 @@ inverted = false
 [networks.rujira-mainnet.BTC_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
+
+[[networks.rujira-mainnet.ETH_USDC.feeds]]
+
+[networks.rujira-mainnet.ETH_USDC.feeds.rujira]
+asset = "ETH.ETH"
+inverted = false
+
+[[networks.rujira-mainnet.ETH_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.ETH_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.RUNE_USDC.feeds]]
+
+[networks.rujira-mainnet.RUNE_USDC.feeds.rujira]
+asset = "RUNE.RUNE"
+inverted = false
+
+[[networks.rujira-mainnet.RUNE_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.RUNE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
