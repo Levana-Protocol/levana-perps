@@ -171,7 +171,7 @@ impl Opt {
             tracing::info!("Overriding gRPC URL to: {grpc}");
             builder.set_grpc_url(grpc);
         }
-        for fallback in &self.grpc_fallbacks {
+        for fallback in &self.grpc_fallbacks.0 {
             builder.add_grpc_fallback_url(fallback);
         }
         if let Some(chain_id) = &self.chain_id {
@@ -199,6 +199,11 @@ impl Opt {
                 tracing::info!("Setting dynamic gas multiplier config: {x:?}");
                 builder.set_dynamic_gas_estimate_multiplier(x);
             }
+        }
+
+        if config.no_gas_chain {
+            tracing::info!("Setting as a no-gas chain");
+            builder.set_gas_price(0.0, 0.0);
         }
 
         if let BotConfigByType::Mainnet { inner } = &config.by_type {

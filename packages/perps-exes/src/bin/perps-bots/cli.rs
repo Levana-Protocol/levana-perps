@@ -24,8 +24,8 @@ pub(crate) struct Opt {
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
     /// Provide optional gRPC fallbacks URLs
-    #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
-    pub(crate) grpc_fallbacks: Vec<String>,
+    #[clap(long, env = "COSMOS_GRPC_FALLBACKS", default_value = "")]
+    pub(crate) grpc_fallbacks: GrpcFallbacks,
     /// Override the chain ID
     #[clap(long, env = "COSMOS_CHAIN_ID")]
     pub(crate) chain_id: Option<String>,
@@ -91,6 +91,9 @@ pub(crate) struct Opt {
     /// Enable copy trading bot
     #[clap(long, env = "LEVANA_BOTS_ENABLE_COPY_TRADE")]
     pub(crate) enable_copy_trade: bool,
+    /// Is this a chain that has no gas fees?
+    #[clap(long, env = "LEVANA_BOTS_NO_GAS_CHAIN")]
+    pub(crate) no_gas_chain: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -244,4 +247,24 @@ impl Opt {
 
 fn get_env(key: &str) -> Result<String> {
     std::env::var(key).with_context(|| format!("Unable to load enviornment variable {key}"))
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct GrpcFallbacks(pub(crate) Vec<String>);
+
+impl FromStr for GrpcFallbacks {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if s.is_empty() {
+            Ok(Self(vec![]))
+        } else {
+            Ok(Self(
+                s.split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(ToOwned::to_owned)
+                    .collect(),
+            ))
+        }
+    }
 }
