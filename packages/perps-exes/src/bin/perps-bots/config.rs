@@ -98,6 +98,8 @@ pub(crate) struct BotConfig {
     pub(crate) log_requests: bool,
     /// Should we run the copy trade bot?
     pub(crate) run_copy_trade: bool,
+    /// Is this a chain with no gas?
+    pub(crate) no_gas_chain: bool,
 }
 
 pub(crate) struct NeedsPriceUpdateParams {
@@ -237,6 +239,7 @@ impl Opt {
             log_requests: self.log_requests,
             run_countertrade: self.enable_countertrade,
             run_copy_trade: self.enable_copy_trade,
+            no_gas_chain: self.no_gas_chain,
         };
 
         Ok(FullBotConfig {
@@ -343,6 +346,7 @@ impl Opt {
             log_requests: self.log_requests,
             run_countertrade: self.enable_countertrade,
             run_copy_trade: self.enable_copy_trade,
+            no_gas_chain: self.no_gas_chain,
         };
         Ok(FullBotConfig {
             config,

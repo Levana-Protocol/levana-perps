@@ -201,6 +201,11 @@ impl Opt {
             }
         }
 
+        if config.no_gas_chain {
+            tracing::info!("Setting as a no-gas chain");
+            builder.set_gas_price(0.0, 0.0);
+        }
+
         if let BotConfigByType::Mainnet { inner } = &config.by_type {
             // Only has an impact on Osmosis mainnet.
             builder.set_max_gas_price(inner.max_gas_price);
