@@ -638,7 +638,7 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Rujira { asset } => {
-                            if asset == "RUNE" {
+                            if asset == "RUNE.RUNE" {
                                 let network = rujira_network::Network::load(self.querier)?;
                                 let price = Decimal256::from(network.rune_price_in_tor);
                                 let price = Number::from(price);
