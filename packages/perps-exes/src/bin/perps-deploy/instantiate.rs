@@ -57,6 +57,10 @@ impl App {
                     denom: "eth-usdt-0xdac17f958d2ee523a2206206994597c13d831ec7".to_string(),
                     decimal_places: 8,
                 },
+                "RUNE_USDT" => CollateralSource::Native {
+                    denom: "eth-usdt-0xdac17f958d2ee523a2206206994597c13d831ec7".to_string(),
+                    decimal_places: 8,
+                },
                 _ => {
                     anyhow::bail!("Unsupported market id {market_id} for RujiraTestnet");
                 }

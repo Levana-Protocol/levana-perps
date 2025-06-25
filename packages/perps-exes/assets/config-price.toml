@@ -2102,6 +2102,18 @@ inverted = false
 price = "1"
 inverted = false
 
+[[networks.rujira-testnet.RUNE_USDT.feeds]]
+
+[networks.rujira-testnet.RUNE_USDT.feeds.rujira]
+asset = "RUNE.RUNE"
+inverted = false
+
+[[networks.rujira-testnet.RUNE_USDT.feeds-usd]]
+
+[networks.rujira-testnet.RUNE_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
 [[networks.rujira-mainnet.BTC_USDC.feeds]]
 
 [networks.rujira-mainnet.BTC_USDC.feeds.rujira]

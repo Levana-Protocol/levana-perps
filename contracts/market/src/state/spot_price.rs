@@ -1,6 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use crate::prelude::*;
+use crate::{prelude::*, state::rujira_network};
 use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
@@ -638,7 +638,21 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Rujira { asset } => {
-                            if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
+                            if asset == "RUNE.RUNE" {
+                                let network = rujira_network::Network::load(self.querier)?;
+                                let price = Decimal256::from(network.rune_price_in_tor);
+                                let price = Number::from(price);
+                                let price =
+                                    NumberGtZero::try_from(price).context("price must be > 0")?;
+
+                                rujira.insert(
+                                    asset.clone(),
+                                    OraclePriceFeedRujiraResp {
+                                        price,
+                                        volatile: feed.volatile.unwrap_or(true),
+                                    },
+                                );
+                            } else if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
                                 let pool = rujira_rs::query::Pool::load(
                                     self.querier,
                                     &asset.to_owned().try_into()?,
