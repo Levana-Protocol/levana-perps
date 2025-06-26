@@ -85,10 +85,7 @@ async fn go(
         let ConfigUpdateAndBorrowFee {
             config: expected_config,
             initial_borrow_fee_rate: _,
-        } = market_config_updates
-            .markets
-            .get(&market_id)
-            .with_context(|| format!("No market config update found for {market_id}"))?;
+        } = market_config_updates.get_market(network, &market_id)?;
         let CrankFeeConfig {
             charged,
             surcharge,
