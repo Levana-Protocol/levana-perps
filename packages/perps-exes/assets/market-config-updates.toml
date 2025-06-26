@@ -274,7 +274,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.BTC_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "100000"
 
 [markets.ETH_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -295,7 +295,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.ETH_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "100000"
 
 [markets.RUNE_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -316,7 +316,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.RUNE_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.XRP_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -337,7 +337,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.XRP_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.DOGE_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -358,7 +358,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.DOGE_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.rujimainnet1.ATOM_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -379,7 +379,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.rujimainnet1.ATOM_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.rujimainnet1.BNB_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -400,7 +400,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.rujimainnet1.BNB_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.rujimainnet1.AVAX_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -421,7 +421,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.rujimainnet1.AVAX_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.rujimainnet1.LTC_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -442,7 +442,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.rujimainnet1.LTC_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.rujimainnet1.BCH_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -463,7 +463,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [markets.rujimainnet1.BCH_USDC.config.max_liquidity.usd]
-amount = "5000"
+amount = "10000"
 
 [markets.CNH_USDC]
 initial-borrow-fee-rate = "0.05"
