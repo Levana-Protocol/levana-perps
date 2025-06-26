@@ -506,13 +506,9 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market }: AddMarketOpts) 
         let ConfigUpdateAndBorrowFee {
             config: mut market_config_update,
             initial_borrow_fee_rate,
-        } = {
-            market_config_updates
-                .markets
-                .get(&market_id)
-                .cloned()
-                .with_context(|| format!("No config update found for market ID: {market_id}"))?
-        };
+        } = market_config_updates
+            .get_market(network, &market_id)?
+            .clone();
         let CrankFeeConfig {
             charged,
             surcharge,

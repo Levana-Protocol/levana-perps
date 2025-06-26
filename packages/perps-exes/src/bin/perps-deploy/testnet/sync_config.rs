@@ -64,10 +64,7 @@ async fn go(
         let ConfigUpdateAndBorrowFee {
             config: expected_config,
             initial_borrow_fee_rate: _,
-        } = market_config_updates
-            .markets
-            .get(&market_id)
-            .with_context(|| format!("No market config update found for {market_id}"))?;
+        } = market_config_updates.get_market(app.basic.network, &market_id)?;
         let default_config = Config::new(
             perpswap::contracts::market::spot_price::SpotPriceConfig::Manual {
                 admin: Addr::unchecked("ignored"),

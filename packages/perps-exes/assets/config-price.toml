@@ -2149,3 +2149,87 @@ inverted = false
 [networks.rujira-mainnet.RUNE_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
+
+[[networks.rujira-mainnet.XRP_USDC.feeds]]
+
+[networks.rujira-mainnet.XRP_USDC.feeds.rujira]
+asset = "XRP.XRP"
+inverted = false
+
+[[networks.rujira-mainnet.XRP_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.XRP_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.DOGE_USDC.feeds]]
+
+[networks.rujira-mainnet.DOGE_USDC.feeds.rujira]
+asset = "DOGE.DOGE"
+inverted = false
+
+[[networks.rujira-mainnet.DOGE_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.DOGE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.ATOM_USDC.feeds]]
+
+[networks.rujira-mainnet.ATOM_USDC.feeds.rujira]
+asset = "GAIA.ATOM"
+inverted = false
+
+[[networks.rujira-mainnet.ATOM_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.ATOM_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.BNB_USDC.feeds]]
+
+[networks.rujira-mainnet.BNB_USDC.feeds.rujira]
+asset = "BSC.BNB"
+inverted = false
+
+[[networks.rujira-mainnet.BNB_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.BNB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.AVAX_USDC.feeds]]
+
+[networks.rujira-mainnet.AVAX_USDC.feeds.rujira]
+asset = "AVAX.AVAX"
+inverted = false
+
+[[networks.rujira-mainnet.AVAX_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.AVAX_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.LTC_USDC.feeds]]
+
+[networks.rujira-mainnet.LTC_USDC.feeds.rujira]
+asset = "LTC.LTC"
+inverted = false
+
+[[networks.rujira-mainnet.LTC_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.LTC_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.BCH_USDC.feeds]]
+
+[networks.rujira-mainnet.BCH_USDC.feeds.rujira]
+asset = "BCH.BCH"
+inverted = false
+
+[[networks.rujira-mainnet.BCH_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.BCH_USDC.feeds-usd.constant]
+price = "1"
+inverted = false

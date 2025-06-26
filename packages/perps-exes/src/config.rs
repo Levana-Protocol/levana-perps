@@ -712,8 +712,34 @@ pub enum Delay {
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
-    pub markets: BTreeMap<MarketId, ConfigUpdateAndBorrowFee>,
+    markets: BTreeMap<MarketId, ConfigUpdateAndBorrowFee>,
     pub crank_fees: BTreeMap<PerpsNetwork, CrankFeeConfig>,
+    per_network: BTreeMap<PerpsNetwork, BTreeMap<MarketId, ConfigUpdateAndBorrowFee>>,
+}
+
+impl MarketConfigUpdates {
+    pub fn get_market(
+        &self,
+        network: PerpsNetwork,
+        market_id: &MarketId,
+    ) -> Result<&ConfigUpdateAndBorrowFee> {
+        if let Some(config) = self
+            .per_network
+            .get(&network)
+            .and_then(|m| m.get(market_id))
+        {
+            return Ok(config);
+        }
+        self.markets.get(market_id).with_context(|| {
+            format!("Did not find a market config update for {market_id} on the {network} network")
+        })
+    }
+
+    fn iter_all_markets(&self) -> impl Iterator<Item = (&MarketId, &ConfigUpdateAndBorrowFee)> {
+        self.markets
+            .iter()
+            .chain(self.per_network.values().flat_map(|x| x.iter()))
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -765,7 +791,7 @@ impl MarketConfigUpdates {
         let default_dnf_cap = ConfigDefaults::delta_neutrality_fee_cap();
         let seven: Decimal256 = "7".parse()?;
         let two: Decimal256 = "2".parse()?;
-        for (market_id, update) in &self.markets {
+        for (market_id, update) in self.iter_all_markets() {
             let max_leverage = update
                 .config
                 .max_leverage
