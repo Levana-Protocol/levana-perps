@@ -43,7 +43,7 @@ pub(crate) enum ChainId {
     Pion1 = 13,
     #[serde(rename = "thorchain-stagenet-2")]
     RujiraTestnet = 14,
-    #[serde(rename = "thorchain-1")]
+    #[serde(rename = "thorchain-1", alias = "THOR")]
     RujiraMainnet = 15,
 }
 
@@ -160,6 +160,10 @@ impl ChainId {
         // load historical data from the database.
         if self == ChainId::RujiraTestnet {
             return Ok(PerpsNetwork::RujiraTestnet.builder().await?);
+        }
+
+        if self == ChainId::RujiraMainnet {
+            return Ok(PerpsNetwork::RujiraMainnet.builder().await?);
         }
 
         Ok(match self {
