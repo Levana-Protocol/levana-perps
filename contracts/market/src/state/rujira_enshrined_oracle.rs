@@ -60,7 +60,7 @@ impl EnshrinedPrice {
         let res = QueryOraclePriceResponse::get(q, req)?;
         EnshrinedPrice::try_from(res)
     }
-
+    #[allow(dead_code)]
     pub fn load_all(q: QuerierWrapper) -> Result<Vec<(String, Decimal)>, Error> {
         let req = QueryOraclePricesRequest {
             height: "0".to_string(),
