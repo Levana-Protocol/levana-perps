@@ -1,4 +1,4 @@
-use crate::state::rujira_network::{Queryable, QueryablePair};
+use crate::state::rujira_grpc::{Queryable, QueryablePair};
 use anyhow::Error;
 use cosmwasm_std::{Decimal, QuerierWrapper, Uint128};
 use std::{ops::Div, str::FromStr};
@@ -12,8 +12,16 @@ pub struct QueryOraclePriceRequest {
 }
 
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryOraclePricesRequest {
+    #[prost(string, tag = "1")]
+    pub height: String,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OraclePrice {
     #[prost(string, tag = "1")]
+    pub symbol: String,
+    #[prost(string, tag = "2")]
     pub price: String,
 }
 
@@ -21,6 +29,12 @@ pub struct OraclePrice {
 pub struct QueryOraclePriceResponse {
     #[prost(message, optional, tag = "1")]
     pub price: Option<OraclePrice>,
+}
+
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryOraclePricesResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub prices: Vec<OraclePrice>,
 }
 
 pub struct EnshrinedPrice {
@@ -46,6 +60,21 @@ impl EnshrinedPrice {
         let res = QueryOraclePriceResponse::get(q, req)?;
         EnshrinedPrice::try_from(res)
     }
+
+    pub fn load_all(q: QuerierWrapper) -> Result<Vec<(String, Decimal)>, Error> {
+        let req = QueryOraclePricesRequest {
+            height: "0".to_string(),
+        };
+        let res = QueryOraclePricesResponse::get(q, req)?;
+
+        res.prices
+            .into_iter()
+            .map(|OraclePrice { symbol, price }| {
+                let dec = Decimal::from_str(&price)?.div(Uint128::from(10u128).pow(8));
+                Ok((symbol, dec))
+            })
+            .collect()
+    }
 }
 
 impl QueryablePair for QueryOraclePriceResponse {
@@ -54,5 +83,14 @@ impl QueryablePair for QueryOraclePriceResponse {
 
     fn grpc_path() -> &'static str {
         "/types.Query/OraclePrice"
+    }
+}
+
+impl QueryablePair for QueryOraclePricesResponse {
+    type Request = QueryOraclePricesRequest;
+    type Response = QueryOraclePricesResponse;
+
+    fn grpc_path() -> &'static str {
+        "/types.Query/OraclePrices"
     }
 }
