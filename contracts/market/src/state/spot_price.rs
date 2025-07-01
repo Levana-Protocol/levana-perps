@@ -1,6 +1,9 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use crate::{prelude::*, state::rujira_network};
+use crate::{
+    prelude::*,
+    state::{rujira_enshrined_oracle, rujira_network},
+};
 use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
@@ -653,12 +656,19 @@ impl State<'_> {
                                     },
                                 );
                             } else if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
-                                let pool = rujira_rs::query::Pool::load(
+                                let price = match rujira_enshrined_oracle::EnshrinedPrice::load(
                                     self.querier,
-                                    &asset.to_owned().try_into()?,
-                                )?;
-
-                                let price = Decimal256::from(pool.asset_tor_price);
+                                    asset.clone(),
+                                ) {
+                                    Ok(enshrined) => Decimal256::from(enshrined.price),
+                                    Err(_) => {
+                                        let pool = rujira_rs::query::Pool::load(
+                                            self.querier,
+                                            &asset.to_owned().try_into()?,
+                                        )?;
+                                        Decimal256::from(pool.asset_tor_price)
+                                    }
+                                };
                                 let price = Number::from(price);
                                 let price =
                                     NumberGtZero::try_from(price).context("price must be > 0")?;
