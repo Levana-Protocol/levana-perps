@@ -47,6 +47,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 perps_exes::PerpsNetwork::NibiruTestnet => {
                     Err(anyhow!("Unsupported Nibiru testnet"))
                 }
+                perps_exes::PerpsNetwork::RujiraDevnet => Err(anyhow!("Unsupported Rujira devnet")),
                 perps_exes::PerpsNetwork::RujiraTestnet => {
                     Err(anyhow!("Unsupported Rujira testnet"))
                 }

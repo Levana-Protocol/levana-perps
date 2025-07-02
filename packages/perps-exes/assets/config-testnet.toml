@@ -1657,6 +1657,10 @@ price_usd = "8"
 price = "1"
 price_usd = "1"
 
+[initial-prices.ETH_USDT]
+price = "1"
+price_usd = "1"
+
 [initial-prices.RUNE_USDT]
 price = "1"
 price_usd = "1"

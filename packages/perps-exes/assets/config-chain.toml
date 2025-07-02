@@ -244,6 +244,11 @@ faucet = "nibi1e5e52yd7hk2j3plfxwfldsn33v4dye2ez0zmjwqea0upcvgmhs2q07mhlj"
 rpc-nodes = ["https://rpc.testnet-1.nibiru.fi"]
 gas-decimals = 6
 
+[rujira-devnet]
+rpc-nodes = ["http://rpc-devnet.starsquid.io"]
+gas-decimals = 8
+spot-price = {}
+
 [rujira-testnet]
 tracker = "sthor1pqj8w5c8aygg8jns6zlq24ltyjha0zd7yfsjq2ahnzdpe4zhtd8q4evugs"
 faucet = "sthor1r85reqy6h0lu02vyz0hnzhv5whsns55gdt4w0d7ft87utzk7u0wq590hsm"

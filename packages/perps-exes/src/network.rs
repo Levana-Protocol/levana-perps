@@ -8,6 +8,7 @@ pub enum PerpsNetwork {
     Regular(CosmosNetwork),
     DymensionTestnet,
     NibiruTestnet,
+    RujiraDevnet,
     RujiraTestnet,
     RujiraMainnet,
 }
@@ -19,6 +20,7 @@ impl FromStr for PerpsNetwork {
         Ok(match s {
             "dymension-testnet" => PerpsNetwork::DymensionTestnet,
             "nibiru-testnet" => PerpsNetwork::NibiruTestnet,
+            "rujira-devnet" => PerpsNetwork::RujiraDevnet,
             "rujira-testnet" => PerpsNetwork::RujiraTestnet,
             "rujira-mainnet" => PerpsNetwork::RujiraMainnet,
             _ => PerpsNetwork::Regular(s.parse()?),
@@ -41,6 +43,12 @@ impl PerpsNetwork {
                 "unibi",
                 Self::NibiruTestnet.get_address_hrp(),
                 "https://grpc.testnet-1.nibiru.fi",
+            )),
+            PerpsNetwork::RujiraDevnet => Ok(CosmosBuilder::new(
+                "thorchain",
+                "rune",
+                Self::RujiraDevnet.get_address_hrp(),
+                "http://grpc-devnet.starsquid.io:81",
             )),
             PerpsNetwork::RujiraTestnet => Ok(CosmosBuilder::new(
                 "thorchain-stagenet-2",
@@ -70,6 +78,7 @@ impl HasAddressHrp for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.get_address_hrp(),
             PerpsNetwork::DymensionTestnet => AddressHrp::from_static("rol"),
             PerpsNetwork::NibiruTestnet => AddressHrp::from_static("nibi"),
+            PerpsNetwork::RujiraDevnet => AddressHrp::from_static("tthor"),
             PerpsNetwork::RujiraTestnet => AddressHrp::from_static("sthor"),
             PerpsNetwork::RujiraMainnet => AddressHrp::from_static("thor"),
         }
@@ -85,6 +94,7 @@ impl serde::Serialize for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.serialize(serializer),
             PerpsNetwork::DymensionTestnet => serializer.serialize_str("dymension-testnet"),
             PerpsNetwork::NibiruTestnet => serializer.serialize_str("nibiru-testnet"),
+            PerpsNetwork::RujiraDevnet => serializer.serialize_str("rujira-devnet"),
             PerpsNetwork::RujiraTestnet => serializer.serialize_str("rujira-testnet"),
             PerpsNetwork::RujiraMainnet => serializer.serialize_str("rujira-mainnet"),
         }
@@ -123,6 +133,7 @@ impl Display for PerpsNetwork {
             PerpsNetwork::Regular(network) => network.fmt(f),
             PerpsNetwork::DymensionTestnet => f.write_str("dymension-testnet"),
             PerpsNetwork::NibiruTestnet => f.write_str("nibiru-testnet"),
+            PerpsNetwork::RujiraDevnet => f.write_str("rujira-devnet"),
             PerpsNetwork::RujiraTestnet => f.write_str("rujira-testnet"),
             PerpsNetwork::RujiraMainnet => f.write_str("rujira-mainnet"),
         }

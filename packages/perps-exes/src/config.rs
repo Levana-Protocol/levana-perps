@@ -472,6 +472,7 @@ pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
         (PerpsNetwork::DymensionTestnet, "dym"),
         (PerpsNetwork::Regular(CosmosNetwork::NeutronTestnet), "ntrn"),
         (PerpsNetwork::NibiruTestnet, "nibi"),
+        (PerpsNetwork::RujiraDevnet, "ruji"),
         (PerpsNetwork::RujiraTestnet, "ruji"),
     ];
     for (network, prefix) in NETWORKS {
