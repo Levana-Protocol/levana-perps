@@ -173,11 +173,13 @@ impl OraclePriceInternal {
                     .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => *price,
-                SpotPriceFeedData::Rujira { asset } => self
-                    .rujira
-                    .get(asset)
-                    .map(|x| x.price)
-                    .with_context(|| format!("no rujira price for asset {}", asset))?,
+                SpotPriceFeedData::Rujira { asset } => {
+                    let asset = ChainSymbol::parse(asset).symbol().to_owned();
+                    self.rujira
+                        .get(&asset)
+                        .map(|x| x.price)
+                        .with_context(|| format!("no rujira price for asset {}", asset))?
+                }
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
@@ -641,11 +643,11 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Rujira { asset } => {
-                            let asset = ChainSymbol::parse(asset).symbol();
-                            if let Entry::Vacant(entry) = rujira.entry(asset.to_owned()) {
+                            let symbol = ChainSymbol::parse(asset).symbol().to_owned();
+                            if let Entry::Vacant(entry) = rujira.entry(symbol.clone()) {
                                 let raw_price = rujira::enshrined_oracle::EnshrinedPrice::load(
                                     self.querier,
-                                    asset.to_owned(),
+                                    symbol,
                                 )?;
                                 let price = Number::from(Decimal256::from(raw_price.price));
                                 let price =
