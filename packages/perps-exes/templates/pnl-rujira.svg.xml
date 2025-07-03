@@ -59,19 +59,21 @@
 
 <style>
   text {
-    font-family: Public Sans;
+    font-family: "Montserrat", "Barlow Semi Condensed";
     text-anchor: start;
   }
 
   .market-title {
     fill: #FFFFFF;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 500;
+    font-family: "Montserrat";
   }
 
   .earnings {
-    fill: #44C194;
-    font-weight: 600;
+    fill: #5DFBD0;
+    font-weight: 700;
+    font-family: "Montserrat";
   }
 
   .earnings.single {
@@ -83,19 +85,24 @@
   }
 
   .stat-title {
-    fill: #B4AFB7;
-    font-size: 12px;
-    font-weight: 500;
+    fill: #71909F;
+    font-size: 13px;
+    font-weight: 400;
+    font-family: "Barlow Semi Condensed";
   }
 
   .stat-value {
     fill: #FFFFFF;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 400;
+    font-family: "Barlow Semi Condensed";
   }
 
   .stat-value.small {
+    fill: #FFFFFF;    
     font-size: 10px;
+    font-weight: 400;
+    font-family: "Barlow Semi Condensed";
   }
 </style>
 
