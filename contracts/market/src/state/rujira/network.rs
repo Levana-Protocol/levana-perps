@@ -1,4 +1,4 @@
-use crate::state::rujira_grpc::{Queryable, QueryablePair};
+use crate::state::rujira::grpc::{Queryable, QueryablePair};
 use anyhow::Error;
 use cosmwasm_std::{Decimal, QuerierWrapper, Uint128};
 use std::{ops::Div, str::FromStr};

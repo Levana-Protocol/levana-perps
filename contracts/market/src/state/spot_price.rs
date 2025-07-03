@@ -1,6 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use crate::{prelude::*, state::rujira_enshrined_oracle};
+use crate::{prelude::*, state::rujira};
 use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
@@ -10,7 +10,6 @@ use perpswap::contracts::market::{
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
-use rujira_rs::Oracle;
 use serde::{Deserialize, Serialize};
 
 /// Stores spot price history.
@@ -640,19 +639,14 @@ impl State<'_> {
 
                         SpotPriceFeedData::Rujira { asset } => {
                             if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
-                                let raw_price = match rujira_enshrined_oracle::EnshrinedPrice::load(
+                                let raw_price = rujira::enshrined_oracle::EnshrinedPrice::load(
                                     self.querier,
                                     asset.clone(),
-                                ) {
-                                    Ok(enshrined) => enshrined.price,
-                                    Err(_) => {
-                                        let l1_asset = rujira_rs::Layer1Asset::from_str(asset)?;
-                                        l1_asset.price(self.querier)?
-                                    }
-                                };
-                                let price = Number::from(Decimal256::from(raw_price));
+                                )?;
+                                let price = Number::from(Decimal256::from(raw_price.price));
                                 let price =
                                     NumberGtZero::try_from(price).context("price must be > 0")?;
+
                                 entry.insert(OraclePriceFeedRujiraResp {
                                     price,
                                     volatile: feed.volatile.unwrap_or(true),
