@@ -53,11 +53,11 @@ impl App {
             PerpsNetwork::RujiraDevnet => match market_id.as_str() {
                 "BTC_USDT" => CollateralSource::Native {
                     denom: "btc-btc".to_string(),
-                    decimal_places: 0,
+                    decimal_places: 8,
                 },
                 "ETH_USDT" => CollateralSource::Native {
                     denom: "eth-eth".to_string(),
-                    decimal_places: 0,
+                    decimal_places: 8,
                 },
                 _ => {
                     anyhow::bail!("Unsupported market id {market_id} for RujiraDevnet");
