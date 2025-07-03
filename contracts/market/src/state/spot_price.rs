@@ -1,6 +1,9 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use crate::{prelude::*, state::rujira};
+use crate::{
+    prelude::*,
+    state::rujira::{self, ChainSymbol},
+};
 use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
@@ -638,10 +641,11 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Rujira { asset } => {
-                            if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
+                            let asset = ChainSymbol::parse(asset).symbol();
+                            if let Entry::Vacant(entry) = rujira.entry(asset.to_owned()) {
                                 let raw_price = rujira::enshrined_oracle::EnshrinedPrice::load(
                                     self.querier,
-                                    asset.clone(),
+                                    asset.to_owned(),
                                 )?;
                                 let price = Number::from(Decimal256::from(raw_price.price));
                                 let price =

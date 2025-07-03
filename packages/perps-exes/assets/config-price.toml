@@ -2069,7 +2069,7 @@ inverted = false
 [[networks.rujira-devnet.BTC_USDT.feeds]]
 
 [networks.rujira-devnet.BTC_USDT.feeds.rujira]
-asset = "BTC"
+asset = "BTC.BTC"
 inverted = false
 
 [[networks.rujira-devnet.BTC_USDT.feeds-usd]]
@@ -2081,7 +2081,7 @@ inverted = false
 [[networks.rujira-devnet.ETH_USDT.feeds]]
 
 [networks.rujira-devnet.ETH_USDT.feeds.rujira]
-asset = "ETH"
+asset = "ETH.ETH"
 inverted = false
 
 [[networks.rujira-devnet.ETH_USDT.feeds-usd]]
