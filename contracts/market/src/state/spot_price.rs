@@ -1,9 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
-use crate::{
-    prelude::*,
-    state::{rujira_enshrined_oracle, rujira_network},
-};
+use crate::{prelude::*, state::rujira_enshrined_oracle};
 use cosmwasm_std::{Binary, Order};
 use perpswap::contracts::market::{
     entry::{
@@ -13,6 +10,7 @@ use perpswap::contracts::market::{
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
+use rujira_rs::Oracle;
 use serde::{Deserialize, Serialize};
 
 /// Stores spot price history.
@@ -641,35 +639,18 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Rujira { asset } => {
-                            if asset == "RUNE.RUNE" {
-                                let network = rujira_network::Network::load(self.querier)?;
-                                let price = Decimal256::from(network.rune_price_in_tor);
-                                let price = Number::from(price);
-                                let price =
-                                    NumberGtZero::try_from(price).context("price must be > 0")?;
-
-                                rujira.insert(
-                                    asset.clone(),
-                                    OraclePriceFeedRujiraResp {
-                                        price,
-                                        volatile: feed.volatile.unwrap_or(true),
-                                    },
-                                );
-                            } else if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
-                                let price = match rujira_enshrined_oracle::EnshrinedPrice::load(
+                            if let Entry::Vacant(entry) = rujira.entry(asset.clone()) {
+                                let raw_price = match rujira_enshrined_oracle::EnshrinedPrice::load(
                                     self.querier,
                                     asset.clone(),
                                 ) {
-                                    Ok(enshrined) => Decimal256::from(enshrined.price),
+                                    Ok(enshrined) => enshrined.price,
                                     Err(_) => {
-                                        let pool = rujira_rs::query::Pool::load(
-                                            self.querier,
-                                            &asset.to_owned().try_into()?,
-                                        )?;
-                                        Decimal256::from(pool.asset_tor_price)
+                                        let l1_asset = rujira_rs::Layer1Asset::from_str(asset)?;
+                                        l1_asset.price(self.querier)?
                                     }
                                 };
-                                let price = Number::from(price);
+                                let price = Number::from(Decimal256::from(raw_price));
                                 let price =
                                     NumberGtZero::try_from(price).context("price must be > 0")?;
                                 entry.insert(OraclePriceFeedRujiraResp {

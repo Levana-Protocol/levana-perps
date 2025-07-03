@@ -15,6 +15,7 @@ pub struct QueryNetworkResponse {
     pub rune_price_in_tor: ::prost::alloc::string::String,
 }
 
+#[allow(dead_code)]
 pub struct Network {
     pub rune_price_in_tor: Decimal,
 }
@@ -30,6 +31,7 @@ impl TryFrom<QueryNetworkResponse> for Network {
     }
 }
 
+#[allow(dead_code)]
 impl Network {
     pub fn load(q: QuerierWrapper) -> Result<Self, Error> {
         let req = QueryNetworkRequest {
