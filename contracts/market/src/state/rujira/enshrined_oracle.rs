@@ -1,7 +1,7 @@
 use crate::state::rujira::grpc::{Queryable, QueryablePair};
 use anyhow::Error;
-use cosmwasm_std::{Decimal, QuerierWrapper, Uint128};
-use std::{ops::Div, str::FromStr};
+use cosmwasm_std::{Decimal, QuerierWrapper};
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QueryOraclePriceRequest {
@@ -9,12 +9,6 @@ pub struct QueryOraclePriceRequest {
     pub height: String,
     #[prost(string, tag = "2")]
     pub symbol: String,
-}
-
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryOraclePricesRequest {
-    #[prost(string, tag = "1")]
-    pub height: String,
 }
 
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -31,12 +25,6 @@ pub struct QueryOraclePriceResponse {
     pub price: Option<OraclePrice>,
 }
 
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct QueryOraclePricesResponse {
-    #[prost(message, repeated, tag = "1")]
-    pub prices: Vec<OraclePrice>,
-}
-
 pub struct EnshrinedPrice {
     pub price: Decimal,
 }
@@ -46,7 +34,7 @@ impl TryFrom<QueryOraclePriceResponse> for EnshrinedPrice {
 
     fn try_from(value: QueryOraclePriceResponse) -> Result<Self, Self::Error> {
         let price = value.price.ok_or_else(|| anyhow::anyhow!("no price"))?;
-        let dec = Decimal::from_str(&price.price)?.div(Uint128::from(10u128).pow(8));
+        let dec = Decimal::from_str(&price.price)?;
         Ok(Self { price: dec })
     }
 }
@@ -60,21 +48,6 @@ impl EnshrinedPrice {
         let res = QueryOraclePriceResponse::get(q, req)?;
         EnshrinedPrice::try_from(res)
     }
-    #[allow(dead_code)]
-    pub fn load_all(q: QuerierWrapper) -> Result<Vec<(String, Decimal)>, Error> {
-        let req = QueryOraclePricesRequest {
-            height: "0".to_string(),
-        };
-        let res = QueryOraclePricesResponse::get(q, req)?;
-
-        res.prices
-            .into_iter()
-            .map(|OraclePrice { symbol, price }| {
-                let dec = Decimal::from_str(&price)?.div(Uint128::from(10u128).pow(8));
-                Ok((symbol, dec))
-            })
-            .collect()
-    }
 }
 
 impl QueryablePair for QueryOraclePriceResponse {
@@ -83,14 +56,5 @@ impl QueryablePair for QueryOraclePriceResponse {
 
     fn grpc_path() -> &'static str {
         "/types.Query/OraclePrice"
-    }
-}
-
-impl QueryablePair for QueryOraclePricesResponse {
-    type Request = QueryOraclePricesRequest;
-    type Response = QueryOraclePricesResponse;
-
-    fn grpc_path() -> &'static str {
-        "/types.Query/OraclePrices"
     }
 }
