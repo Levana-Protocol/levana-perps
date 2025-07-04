@@ -12,7 +12,7 @@ pub(crate) mod meta;
 pub(crate) mod order;
 pub(crate) mod position;
 pub(crate) mod referral;
-pub(crate) mod rujira;
+pub mod rujira;
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
 pub(crate) mod shutdown;
