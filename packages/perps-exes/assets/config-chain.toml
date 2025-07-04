@@ -248,6 +248,7 @@ gas-decimals = 6
 tracker = "tthor1hrpna9v7vs3stzyd4z3xf00676kf78zpe2u5ksvljswn2vnjp3ysxdy63p"
 faucet = "tthor1nc5tatafv6eyq7llkr2gv50ff9e22mnf70qgjlv737ktmt4eswrqzpz780"
 rpc-nodes = ["http://rpc-devnet.starsquid.io"]
+explorer = "http://api-devnet.starsquid.io"
 gas-decimals = 8
 spot-price = {}
 
