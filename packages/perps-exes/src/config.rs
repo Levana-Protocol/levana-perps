@@ -472,9 +472,19 @@ pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
         (PerpsNetwork::DymensionTestnet, "dym"),
         (PerpsNetwork::Regular(CosmosNetwork::NeutronTestnet), "ntrn"),
         (PerpsNetwork::NibiruTestnet, "nibi"),
-        (PerpsNetwork::RujiraDevnet, "ruji"),
-        (PerpsNetwork::RujiraTestnet, "ruji"),
     ];
+
+    if deployment.starts_with("ruji") {
+        return match deployment.strip_prefix("ruji") {
+            Some("beta") => Ok((PerpsNetwork::RujiraTestnet, "beta")),
+            Some("dev") => Ok((PerpsNetwork::RujiraDevnet, "dev")),
+            _ => Err(anyhow::anyhow!(
+                "Unknown rujira deployment variant in '{}'. Expected 'rujibeta' or 'rujidev'.",
+                deployment
+            )),
+        };
+    }
+
     for (network, prefix) in NETWORKS {
         if let Some(suffix) = deployment.strip_prefix(prefix) {
             return Ok((*network, suffix));
