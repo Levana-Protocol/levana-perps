@@ -3,6 +3,7 @@ use std::collections::{hash_map::Entry, HashMap, HashSet};
 use chrono::{DateTime, Utc};
 use cosmos::Address;
 use cosmwasm_std::Uint256;
+use levana_perpswap_cosmos_market::state::rujira::ChainSymbol;
 use parking_lot::RwLock;
 use perps_exes::pyth::fetch_json_with_retry;
 use perpswap::{
@@ -316,9 +317,10 @@ fn compose_oracle_feeds(
                 sei.price.into_decimal256()
             }
             SpotPriceFeedData::Rujira { asset } => {
+                let asset = ChainSymbol::parse(asset).symbol().to_owned();
                 let rujira = oracle_price
                     .rujira
-                    .get(asset)
+                    .get(&asset)
                     .with_context(|| format!("Missing price for Ruji asset: {asset}"))?;
                 update_publish_time(Utc::now(), feed.volatile, true);
                 rujira.price.into_decimal256()

@@ -1,6 +1,6 @@
+use crate::state::rujira::grpc::{Queryable, QueryablePair};
 use anyhow::Error;
-use cosmwasm_std::{Binary, Decimal, QuerierWrapper, Uint128};
-use prost::Message;
+use cosmwasm_std::{Decimal, QuerierWrapper, Uint128};
 use std::{ops::Div, str::FromStr};
 
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -15,6 +15,7 @@ pub struct QueryNetworkResponse {
     pub rune_price_in_tor: ::prost::alloc::string::String,
 }
 
+#[allow(dead_code)]
 pub struct Network {
     pub rune_price_in_tor: Decimal,
 }
@@ -30,6 +31,7 @@ impl TryFrom<QueryNetworkResponse> for Network {
     }
 }
 
+#[allow(dead_code)]
 impl Network {
     pub fn load(q: QuerierWrapper) -> Result<Self, Error> {
         let req = QueryNetworkRequest {
@@ -37,41 +39,6 @@ impl Network {
         };
         let res = QueryNetworkResponse::get(q, req)?;
         Network::try_from(res)
-    }
-}
-
-pub trait QueryablePair {
-    type Request: Message + Default;
-    type Response: Message + Sized + Default;
-
-    fn grpc_path() -> &'static str;
-}
-
-pub trait Queryable: Sized {
-    type Pair: QueryablePair;
-
-    fn get(
-        querier: QuerierWrapper,
-        req: <Self::Pair as QueryablePair>::Request,
-    ) -> Result<Self, Error>;
-}
-
-impl<T> Queryable for T
-where
-    T: QueryablePair<Response = Self> + Message + Default,
-{
-    type Pair = T;
-
-    fn get(
-        querier: QuerierWrapper,
-        req: <Self::Pair as QueryablePair>::Request,
-    ) -> Result<Self, Error> {
-        let mut buf = Vec::new();
-        req.encode(&mut buf)?;
-        let res = querier
-            .query_grpc(Self::grpc_path().to_string(), Binary::from(buf))?
-            .to_vec();
-        Ok(Self::decode(&*res)?)
     }
 }
 

@@ -2066,6 +2066,30 @@ inverted = false
 key = "DYM_USD"
 inverted = false
 
+[[networks.rujira-devnet.BTC_USDT.feeds]]
+
+[networks.rujira-devnet.BTC_USDT.feeds.rujira]
+asset = "BTC.BTC"
+inverted = false
+
+[[networks.rujira-devnet.BTC_USDT.feeds-usd]]
+
+[networks.rujira-devnet.BTC_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-devnet.ETH_USDT.feeds]]
+
+[networks.rujira-devnet.ETH_USDT.feeds.rujira]
+asset = "ETH.ETH"
+inverted = false
+
+[[networks.rujira-devnet.ETH_USDT.feeds-usd]]
+
+[networks.rujira-devnet.ETH_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
 [[networks.rujira-testnet.KUJI_USDC.feeds]]
 
 [networks.rujira-testnet.KUJI_USDC.feeds.rujira]

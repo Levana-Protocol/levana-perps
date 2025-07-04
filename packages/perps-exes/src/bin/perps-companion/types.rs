@@ -45,6 +45,8 @@ pub(crate) enum ChainId {
     RujiraTestnet = 14,
     #[serde(rename = "thorchain-1", alias = "THOR")]
     RujiraMainnet = 15,
+    #[serde(rename = "thorchain")]
+    RujiraDevnet = 16,
 }
 
 impl From<ChainId> for i32 {
@@ -65,6 +67,7 @@ impl From<ChainId> for i32 {
             ChainId::Pion1 => 13,
             ChainId::RujiraTestnet => 14,
             ChainId::RujiraMainnet => 15,
+            ChainId::RujiraDevnet => 16,
         }
     }
 }
@@ -90,6 +93,7 @@ impl TryFrom<&str> for ChainId {
             "pion-1" => Ok(ChainId::Pion1),
             "thorchain-stagenet-2" => Ok(ChainId::RujiraTestnet),
             "thorchain-1" => Ok(ChainId::RujiraMainnet),
+            "thorchain" => Ok(ChainId::RujiraDevnet),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
     }
@@ -122,6 +126,7 @@ impl Display for ChainId {
             ChainId::Pion1 => "pion-1",
             ChainId::RujiraTestnet => "thorchain-stagenet-2",
             ChainId::RujiraMainnet => "thorchain-1",
+            ChainId::RujiraDevnet => "thorchain",
         })
     }
 }
@@ -135,7 +140,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 14] {
+    pub(crate) fn all() -> [ChainId; 15] {
         [
             ChainId::Atlantic2,
             ChainId::Elgafar1,
@@ -151,6 +156,7 @@ impl ChainId {
             ChainId::Pion1,
             ChainId::RujiraTestnet,
             ChainId::RujiraMainnet,
+            ChainId::RujiraDevnet,
         ]
     }
 
@@ -158,6 +164,10 @@ impl ChainId {
         // In the future this may be a partial mapping (i.e. to None) if we drop
         // support for some chains. But by keeping the ChainId present, we can
         // load historical data from the database.
+        if self == ChainId::RujiraDevnet {
+            return Ok(PerpsNetwork::RujiraDevnet.builder().await?);
+        }
+
         if self == ChainId::RujiraTestnet {
             return Ok(PerpsNetwork::RujiraTestnet.builder().await?);
         }
@@ -189,6 +199,7 @@ impl ChainId {
     pub(crate) fn from_perps_network(network: PerpsNetwork) -> Result<Self> {
         match network {
             PerpsNetwork::Regular(network) => Self::from_cosmos_network(network),
+            PerpsNetwork::RujiraDevnet => Ok(ChainId::RujiraDevnet),
             PerpsNetwork::RujiraTestnet => Ok(ChainId::RujiraTestnet),
             PerpsNetwork::RujiraMainnet => Ok(ChainId::RujiraMainnet),
             PerpsNetwork::DymensionTestnet => Err(anyhow::anyhow!(
@@ -235,6 +246,7 @@ impl ChainId {
             ChainId::Pion1 => false,
             ChainId::RujiraTestnet => false,
             ChainId::RujiraMainnet => true,
+            ChainId::RujiraDevnet => false,
         }
     }
 }
@@ -379,7 +391,7 @@ pub(crate) fn is_rujira_chain(chain_id: &str) -> bool {
     match chain_id.parse::<ChainId>() {
         // If it's an invalid chain ID, treat it as non-Rujira
         Err(_) => false,
-        Ok(ChainId::RujiraTestnet | ChainId::RujiraMainnet) => true,
+        Ok(ChainId::RujiraDevnet | ChainId::RujiraTestnet | ChainId::RujiraMainnet) => true,
         // Keep an explicit list here so that, when adding new chains,
         // the compiler forces us to decide if the chain should use
         // Rujira styling or not.

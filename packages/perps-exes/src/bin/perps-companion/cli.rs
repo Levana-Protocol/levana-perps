@@ -54,6 +54,15 @@ pub(crate) struct Opt {
     )]
     pub(crate) osmosis_mainnet_fallbacks: Vec<String>,
 
+    /// Primary GRPC endpoints for Rujira devnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_RUJIRA_DEVNET_GRPC",
+        value_delimiter = ',',
+        default_value = "http://grpc-devnet.starsquid.io:81"
+    )]
+    pub(crate) rujira_devnet_primary: String,
+
     /// Primary GRPC endpoints for Rujira testnet.
     #[clap(
         long,
@@ -98,6 +107,14 @@ pub(crate) struct Opt {
         default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
     )]
     pub(crate) neutron_mainnet_fallbacks: Vec<String>,
+
+    /// Fallback GRPC endpoints for Rujira devnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_RUJIRA_DEVNET_FALLBACKS_GRPC",
+        value_delimiter = ','
+    )]
+    pub(crate) rujira_devnet_fallbacks: Vec<String>,
 
     /// Fallback GRPC endpoints for Rujira testnet.
     #[clap(
