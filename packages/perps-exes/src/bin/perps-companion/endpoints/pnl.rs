@@ -26,6 +26,7 @@ use perpswap::storage::{MarketId, MarketType};
 use resvg::usvg::fontdb::Database;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::path::Path;
 
 use crate::{
     app::App,
@@ -365,11 +366,11 @@ impl PnlInfo {
 
     fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
-        let svg = if is_rujira_chain(&self.chain) {
-            PnlRujiraSvg { info: self }.render()
+        let (svg, fontsdb) = if is_rujira_chain(&self.chain) {
+            (PnlRujiraSvg { info: self }.render()?, &Self::load_fonts()?)
         } else {
-            PnlLevanaSvg { info: self }.render()
-        }?;
+            (PnlLevanaSvg { info: self }.render()?, fontsdb)
+        };
 
         // Convert the SVG into a usvg tree using default settings
         let tree = resvg::usvg::Tree::from_str(
@@ -404,6 +405,33 @@ impl PnlInfo {
             HeaderValue::from_static("public, max-age=86400"),
         );
         Ok(res)
+    }
+
+    /// Loads the required fonts from the project directory.
+    fn load_fonts() -> Result<Database> {
+        let current_dir =
+            std::env::current_dir().context("Failed to get current working directory")?;
+
+        let project_root = current_dir
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+            .context("Failed to navigate to project root directory")?;
+
+        let fonts_path = project_root.join("static/fonts");
+
+        let mut db = Database::new();
+
+        db.load_font_file(fonts_path.join("Montserrat-Regular.ttf"))?;
+        db.load_font_file(fonts_path.join("Montserrat-Bold.ttf"))?;
+        db.load_font_file(fonts_path.join("Montserrat-SemiBold.ttf"))?;
+        db.load_font_file(fonts_path.join("Montserrat-ExtraBold.ttf"))?;
+
+        db.load_font_file(fonts_path.join("BarlowSemiCondensed-Regular.ttf"))?;
+        db.load_font_file(fonts_path.join("BarlowSemiCondensed-Medium.ttf"))?;
+        db.load_font_file(fonts_path.join("BarlowSemiCondensed-SemiBold.ttf"))?;
+
+        Ok(db)
     }
 }
 
