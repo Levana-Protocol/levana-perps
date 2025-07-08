@@ -545,7 +545,7 @@ async fn check_market_needs_price_update(
     {
         return Ok(ActionWithReason::PythPricesClosed);
     }
-    match get_latest_price(&offchain_price_data, market).await? {
+    match get_latest_price(&offchain_price_data, market, app.config.network).await? {
         LatestPrice::NoPriceInContract => Ok(ActionWithReason::WorkNeeded(
             CrankTriggerReason::NoPriceOnChain,
         )),
