@@ -46,6 +46,9 @@ impl App {
                 ChainId::Neutron1 => {
                     Some((&opt.neutron_mainnet_primary, &opt.neutron_mainnet_fallbacks))
                 }
+                ChainId::RujiraDevnet => {
+                    Some((&opt.rujira_devnet_primary, &opt.rujira_devnet_fallbacks))
+                }
                 ChainId::RujiraTestnet => {
                     Some((&opt.rujira_testnet_primary, &opt.rujira_testnet_fallbacks))
                 }
