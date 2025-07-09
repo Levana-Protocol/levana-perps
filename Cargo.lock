@@ -3909,7 +3909,6 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "sqlx",
- "tempfile",
  "thiserror 2.0.0",
  "tokio",
  "tokio-tungstenite",

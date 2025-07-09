@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Display, path::PathBuf, sync::Arc};
+use std::{borrow::Cow, fmt::Display, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -23,12 +23,9 @@ use perpswap::{
 };
 
 use perpswap::storage::{MarketId, MarketType};
-use reqwest::Client;
 use resvg::usvg::fontdb::Database;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tempfile::NamedTempFile;
-use tokio::{fs::File, io::AsyncWriteExt};
 
 use crate::{
     app::App,
@@ -122,8 +119,9 @@ pub(super) async fn pnl_image(
     TypedHeader(host): TypedHeader<Host>,
     State(app): State<Arc<App>>,
 ) -> Result<Response, Error> {
-    let info = PnlInfo::load_from_database(&app, pnl_id, &host).await?;
-    Ok(info.image(&app.fontdb).await)
+    PnlInfo::load_from_database(&app, pnl_id, &host)
+        .await
+        .map(|info| info.image(&app.fontdb))
 }
 
 pub(super) async fn pnl_image_svg(
@@ -333,8 +331,8 @@ impl PnlInfo {
         res
     }
 
-    async fn image(self, fontsdb: &Database) -> Response {
-        match self.image_inner(fontsdb).await {
+    fn image(self, fontsdb: &Database) -> Response {
+        match self.image_inner(fontsdb) {
             Ok(res) => res,
             Err(e) => {
                 let mut res = format!("Error while rendering SVG: {e:?}").into_response();
@@ -365,16 +363,13 @@ impl PnlInfo {
         res
     }
 
-    async fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
+    fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
-        let (svg, fontsdb) = if is_rujira_chain(&self.chain) {
-            (
-                PnlRujiraSvg { info: self }.render()?,
-                &Self::load_fonts().await?,
-            )
+        let svg = if is_rujira_chain(&self.chain) {
+            PnlRujiraSvg { info: self }.render()
         } else {
-            (PnlLevanaSvg { info: self }.render()?, fontsdb)
-        };
+            PnlLevanaSvg { info: self }.render()
+        }?;
 
         // Convert the SVG into a usvg tree using default settings
         let tree = resvg::usvg::Tree::from_str(
@@ -409,41 +404,6 @@ impl PnlInfo {
             HeaderValue::from_static("public, max-age=86400"),
         );
         Ok(res)
-    }
-
-    /// Loads the required fonts from the project directory.
-    async fn load_fonts() -> Result<Database> {
-        let client = Client::new();
-        let mut db = Database::new();
-
-        let font_urls = vec![
-            "https://static.rujiperps.com/fonts/Montserrat-Regular.ttf",
-            "https://static.rujiperps.com/fonts/Montserrat-Bold.ttf",
-            "https://static.rujiperps.com/fonts/Montserrat-SemiBold.ttf",
-            "https://static.rujiperps.com/fonts/Montserrat-ExtraBold.ttf",
-            "https://static.rujiperps.com/fonts/BarlowSemiCondensed-Regular.ttf",
-            "https://static.rujiperps.com/fonts/BarlowSemiCondensed-Medium.ttf",
-            "https://static.rujiperps.com/fonts/BarlowSemiCondensed-SemiBold.ttf",
-        ];
-
-        for url in font_urls {
-            let response = client
-                .get(url)
-                .send()
-                .await
-                .with_context(|| format!("Failed to GET {url}"))?;
-
-            let bytes = response.bytes().await?;
-
-            let temp_file = NamedTempFile::new()?;
-            let path: PathBuf = temp_file.path().into();
-            let mut file = File::create(&path).await?;
-            file.write_all(&bytes).await?;
-
-            db.load_font_file(&path)?;
-        }
-
-        Ok(db)
     }
 }
 

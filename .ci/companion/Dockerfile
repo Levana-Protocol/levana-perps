@@ -5,6 +5,13 @@ ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.6.0/he
 RUN apk update && apk add fontconfig
 
 ADD --chmod=444 https://static.levana.finance/PublicSans-Regular.ttf /usr/share/fonts/PublicSans-Regular.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/BarlowSemiCondensed-Medium.ttf /usr/share/fonts/BarlowSemiCondensed-Medium.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/BarlowSemiCondensed-Regular.ttf /usr/share/fonts/BarlowSemiCondensed-Regular.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/BarlowSemiCondensed-SemiBold.ttf /usr/share/fonts/BarlowSemiCondensed-SemiBold.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/Montserrat-Bold.ttf /usr/share/fonts/Montserrat-Bold.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/Montserrat-ExtraBold.ttf /usr/share/fonts/Montserrat-ExtraBold.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/Montserrat-Regular.ttf /usr/share/fonts/Montserrat-Regular.ttf
+ADD --chmod=444 https://static.rujiperps.com/fonts/Montserrat-SemiBold.ttf /usr/share/fonts/Montserrat-SemiBold.ttf
 
 # Force re-generation of font information cache files
 RUN fc-cache -fv
