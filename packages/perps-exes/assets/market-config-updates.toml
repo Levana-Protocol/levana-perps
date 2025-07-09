@@ -1119,9 +1119,9 @@ surcharge = "0.025"
 reward = "0.045"
 
 [crank-fees.rujira-mainnet]
-charged = "0.02"
-surcharge = "0.01"
-reward = "0.018"
+charged = "0"
+surcharge = "0"
+reward = "0"
 
 [per-network.rujira-mainnet.BTC_USDC]
 initial-borrow-fee-rate = "0.05"
