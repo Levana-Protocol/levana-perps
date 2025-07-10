@@ -1,7 +1,7 @@
 FROM alpine:3.21
 
 ADD --chmod=755 https://github.com/fpco/amber/releases/download/v0.1.7/amber-aarch64-unknown-linux-musl /usr/bin/amber
-ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.6.0/health-check-aarch64-unknown-linux-musl /usr/bin/health-check
+ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.7.0/health-check-aarch64-unknown-linux-musl /usr/bin/health-check
 
 ENV AMBER_YAML=/etc/amber.yaml
 ENV LEVANA_BOTS_PRICE_CONFIG=/etc/config-price.toml
