@@ -1386,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/fpco/cosmos-rs.git?rev=9ea2e62e5a6ef59436c86a4225147cbc5e29f2bd#9ea2e62e5a6ef59436c86a4225147cbc5e29f2bd"
+source = "git+https://github.com/fpco/cosmos-rs.git?rev=d3df544ef1ab2787c55d166602c9a9e2524a8457#d3df544ef1ab2787c55d166602c9a9e2524a8457"
 dependencies = [
  "base64 0.22.1",
  "bech32",
@@ -1401,7 +1401,6 @@ dependencies = [
  "fs-err",
  "hex",
  "http 1.1.0",
- "once_cell",
  "parking_lot",
  "prost 0.13.3",
  "prost-types",
