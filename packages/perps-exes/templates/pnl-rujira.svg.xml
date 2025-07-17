@@ -398,25 +398,25 @@
 
 {% match info.wallet %}
   {% when Some with (_) %}
-    <g transform="translate(0, -50)">
+    <g transform="translate(0, -57)">
   {% when None %}
     <g>
 {% endmatch %}
 
-  <text class="stat-title" x="24" y="282">Entry price</text>
-  <text class="stat-value" x="24" y="305">{{info.entry_price}} {{info.quote_currency}}</text>
+  <text class="stat-title" x="24" y="289">Entry price</text>
+  <text class="stat-value" x="24" y="312">{{info.entry_price}} {{info.quote_currency}}</text>
 
-  <text class="stat-title" x="114" y="282">Exit price</text>
-  <text class="stat-value" x="114" y="305">{{info.exit_price}} {{info.quote_currency}}</text>
+  <text class="stat-title" x="154" y="289">Exit price</text>
+  <text class="stat-value" x="154" y="312">{{info.exit_price}} {{info.quote_currency}}</text>
 
-  <text class="stat-title" x="204" y="282">Leverage</text>
-  <text class="stat-value" x="204" y="305">{{info.leverage}}x</text>
+  <text class="stat-title" x="284" y="289">Leverage</text>
+  <text class="stat-value" x="284" y="312">{{info.leverage}}x</text>
 </g>
 
 {% match info.wallet %}
   {% when Some with (wallet) %}
-      <text class="stat-title" x="24" y="290">Wallet</text>
-      <text class="stat-value small" x="24" y="313">{{wallet}}</text>
+      <text class="stat-title" x="24" y="294">Wallet</text>
+      <text class="stat-value small" x="24" y="317">{{wallet}}</text>
   {% when None %}
 {% endmatch %}
 
