@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
 use perps_exes::contracts::Factory;
-use perpswap::prelude::MarketExecuteMsg;
 use perpswap::storage::MarketId;
+use perpswap::{namespace::CLOSE_ALL_POSITIONS, prelude::MarketExecuteMsg};
 
 use crate::{cli::Opt, util::add_cosmos_msg};
 
@@ -41,7 +41,19 @@ async fn go(
     let mut builder = TxBuilder::default();
     let mut msgs = vec![];
     let market = if market.is_empty() {
-        factory.get_markets().await?
+        let mut markets = vec![];
+        for market in factory.get_markets().await? {
+            let res = market.market.query_raw(CLOSE_ALL_POSITIONS).await?;
+            if res.is_empty() {
+                markets.push(market);
+            } else {
+                tracing::info!(
+                    "Skipping close-all-positions on already closed market {}",
+                    market.market_id
+                );
+            }
+        }
+        markets
     } else {
         let mut market2 = vec![];
         for market in market {
