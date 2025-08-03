@@ -534,3 +534,11 @@ hash = "c654a041bb05201afa7a973a1cfc5a1dc8bfc6f9af1f0f614ac8478a47f61ea5"
 
 [hashes.code-ids]
 rujira-mainnet = 16
+
+[[hashes]]
+contract-type = "market"
+gitrev = "1d0f649958a5bc3651aabfc60c51fc93e6080691"
+hash = "460f431eb441f4e92344b7d674c67745d4e6a2b424685af932980c20bc797a88"
+
+[hashes.code-ids]
+rujira-mainnet = 44
