@@ -1,5 +1,5 @@
 use crate::state::rujira::grpc::{Queryable, QueryablePair};
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use cosmwasm_std::{Decimal, QuerierWrapper};
 use std::str::FromStr;
 
@@ -43,9 +43,22 @@ impl EnshrinedPrice {
     pub fn load(q: QuerierWrapper, symbol: String) -> Result<Self, Error> {
         let req = QueryOraclePriceRequest {
             height: "0".to_string(),
-            symbol,
+            symbol: symbol.clone(),
         };
         let res = QueryOraclePriceResponse::get(q, req)?;
+        let asset = res
+            .clone()
+            .price
+            .ok_or_else(|| anyhow!("No price returned from enshrined oracle"))?;
+
+        if asset.symbol != symbol {
+            return Err(anyhow!(
+                "Symbol mismatch: expected {}, found {}",
+                symbol,
+                asset.symbol
+            ));
+        }
+
         EnshrinedPrice::try_from(res)
     }
 }
