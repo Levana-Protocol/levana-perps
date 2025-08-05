@@ -64,7 +64,7 @@ pub(super) struct TopTradersOpt {
     #[clap(
         long,
         env = "LEVANA_TRADERS_NEUTRON_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://neutron-grpc.rpc.p2p.world:3001,http://grpc-kralum.neutron-1.neutron.org",
+        default_value = "http://neutron-grpc.rpc.p2p.world:3001,https://grpc-kralum.neutron-1.neutron.org:443",
         value_delimiter = ','
     )]
     neutron_mainnet_fallbacks_grpc: Vec<Url>,

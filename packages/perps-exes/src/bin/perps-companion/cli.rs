@@ -41,7 +41,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_COMPANION_NEUTRON_MAINNET_PRIMARY_GRPC",
-        default_value = "http://grpc-kralum.neutron-1.neutron.org"
+        default_value = "https://grpc-kralum.neutron-1.neutron.org:443"
     )]
     pub(crate) neutron_mainnet_primary: String,
 
