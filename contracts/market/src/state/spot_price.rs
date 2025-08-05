@@ -10,6 +10,7 @@ use perpswap::contracts::market::{
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
+use rujira_rs::Layer1Asset;
 use serde::{Deserialize, Serialize};
 
 /// Stores spot price history.
@@ -658,14 +659,17 @@ impl State<'_> {
                                     &asset.to_owned().try_into()?,
                                 )?;
 
-                                let price = Decimal256::from(pool.asset_tor_price);
-                                let price = Number::from(price);
-                                let price =
-                                    NumberGtZero::try_from(price).context("price must be > 0")?;
-                                entry.insert(OraclePriceFeedRujiraResp {
-                                    price,
-                                    volatile: feed.volatile.unwrap_or(true),
-                                });
+                                let parsed_asset = Layer1Asset::from_str(asset)?;
+                                if pool.asset == rujira_rs::Asset::Layer1(parsed_asset) {
+                                    let price = Decimal256::from(pool.asset_tor_price);
+                                    let price = Number::from(price);
+                                    let price = NumberGtZero::try_from(price)
+                                        .context("price must be > 0")?;
+                                    entry.insert(OraclePriceFeedRujiraResp {
+                                        price,
+                                        volatile: feed.volatile.unwrap_or(true),
+                                    });
+                                }
                             }
                         }
                         SpotPriceFeedData::Constant { .. } => {
