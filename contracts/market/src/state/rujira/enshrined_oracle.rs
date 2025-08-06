@@ -29,12 +29,17 @@ pub struct EnshrinedPrice {
     pub price: Decimal,
 }
 
-impl TryFrom<QueryOraclePriceResponse> for EnshrinedPrice {
+impl TryFrom<OraclePrice> for EnshrinedPrice {
     type Error = Error;
 
-    fn try_from(value: QueryOraclePriceResponse) -> Result<Self, Self::Error> {
-        let price = value.price.ok_or_else(|| anyhow::anyhow!("no price"))?;
-        let dec = Decimal::from_str(&price.price)?;
+    fn try_from(value: OraclePrice) -> Result<Self, Self::Error> {
+        let dec = Decimal::from_str(&value.price).map_err(|e| {
+            anyhow!(
+                "Failed to parse price '{}' for OraclePrice: {}",
+                value.price,
+                e
+            )
+        })?;
         Ok(Self { price: dec })
     }
 }
@@ -46,10 +51,12 @@ impl EnshrinedPrice {
             symbol: symbol.clone(),
         };
         let res = QueryOraclePriceResponse::get(q, req)?;
-        let asset = res
-            .clone()
-            .price
-            .ok_or_else(|| anyhow!("No price returned from enshrined oracle"))?;
+        let asset = res.price.ok_or_else(|| {
+            anyhow!(
+                "No price returned from enshrined oracle for symbol: {}",
+                symbol
+            )
+        })?;
 
         if asset.symbol != symbol {
             return Err(anyhow!(
@@ -59,7 +66,7 @@ impl EnshrinedPrice {
             ));
         }
 
-        EnshrinedPrice::try_from(res)
+        EnshrinedPrice::try_from(asset)
     }
 }
 
