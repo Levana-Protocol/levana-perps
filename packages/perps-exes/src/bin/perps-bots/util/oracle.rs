@@ -5,7 +5,7 @@ use cosmos::Address;
 use cosmwasm_std::Uint256;
 use levana_perpswap_cosmos_market::state::rujira::ChainSymbol;
 use parking_lot::RwLock;
-use perps_exes::{pyth::fetch_json_with_retry, PerpsNetwork};
+use perps_exes::pyth::fetch_json_with_retry;
 use perpswap::{
     contracts::market::{
         entry::OraclePriceResp,
@@ -125,7 +125,6 @@ pub(crate) enum LatestPrice {
 pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
-    network: PerpsNetwork,
 ) -> Result<LatestPrice> {
     let on_chain_price_point = match market.market.current_price().await {
         Ok(price_point) => price_point,
@@ -165,7 +164,6 @@ pub(crate) async fn get_latest_price(
             &offchain_price_data.values,
             feeds,
             volatile_diff_seconds,
-            &network,
         )? {
             ComposedOracleFeed::UpdateTooOld { too_old } => LatestPrice::PriceTooOld { too_old },
             ComposedOracleFeed::VolatileDiffTooLarge => LatestPrice::VolatileDiffTooLarge,
@@ -231,7 +229,6 @@ fn compose_oracle_feeds(
     offchain_pyth_prices: &HashMap<PriceIdentifier, (NumberGtZero, DateTime<Utc>)>,
     feeds: &[SpotPriceFeed],
     volatile_diff_seconds: u32,
-    network: &PerpsNetwork,
 ) -> Result<ComposedOracleFeed> {
     let mut final_price = Decimal256::one();
     let mut publish_times = None::<(DateTime<Utc>, DateTime<Utc>)>;
@@ -320,11 +317,7 @@ fn compose_oracle_feeds(
                 sei.price.into_decimal256()
             }
             SpotPriceFeedData::Rujira { asset } => {
-                let asset = if network == &PerpsNetwork::RujiraDevnet {
-                    ChainSymbol::parse(asset).symbol().to_owned()
-                } else {
-                    asset.to_owned()
-                };
+                let asset = ChainSymbol::parse(asset).symbol().to_owned();
                 let rujira = oracle_price
                     .rujira
                     .get(&asset)
