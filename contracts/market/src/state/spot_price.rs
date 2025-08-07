@@ -657,7 +657,8 @@ impl State<'_> {
                                 let pool = rujira_rs::query::Pool::load(
                                     self.querier,
                                     &asset.to_owned().try_into()?,
-                                )?;
+                                )
+                                .context("Failed to load pool from Rujira")?;
 
                                 let parsed_asset = Layer1Asset::from_str(asset)?;
                                 if pool.asset == rujira_rs::Asset::Layer1(parsed_asset) {
@@ -669,6 +670,11 @@ impl State<'_> {
                                         price,
                                         volatile: feed.volatile.unwrap_or(true),
                                     });
+                                } else {
+                                    return Err(anyhow!(
+                                        "Mismatched asset in Rujira pool response: expected {:?}, got {:?}",
+                                        asset, pool.asset.to_string()
+                                    ));
                                 }
                             }
                         }
