@@ -600,7 +600,8 @@ async fn check_market_needs_price_update(
 }
 
 async fn check_market_needs_crank(market: &Market) -> Result<ActionWithReason> {
-    if market.market.status().await?.next_crank.is_some() {
+    let status = market.market.status().await?;
+    if status.next_crank.is_some() || status.next_deferred_execution.is_some() {
         Ok(ActionWithReason::WorkNeeded(
             CrankTriggerReason::CrankWorkAvailable {
                 requires_pyth_update: false,
