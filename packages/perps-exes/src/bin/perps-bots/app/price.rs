@@ -83,6 +83,7 @@ impl WatchedTask for Worker {
 
 async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedTaskOutput> {
     let factory = app.get_factory_info().await;
+
     let mut successes = vec![];
     let mut errors = vec![];
     let mut markets_to_update = vec![];
@@ -545,6 +546,10 @@ async fn check_market_needs_price_update(
     {
         return Ok(ActionWithReason::PythPricesClosed);
     }
+
+    if !market.has_off_chain_price_data() {
+        return check_market_needs_crank(market).await;
+    }
     match get_latest_price(&offchain_price_data, market).await? {
         LatestPrice::NoPriceInContract => Ok(ActionWithReason::WorkNeeded(
             CrankTriggerReason::NoPriceOnChain,
@@ -591,6 +596,31 @@ async fn check_market_needs_price_update(
 
             info.actions(&app.config.needs_price_update_params)
         }
+    }
+}
+
+async fn check_market_needs_crank(market: &Market) -> Result<ActionWithReason> {
+    if market.market.status().await?.next_crank.is_some() {
+        Ok(ActionWithReason::WorkNeeded(
+            CrankTriggerReason::CrankWorkAvailable {
+                requires_pyth_update: false,
+            },
+        ))
+    } else if market
+        .market
+        .price_would_trigger(market.market.current_price().await?.price_base)
+        .await?
+    {
+        // TODO: this extra check may not be necessary at all, the next_crank field
+        // itself may cover all cases. However, sticking with this as-is to be on the
+        // safe side.
+        Ok(ActionWithReason::WorkNeeded(
+            CrankTriggerReason::PriceWillTrigger {
+                gas_level: GasLevel::Normal,
+            },
+        ))
+    } else {
+        Ok(ActionWithReason::NoWorkAvailable)
     }
 }
 

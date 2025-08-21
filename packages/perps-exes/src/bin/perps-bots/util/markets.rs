@@ -2,6 +2,7 @@ use cosmos::{Contract, Cosmos, HasAddress};
 use perps_exes::prelude::MarketContract;
 use perpswap::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use perpswap::contracts::market::config::Config;
+use perpswap::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData};
 use perpswap::prelude::*;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -79,4 +80,31 @@ pub(crate) async fn get_markets(
         }
     }
     Ok(res)
+}
+
+impl Market {
+    pub(crate) fn has_off_chain_price_data(&self) -> bool {
+        match &self.config.spot_price {
+            SpotPriceConfig::Manual { .. } => false,
+            SpotPriceConfig::Oracle {
+                pyth: _,
+                stride: _,
+                feeds,
+                feeds_usd,
+                volatile_diff_seconds: _,
+            } => {
+                for feed in feeds.iter().chain(feeds_usd.iter()) {
+                    match feed.data {
+                        SpotPriceFeedData::Pyth { .. } => return true,
+                        SpotPriceFeedData::Constant { .. }
+                        | SpotPriceFeedData::Stride { .. }
+                        | SpotPriceFeedData::Sei { .. }
+                        | SpotPriceFeedData::Rujira { .. }
+                        | SpotPriceFeedData::Simple { .. } => (),
+                    }
+                }
+                false
+            }
+        }
+    }
 }
