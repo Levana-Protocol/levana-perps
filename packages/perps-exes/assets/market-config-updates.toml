@@ -1184,7 +1184,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.RUNE_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.XRP_USDC]
 initial-borrow-fee-rate = "0.05"
