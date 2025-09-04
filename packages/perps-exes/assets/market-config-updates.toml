@@ -1205,7 +1205,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.XRP_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.DOGE_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -1226,7 +1226,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.DOGE_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.ATOM_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -1247,7 +1247,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.ATOM_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.BNB_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -1268,7 +1268,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.BNB_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.AVAX_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -1289,7 +1289,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.AVAX_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.LTC_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -1310,7 +1310,7 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.LTC_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
 
 [per-network.rujira-mainnet.BCH_USDC]
 initial-borrow-fee-rate = "0.05"
@@ -1331,4 +1331,4 @@ liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.BCH_USDC.config.max_liquidity.usd]
-amount = "10000"
+amount = "15000"
