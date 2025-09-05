@@ -20,7 +20,7 @@ jobs:
       group: ci-perps-deploy-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.25.2,cross@0.2.5
