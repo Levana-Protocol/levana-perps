@@ -2257,3 +2257,27 @@ inverted = false
 [networks.rujira-mainnet.BCH_USDC.feeds-usd.constant]
 price = "1"
 inverted = false
+
+[[networks.rujira-mainnet.SOL_USDC.feeds]]
+
+[networks.rujira-mainnet.SOL_USDC.feeds.rujira]
+asset = "SOL"
+inverted = false
+
+[[networks.rujira-mainnet.SOL_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.SOL_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.rujira-mainnet.TRX_USDC.feeds]]
+
+[networks.rujira-mainnet.TRX_USDC.feeds.rujira]
+asset = "TRX"
+inverted = false
+
+[[networks.rujira-mainnet.TRX_USDC.feeds-usd]]
+
+[networks.rujira-mainnet.TRX_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
