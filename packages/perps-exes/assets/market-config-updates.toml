@@ -1332,3 +1332,45 @@ exposure_margin_ratio = "0.02"
 
 [per-network.rujira-mainnet.BCH_USDC.config.max_liquidity.usd]
 amount = "15000"
+
+[per-network.rujira-mainnet.SOL_USDC]
+initial-borrow-fee-rate = "0.05"
+
+[per-network.rujira-mainnet.SOL_USDC.config]
+max_leverage = "4"
+carry_leverage = "2"
+funding_rate_sensitivity = "2"
+funding_rate_max_annualized = "0.45"
+borrow_fee_rate_min_annualized = "0.03"
+borrow_fee_rate_max_annualized = "0.3"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.3"
+delta_neutrality_fee_sensitivity = "1579625"
+delta_neutrality_fee_cap = "0.015"
+delta_neutrality_fee_tax = "0.5"
+liquidity_cooldown_seconds = 86400
+exposure_margin_ratio = "0.02"
+
+[per-network.rujira-mainnet.SOL_USDC.config.max_liquidity.usd]
+amount = "15000"
+
+[per-network.rujira-mainnet.TRX_USDC]
+initial-borrow-fee-rate = "0.05"
+
+[per-network.rujira-mainnet.TRX_USDC.config]
+max_leverage = "4"
+carry_leverage = "2"
+funding_rate_sensitivity = "2"
+funding_rate_max_annualized = "0.45"
+borrow_fee_rate_min_annualized = "0.03"
+borrow_fee_rate_max_annualized = "0.3"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.3"
+delta_neutrality_fee_sensitivity = "1579625"
+delta_neutrality_fee_cap = "0.015"
+delta_neutrality_fee_tax = "0.5"
+liquidity_cooldown_seconds = 86400
+exposure_margin_ratio = "0.02"
+
+[per-network.rujira-mainnet.TRX_USDC.config.max_liquidity.usd]
+amount = "15000"
