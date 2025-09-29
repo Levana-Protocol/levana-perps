@@ -1,7 +1,10 @@
 use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
-use perps_exes::contracts::{ConfiguredCodeIds, Factory};
+use perps_exes::{
+    contracts::{ConfiguredCodeIds, Factory},
+    PerpsNetwork,
+};
 use perpswap::prelude::*;
 
 use crate::{cli::Opt, util::add_cosmos_msg};
@@ -57,6 +60,7 @@ async fn go(
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
+    let is_rujira_mainnet = factory.network == PerpsNetwork::RujiraMainnet;
 
     let factory = app.cosmos.make_contract(factory.address);
     let current_factory_code_id = factory.info().await?.code_id;
@@ -177,9 +181,17 @@ async fn go(
         let lp = market.liquidity_token_lp;
         let xlp = market.liquidity_token_xlp;
         let pos = market.position_token;
+        let market_id = market.market_id;
         let market = market.market;
         let info = market.info().await?;
-        anyhow::ensure!(info.admin == migration_admin.get_address_string(), "Invalid migration admin set up. Factory says: {migration_admin}. But market contract {market} has {}.", info.admin);
+        if info.admin != migration_admin.get_address_string() {
+            if is_rujira_mainnet {
+                tracing::info!("Market contract {market_id} ({market}) has wrong migration admin, probably using native multisig instead.");
+                continue;
+            } else {
+                anyhow::bail!("Invalid migration admin set up. Factory says: {migration_admin}. But market contract {market} has {}.", info.admin);
+            }
+        }
         if let Some(market_code_id) = market_code_id {
             if info.code_id != market_code_id {
                 migrate_msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
