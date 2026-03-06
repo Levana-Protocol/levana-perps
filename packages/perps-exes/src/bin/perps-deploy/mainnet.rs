@@ -1,6 +1,7 @@
 mod check_price_feed_health;
 mod close_all_positions;
 mod contracts_csv;
+mod crank_all_markets;
 mod fees_paid;
 mod migrate;
 mod rewards;
@@ -127,6 +128,11 @@ enum Sub {
         #[clap(flatten)]
         inner: fees_paid::FeesPaidOpts,
     },
+    /// Crank all markets until all crank work is complete
+    CrankAllMarkets {
+        #[clap(flatten)]
+        inner: crank_all_markets::CrankAllMarketsOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -154,6 +160,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::CloseAllPositions { inner } => inner.go(opt).await?,
         Sub::Rewards { inner } => inner.go(opt).await?,
         Sub::FeesPaid { inner } => inner.go(opt).await?,
+        Sub::CrankAllMarkets { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
