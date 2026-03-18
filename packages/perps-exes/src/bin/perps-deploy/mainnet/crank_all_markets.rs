@@ -61,6 +61,7 @@ async fn crank_market(
                 },
             )
             .await?;
+        println!("Finished one crank");
     }
 }
 //         match market

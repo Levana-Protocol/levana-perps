@@ -104,6 +104,9 @@ impl Opt {
         if let Some(x) = self.cosmos_gas_multiplier {
             builder.set_gas_estimate_multiplier(x);
         }
+        if network == PerpsNetwork::RujiraMainnet {
+            builder.set_gas_price(0.0, 0.0);
+        }
         tracing::info!("Connecting to {}", builder.grpc_url());
 
         builder.build().map_err(anyhow::Error::from)
