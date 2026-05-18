@@ -28,11 +28,11 @@ rm -f "$WASM_DIR/artifacts/gitrev"
 
 docker  run --rm --tty \
 -u "$(id -u)":"$(id -g)" \
--v "$(pwd)":/code \
--v "$TARGET_CACHE":/target \
--v "$ARTIFACTS":/code/artifacts \
--v "$REGISTRY_CACHE":/usr/local/cargo/registry \
--v "$CARGO_GIT_CACHE":/usr/local/cargo/git \
+-v "$(pwd)":/code:Z \
+-v "$TARGET_CACHE":/target:Z \
+-v "$ARTIFACTS":/code/artifacts:Z \
+-v "$REGISTRY_CACHE":/usr/local/cargo/registry:Z \
+-v "$CARGO_GIT_CACHE":/usr/local/cargo/git:Z \
 $OPTIMIZER_VERSION
 
 # not sure how this was created since we mapped the tool's /code/artifacts
