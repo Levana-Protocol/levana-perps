@@ -550,3 +550,11 @@ hash = "97e6446352de99652f3e3872c85281496293b0a83cb1a4fcc6f3523a9b4a5b5b"
 
 [hashes.code-ids]
 rujira-mainnet = 63
+
+[[hashes]]
+contract-type = "market"
+gitrev = "e72aec76b2a30704f6700776e07bbe03746f55ee"
+hash = "7a8d31f305a184a1148bbe9182b201ad7c8c785f9c403a1c8a61e5a397163174"
+
+[hashes.code-ids]
+neutron-mainnet = 5336
