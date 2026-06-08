@@ -3,6 +3,7 @@ mod close_all_positions;
 mod contracts_csv;
 mod crank_all_markets;
 mod fees_paid;
+mod force_withdraw_all;
 mod market_funds;
 mod migrate;
 mod rewards;
@@ -35,9 +36,10 @@ use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_f
 
 use self::{
     check_price_feed_health::CheckPriceFeedHealthOpts, close_all_positions::CloseAllPositionsOpts,
-    contracts_csv::ContractsCsvOpts, migrate::MigrateOpts, send_treasury::SendTreasuryOpts,
-    sync_config::SyncConfigOpts, transfer_dao_fees::TransferDaoFeesOpts,
-    update_config::UpdateConfigOpts, wind_down::WindDownOpts,
+    contracts_csv::ContractsCsvOpts, force_withdraw_all::ForceWithdrawAllOpts,
+    migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
+    transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
+    wind_down::WindDownOpts,
 };
 
 #[derive(clap::Parser)]
@@ -134,6 +136,11 @@ enum Sub {
         #[clap(flatten)]
         inner: crank_all_markets::CrankAllMarketsOpts,
     },
+    /// Force-withdraw all discovered LP and limit-order funds in every market
+    ForceWithdrawAll {
+        #[clap(flatten)]
+        inner: ForceWithdrawAllOpts,
+    },
     /// Report collateral funds still held by markets
     MarketFunds {
         #[clap(flatten)]
@@ -167,6 +174,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::Rewards { inner } => inner.go(opt).await?,
         Sub::FeesPaid { inner } => inner.go(opt).await?,
         Sub::CrankAllMarkets { inner } => inner.go(opt).await?,
+        Sub::ForceWithdrawAll { inner } => inner.go(opt).await?,
         Sub::MarketFunds { inner } => inner.go(opt).await?,
     }
     Ok(())
