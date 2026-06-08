@@ -3,6 +3,7 @@ mod close_all_positions;
 mod contracts_csv;
 mod crank_all_markets;
 mod fees_paid;
+mod market_funds;
 mod migrate;
 mod rewards;
 mod send_treasury;
@@ -133,6 +134,11 @@ enum Sub {
         #[clap(flatten)]
         inner: crank_all_markets::CrankAllMarketsOpts,
     },
+    /// Report collateral funds still held by markets
+    MarketFunds {
+        #[clap(flatten)]
+        inner: market_funds::MarketFundsOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -161,6 +167,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::Rewards { inner } => inner.go(opt).await?,
         Sub::FeesPaid { inner } => inner.go(opt).await?,
         Sub::CrankAllMarkets { inner } => inner.go(opt).await?,
+        Sub::MarketFunds { inner } => inner.go(opt).await?,
     }
     Ok(())
 }

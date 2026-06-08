@@ -118,6 +118,7 @@ impl ShutdownImpact {
             ExecuteMsg::StopUnstakingXlp {} => Some(Self::Unstaking),
             ExecuteMsg::CollectUnstakedLp {} => Some(Self::Unstaking),
             ExecuteMsg::Crank { .. } => Some(Self::Crank),
+            ExecuteMsg::ForceWithdrawAll { .. } => None,
             ExecuteMsg::NftProxy { .. } => Some(Self::TransferPositions),
             ExecuteMsg::LiquidityTokenProxy { .. } => Some(Self::TransferLp),
             ExecuteMsg::TransferDaoFees { .. } => Some(Self::TransferDaoFees),

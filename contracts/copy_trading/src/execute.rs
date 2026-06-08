@@ -563,6 +563,7 @@ fn execute_leader_msg(
         MarketExecuteMsg::StopUnstakingXlp {} => not_supported_response("stop-unstaking-xlp"),
         MarketExecuteMsg::CollectUnstakedLp {} => not_supported_response("collect-unstaked-lp"),
         MarketExecuteMsg::Crank { .. } => not_supported_response("crank"),
+        MarketExecuteMsg::ForceWithdrawAll { .. } => not_supported_response("force-withdraw-all"),
         MarketExecuteMsg::NftProxy { .. } => not_supported_response("nft-proxy"),
         MarketExecuteMsg::LiquidityTokenProxy { .. } => {
             not_supported_response("liquidity-token-proxy")

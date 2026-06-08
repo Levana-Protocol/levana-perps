@@ -5,6 +5,7 @@ pub(crate) mod data_series;
 pub(crate) mod deferred_execution;
 pub(crate) mod delta_neutrality_fee;
 pub(crate) mod fees;
+pub(crate) mod force_withdraw;
 pub(crate) mod funding;
 pub(crate) mod history;
 pub(crate) mod liquidity;
@@ -92,6 +93,23 @@ impl<'a> State<'a> {
 
     pub(crate) fn assert_auth(&self, addr: &Addr, check: AuthCheck) -> Result<()> {
         assert_auth(&self.factory_address, &self.querier, addr, check)
+    }
+
+    pub(crate) fn force_withdraw_user_funds(
+        &self,
+        ctx: &mut StateContext,
+        wallet: &Addr,
+        order_limit: u32,
+    ) -> Result<u32> {
+        self.force_withdraw_liquidity(ctx, wallet)?;
+
+        let order_ids = self.limit_order_ids_by_addr(ctx.storage, wallet, None, order_limit)?;
+        let order_count = u32::try_from(order_ids.len())?;
+        for order_id in order_ids {
+            self.force_cancel_limit_order(ctx, order_id)?;
+        }
+
+        Ok(order_count)
     }
 }
 

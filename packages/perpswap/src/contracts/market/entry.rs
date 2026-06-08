@@ -334,6 +334,18 @@ pub enum ExecuteMsg {
         rewards: Option<RawAddr>,
     },
 
+    /// Force-withdraw discovered user funds in batches.
+    ///
+    /// This is unpermissioned and iterates over on-chain LP entries and limit orders, sending
+    /// funds back to the relevant users and removing the entries. Repeat until the returned
+    /// events show no more work.
+    ForceWithdrawAll {
+        /// Maximum number of LP providers or limit orders to process.
+        ///
+        /// None: config default crank batch size.
+        limit: Option<u32>,
+    },
+
     /// Nft proxy messages.
     /// Only allowed to be called by this market's position_token contract
     NftProxy {
@@ -1333,11 +1345,14 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 execs: u.arbitrary()?,
                 rewards: None,
             }),
+            21 => Ok(ExecuteMsg::ForceWithdrawAll {
+                limit: u.arbitrary()?,
+            }),
 
-            21 => Ok(ExecuteMsg::TransferDaoFees {}),
+            22 => Ok(ExecuteMsg::TransferDaoFees {}),
 
-            22 => Ok(ExecuteMsg::CloseAllPositions {}),
-            23 => Ok(ExecuteMsg::ProvideCrankFunds {}),
+            23 => Ok(ExecuteMsg::CloseAllPositions {}),
+            24 => Ok(ExecuteMsg::ProvideCrankFunds {}),
 
             _ => unreachable!(),
         }

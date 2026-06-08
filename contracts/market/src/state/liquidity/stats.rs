@@ -257,6 +257,7 @@ impl State<'_> {
             ExecuteMsg::StopUnstakingXlp {} => true,
             ExecuteMsg::CollectUnstakedLp {} => true,
             ExecuteMsg::Crank { .. } => false,
+            ExecuteMsg::ForceWithdrawAll { .. } => false,
             ExecuteMsg::NftProxy { .. } => true,
             ExecuteMsg::LiquidityTokenProxy { .. } => true,
             ExecuteMsg::TransferDaoFees { .. } => true,
