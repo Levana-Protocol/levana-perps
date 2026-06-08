@@ -542,8 +542,10 @@ impl State<'_> {
             None => {
                 let total_yield = addr_stats.total_yield()?;
                 if let Some(total_yield) = NonZero::new(total_yield) {
-                    self.register_lp_claimed_yield(ctx, total_yield)?;
-                    self.add_token_transfer_msg(ctx, lp_addr, total_yield)?;
+                    let claimed_yield = self.register_lp_claimed_yield_capped(ctx, total_yield)?;
+                    if let Some(claimed_yield_non_zero) = NonZero::new(claimed_yield) {
+                        self.add_token_transfer_msg(ctx, lp_addr, claimed_yield_non_zero)?;
+                    }
                     addr_stats.lp_accrued_yield = Collateral::zero();
                     addr_stats.xlp_accrued_yield = Collateral::zero();
                     addr_stats.crank_rewards = Collateral::zero();
@@ -552,7 +554,7 @@ impl State<'_> {
                     ctx.response_mut().add_event(
                         Event::new("force-withdraw-liquidity")
                             .add_attribute("lp-addr", lp_addr.as_str())
-                            .add_attribute("yield", total_yield.to_string())
+                            .add_attribute("yield", claimed_yield.to_string())
                             .add_attribute("withdrawn-funds", Collateral::zero().to_string()),
                     );
                 }
@@ -582,9 +584,10 @@ impl State<'_> {
 
         let total_yield = addr_stats.total_yield()?;
         let mut total_to_return = liquidity_to_return;
+        let mut claimed_yield = Collateral::zero();
         if let Some(total_yield) = NonZero::new(total_yield) {
-            self.register_lp_claimed_yield(ctx, total_yield)?;
-            total_to_return = total_to_return.checked_add(total_yield.raw())?;
+            claimed_yield = self.register_lp_claimed_yield_capped(ctx, total_yield)?;
+            total_to_return = total_to_return.checked_add(claimed_yield)?;
         }
 
         addr_stats.lp = LpToken::zero();
@@ -605,7 +608,7 @@ impl State<'_> {
                 .add_attribute("lp-addr", lp_addr.as_str())
                 .add_attribute("burned-shares", shares_to_withdraw.to_string())
                 .add_attribute("withdrawn-funds", liquidity_to_return.to_string())
-                .add_attribute("yield", total_yield.to_string())
+                .add_attribute("yield", claimed_yield.to_string())
                 .add_attribute("total-returned", total_to_return.to_string()),
         );
 
