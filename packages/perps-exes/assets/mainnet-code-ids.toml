@@ -565,4 +565,5 @@ gitrev = "7e23b29c90de352a012c66170144f1c186b748e7"
 hash = "bcc44e52214b8cf4be0ca58933044cb7337caebbd63eae2c7c3b10b7be081b84"
 
 [hashes.code-ids]
+osmosis-mainnet = 1896
 neutron-mainnet = 5337
