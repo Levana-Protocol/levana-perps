@@ -550,51 +550,69 @@ impl State<'_> {
             return Ok(());
         }
 
-        let old_unstaking = addr_stats.unstaking.take();
-        if let Some(old_unstaking) = old_unstaking {
-            let xlp_to_restore = old_unstaking
+        let unstaking_xlp = match addr_stats.unstaking.take() {
+            Some(old_unstaking) => old_unstaking
                 .xlp_amount
                 .raw()
-                .checked_sub(old_unstaking.collected)?;
-
-            if !xlp_to_restore.is_zero() {
-                let mut stats = self.load_liquidity_stats(ctx.storage)?;
-                stats.total_lp = stats.total_lp.checked_sub(xlp_to_restore)?;
-                stats.total_xlp = stats.total_xlp.checked_add(xlp_to_restore)?;
-                self.save_liquidity_stats(ctx.storage, &stats)?;
-
-                addr_stats.xlp = addr_stats.xlp.checked_add(xlp_to_restore)?;
-            }
-        }
-
-        let lp_shares = addr_stats.lp;
-        let xlp_shares = addr_stats.xlp;
-        let shares_to_withdraw = match NonZero::new(lp_shares.checked_add(xlp_shares)?) {
-            Some(shares) => shares,
-            None => {
-                let total_yield = addr_stats.total_yield()?;
-                if let Some(total_yield) = NonZero::new(total_yield) {
-                    let claimed_yield = self.register_lp_claimed_yield_capped(ctx, total_yield)?;
-                    if let Some(claimed_yield_non_zero) = NonZero::new(claimed_yield) {
-                        self.add_token_transfer_msg(ctx, lp_addr, claimed_yield_non_zero)?;
-                    }
-                    addr_stats.lp_accrued_yield = Collateral::zero();
-                    addr_stats.xlp_accrued_yield = Collateral::zero();
-                    addr_stats.crank_rewards = Collateral::zero();
-                    addr_stats.referrer_rewards = Collateral::zero();
-                    self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
-                    ctx.response_mut().add_event(
-                        Event::new("force-withdraw-liquidity")
-                            .add_attribute("lp-addr", lp_addr.as_str())
-                            .add_attribute("yield", claimed_yield.to_string())
-                            .add_attribute("withdrawn-funds", Collateral::zero().to_string()),
-                    );
-                }
-                return Ok(());
-            }
+                .checked_sub(old_unstaking.collected)?,
+            None => LpToken::zero(),
         };
 
+        // During unstaking, the protocol-wide totals already count uncollected
+        // xLP as LP. Since force-withdraw immediately clears the wallet, burn
+        // those residual unstaking shares directly from total LP instead of
+        // restoring them to xLP first.
+        let lp_shares = addr_stats.lp.checked_add(unstaking_xlp)?;
+        let xlp_shares = addr_stats.xlp;
         let mut liquidity_stats = liquidity_stats;
+        let burned_lp_shares = lp_shares.min(liquidity_stats.total_lp);
+        let burned_xlp_shares = xlp_shares.min(liquidity_stats.total_xlp);
+        let stale_lp_shares = lp_shares.checked_sub(burned_lp_shares)?;
+        let stale_xlp_shares = xlp_shares.checked_sub(burned_xlp_shares)?;
+
+        let shares_to_withdraw =
+            match NonZero::new(burned_lp_shares.checked_add(burned_xlp_shares)?) {
+                Some(shares) => shares,
+                None => {
+                    let total_yield = addr_stats.total_yield()?;
+                    if let Some(total_yield) = NonZero::new(total_yield) {
+                        let claimed_yield =
+                            self.register_lp_claimed_yield_capped(ctx, total_yield)?;
+                        if let Some(claimed_yield_non_zero) = NonZero::new(claimed_yield) {
+                            self.add_token_transfer_msg(ctx, lp_addr, claimed_yield_non_zero)?;
+                        }
+                        addr_stats.lp_accrued_yield = Collateral::zero();
+                        addr_stats.xlp_accrued_yield = Collateral::zero();
+                        addr_stats.crank_rewards = Collateral::zero();
+                        addr_stats.referrer_rewards = Collateral::zero();
+                        self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
+                        ctx.response_mut().add_event(
+                            Event::new("force-withdraw-liquidity")
+                                .add_attribute("lp-addr", lp_addr.as_str())
+                                .add_attribute("yield", claimed_yield.to_string())
+                                .add_attribute("withdrawn-funds", Collateral::zero().to_string()),
+                        );
+                    }
+
+                    if !stale_lp_shares.is_zero() || !stale_xlp_shares.is_zero() {
+                        addr_stats.lp = LpToken::zero();
+                        addr_stats.xlp = LpToken::zero();
+                        addr_stats.unstaking = None;
+                        addr_stats.cooldown_ends = None;
+                        addr_stats.last_accrue_key = self.latest_yield_per_token(ctx.storage)?.0;
+                        self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
+                        ctx.response_mut().add_event(
+                            Event::new("force-withdraw-liquidity")
+                                .add_attribute("lp-addr", lp_addr.as_str())
+                                .add_attribute("stale-lp-shares", stale_lp_shares.to_string())
+                                .add_attribute("stale-xlp-shares", stale_xlp_shares.to_string())
+                                .add_attribute("withdrawn-funds", Collateral::zero().to_string()),
+                        );
+                    }
+                    return Ok(());
+                }
+            };
+
         let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
         anyhow::ensure!(
             liquidity_to_return.raw() <= liquidity_stats.unlocked,
@@ -602,8 +620,8 @@ impl State<'_> {
             liquidity_stats.unlocked
         );
 
-        liquidity_stats.total_lp = liquidity_stats.total_lp.checked_sub(lp_shares)?;
-        liquidity_stats.total_xlp = liquidity_stats.total_xlp.checked_sub(xlp_shares)?;
+        liquidity_stats.total_lp = liquidity_stats.total_lp.checked_sub(burned_lp_shares)?;
+        liquidity_stats.total_xlp = liquidity_stats.total_xlp.checked_sub(burned_xlp_shares)?;
         liquidity_stats.unlocked = liquidity_stats
             .unlocked
             .checked_sub(liquidity_to_return.raw())?;
@@ -639,6 +657,8 @@ impl State<'_> {
             Event::new("force-withdraw-liquidity")
                 .add_attribute("lp-addr", lp_addr.as_str())
                 .add_attribute("burned-shares", shares_to_withdraw.to_string())
+                .add_attribute("stale-lp-shares", stale_lp_shares.to_string())
+                .add_attribute("stale-xlp-shares", stale_xlp_shares.to_string())
                 .add_attribute("withdrawn-funds", liquidity_to_return.to_string())
                 .add_attribute("yield", claimed_yield.to_string())
                 .add_attribute("total-returned", total_to_return.to_string()),
