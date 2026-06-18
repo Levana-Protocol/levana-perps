@@ -517,6 +517,38 @@ impl State<'_> {
     ) -> Result<()> {
         self.update_accrued_yield(ctx, lp_addr)?;
         let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
+        let liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
+
+        if liquidity_stats.total_collateral()?.is_zero() {
+            let total_yield = addr_stats.total_yield()?;
+            let mut claimed_yield = Collateral::zero();
+            if let Some(total_yield) = NonZero::new(total_yield) {
+                claimed_yield = self.register_lp_claimed_yield_capped(ctx, total_yield)?;
+                if let Some(claimed_yield) = NonZero::new(claimed_yield) {
+                    self.add_token_transfer_msg(ctx, lp_addr, claimed_yield)?;
+                }
+            }
+
+            addr_stats.lp = LpToken::zero();
+            addr_stats.xlp = LpToken::zero();
+            addr_stats.unstaking = None;
+            addr_stats.cooldown_ends = None;
+            addr_stats.last_accrue_key = self.latest_yield_per_token(ctx.storage)?.0;
+            addr_stats.lp_accrued_yield = Collateral::zero();
+            addr_stats.xlp_accrued_yield = Collateral::zero();
+            addr_stats.crank_rewards = Collateral::zero();
+            addr_stats.referrer_rewards = Collateral::zero();
+            self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
+
+            ctx.response_mut().add_event(
+                Event::new("force-withdraw-liquidity")
+                    .add_attribute("lp-addr", lp_addr.as_str())
+                    .add_attribute("yield", claimed_yield.to_string())
+                    .add_attribute("withdrawn-funds", Collateral::zero().to_string()),
+            );
+
+            return Ok(());
+        }
 
         let old_unstaking = addr_stats.unstaking.take();
         if let Some(old_unstaking) = old_unstaking {
@@ -562,7 +594,7 @@ impl State<'_> {
             }
         };
 
-        let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
+        let mut liquidity_stats = liquidity_stats;
         let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
         anyhow::ensure!(
             liquidity_to_return.raw() <= liquidity_stats.unlocked,

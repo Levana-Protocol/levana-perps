@@ -822,7 +822,20 @@ fn drain_all_liquidity_perp_705() {
         .exec_mint_and_deposit_liquidity(lp, Number::from(5u64))
         .unwrap_err();
 
-    // Now crank till all balances are reset
+    // ForceWithdrawAll is allowed during shutdown/reset and should clear the
+    // stale LP balance without trying to convert shares against zero collateral.
+    market
+        .exec(
+            &crank,
+            &perpswap::contracts::market::entry::ExecuteMsg::ForceWithdrawAll { limit: Some(1) },
+        )
+        .unwrap();
+    let info = market.query_lp_info(lp).unwrap();
+    assert_eq!(info.lp_amount, LpToken::zero());
+    assert_eq!(info.xlp_amount, LpToken::zero());
+    assert_eq!(info.available_yield, Collateral::zero());
+
+    // Now crank till the reset marker is cleared.
     market.exec_crank_till_finished(&crank).unwrap();
 
     // Ensure we have no liquidity left
@@ -837,9 +850,8 @@ fn drain_all_liquidity_perp_705() {
         }
     );
 
-    // We should have a small amount of borrow fee received from the previous generation
-    market.exec_claim_yield(lp).unwrap();
-    // But as usual it should fail the second time through
+    // ForceWithdrawAll claimed any remaining capped yield, so a separate yield
+    // claim should fail.
     market.exec_claim_yield(lp).unwrap_err();
 
     // Ensure we can deposit liquidity again
