@@ -519,7 +519,10 @@ impl State<'_> {
         let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
         let liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
 
-        if liquidity_stats.total_collateral()?.is_zero() {
+        if liquidity_stats
+            .total_collateral()?
+            .approx_eq(Collateral::zero())
+        {
             let total_yield = addr_stats.total_yield()?;
             let mut claimed_yield = Collateral::zero();
             if let Some(total_yield) = NonZero::new(total_yield) {
@@ -539,6 +542,7 @@ impl State<'_> {
             addr_stats.crank_rewards = Collateral::zero();
             addr_stats.referrer_rewards = Collateral::zero();
             self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
+            self.save_liquidity_stats(ctx.storage, &LiquidityStats::default())?;
 
             ctx.response_mut().add_event(
                 Event::new("force-withdraw-liquidity")
@@ -1048,42 +1052,42 @@ impl State<'_> {
             .checked_add(addr_stats.crank_rewards)?
             .checked_add(addr_stats.referrer_rewards)?;
 
-        let (lp_amount, xlp_amount, unstaking) = match addr_stats.unstaking {
-            None => (addr_stats.lp, addr_stats.xlp, None),
-            Some(unstaking_info) => {
-                let unstaked_lp = self.calculate_unstaked_lp(&unstaking_info)?;
-                (
-                    addr_stats.lp.checked_add(unstaked_lp)?,
-                    addr_stats
-                        .xlp
-                        .checked_add(unstaking_info.xlp_amount.raw())?
-                        .checked_sub(unstaking_info.collected)?
-                        .checked_sub(unstaked_lp)?,
-                    Some(UnstakingStatus {
-                        start: unstaking_info.unstake_started,
-                        end: unstaking_info.unstake_started + unstaking_info.unstake_duration,
-                        xlp_unstaking: unstaking_info.xlp_amount,
-                        xlp_unstaking_collateral: stats
-                            .lp_to_collateral(unstaking_info.xlp_amount.raw())?,
-                        collected: unstaking_info.collected,
-                        available: unstaked_lp,
-                        pending: unstaking_info
-                            .xlp_amount
-                            .raw()
-                            .checked_sub(unstaked_lp)?
-                            .checked_sub(unstaking_info.collected)?,
-                    }),
-                )
-            }
-        };
-
+        let total_collateral = stats.total_collateral()?;
         // Handle the degenerate case where all liquidity has been drained from
-        // the pool. In such as case: we reset all balances to 0, except for the
-        // available yield.
-        let (lp_amount, xlp_amount, unstaking) = if stats.total_collateral()?.is_zero() {
+        // the pool. In such a case: we reset all balances to 0, except for the
+        // available yield. Do this before calculating unstaking collateral
+        // values, since stale LP/xLP shares no longer have backing collateral.
+        let (lp_amount, xlp_amount, unstaking) = if total_collateral.approx_eq(Collateral::zero()) {
             (LpToken::zero(), LpToken::zero(), None)
         } else {
-            (lp_amount, xlp_amount, unstaking)
+            match addr_stats.unstaking {
+                None => (addr_stats.lp, addr_stats.xlp, None),
+                Some(unstaking_info) => {
+                    let unstaked_lp = self.calculate_unstaked_lp(&unstaking_info)?;
+                    (
+                        addr_stats.lp.checked_add(unstaked_lp)?,
+                        addr_stats
+                            .xlp
+                            .checked_add(unstaking_info.xlp_amount.raw())?
+                            .checked_sub(unstaking_info.collected)?
+                            .checked_sub(unstaked_lp)?,
+                        Some(UnstakingStatus {
+                            start: unstaking_info.unstake_started,
+                            end: unstaking_info.unstake_started + unstaking_info.unstake_duration,
+                            xlp_unstaking: unstaking_info.xlp_amount,
+                            xlp_unstaking_collateral: stats
+                                .lp_to_collateral(unstaking_info.xlp_amount.raw())?,
+                            collected: unstaking_info.collected,
+                            available: unstaked_lp,
+                            pending: unstaking_info
+                                .xlp_amount
+                                .raw()
+                                .checked_sub(unstaked_lp)?
+                                .checked_sub(unstaking_info.collected)?,
+                        }),
+                    )
+                }
+            }
         };
 
         let history = self.lp_history_get_summary(store, lp_addr)?;
