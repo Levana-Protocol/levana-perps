@@ -583,3 +583,11 @@ hash = "4ea735d6e7f1d1f2907ec6b937606820abdaa586bbb07f3af6270bc3daa719a2"
 
 [hashes.code-ids]
 neutron-mainnet = 5340
+
+[[hashes]]
+contract-type = "market"
+gitrev = "d16499ac8d7445ae846ff7958ecffe5cac553681"
+hash = "a871b57ef07f564574a7bb22f70546ba3cce7fe5e4e29c7e248e243b42f6829a"
+
+[hashes.code-ids]
+neutron-mainnet = 5341
