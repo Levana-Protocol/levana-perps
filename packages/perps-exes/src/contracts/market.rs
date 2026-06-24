@@ -177,6 +177,31 @@ impl MarketContract {
             .await
     }
 
+    pub async fn place_limit_order(
+        &self,
+        wallet: &Wallet,
+        status: &StatusResp,
+        funds: NonZero<Collateral>,
+        trigger_price: PriceBaseInQuote,
+        direction: DirectionToBase,
+        leverage: LeverageToBase,
+        take_profit: PriceBaseInQuote,
+    ) -> Result<TxResponse> {
+        self.exec_with_funds(
+            wallet,
+            status,
+            funds,
+            &MarketExecuteMsg::PlaceLimitOrder {
+                trigger_price,
+                leverage,
+                direction,
+                stop_loss_override: None,
+                take_profit: TakeProfitTrader::Finite(take_profit.into_non_zero()),
+            },
+        )
+        .await
+    }
+
     pub async fn get_collateral_balance(
         &self,
         status: &StatusResp,

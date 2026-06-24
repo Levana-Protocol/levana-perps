@@ -550,3 +550,45 @@ hash = "97e6446352de99652f3e3872c85281496293b0a83cb1a4fcc6f3523a9b4a5b5b"
 
 [hashes.code-ids]
 rujira-mainnet = 63
+
+[[hashes]]
+contract-type = "market"
+gitrev = "e72aec76b2a30704f6700776e07bbe03746f55ee"
+hash = "7a8d31f305a184a1148bbe9182b201ad7c8c785f9c403a1c8a61e5a397163174"
+
+[hashes.code-ids]
+neutron-mainnet = 5336
+
+[[hashes]]
+contract-type = "market"
+gitrev = "7e23b29c90de352a012c66170144f1c186b748e7"
+hash = "bcc44e52214b8cf4be0ca58933044cb7337caebbd63eae2c7c3b10b7be081b84"
+
+[hashes.code-ids]
+osmosis-mainnet = 1896
+neutron-mainnet = 5337
+
+[[hashes]]
+contract-type = "market"
+gitrev = "df4133ed3972c255b383b038e71a3c3f4debae30"
+hash = "aefc469b8896dcb2f38f91121398306a854bc9fb8c810f111ec5f3952b9da839"
+
+[hashes.code-ids]
+neutron-mainnet = 5339
+
+[[hashes]]
+contract-type = "market"
+gitrev = "929cb66aff54ef682ba50cc0756e5d2417e03510"
+hash = "4ea735d6e7f1d1f2907ec6b937606820abdaa586bbb07f3af6270bc3daa719a2"
+
+[hashes.code-ids]
+neutron-mainnet = 5340
+
+[[hashes]]
+contract-type = "market"
+gitrev = "d16499ac8d7445ae846ff7958ecffe5cac553681"
+hash = "a871b57ef07f564574a7bb22f70546ba3cce7fe5e4e29c7e248e243b42f6829a"
+
+[hashes.code-ids]
+osmosis-mainnet = 1897
+neutron-mainnet = 5341

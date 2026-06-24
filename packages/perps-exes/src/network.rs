@@ -60,7 +60,7 @@ impl PerpsNetwork {
                 "thorchain-1",
                 "rune",
                 Self::RujiraMainnet.get_address_hrp(),
-                "https://thornode-mainnet-grpc.bryanlabs.net:443",
+                "https://grpc.rujira.network#Authorization=Bearer mb5ZAy3qWUcTScLENET3wJNmTUmQ7LDjrWaFjKAqDAbY97Xu",
             )),
         }
     }

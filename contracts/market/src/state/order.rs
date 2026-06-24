@@ -295,6 +295,54 @@ impl State<'_> {
         })
     }
 
+    pub(crate) fn limit_order_ids_by_addr(
+        &self,
+        storage: &dyn Storage,
+        addr: &Addr,
+        start_after: Option<OrderId>,
+        limit: u32,
+    ) -> Result<Vec<OrderId>> {
+        let limit = usize::try_from(limit.min(QUERY_MAX_LIMIT))?;
+        LIMIT_ORDERS_BY_ADDR
+            .prefix(addr)
+            .keys(
+                storage,
+                start_after.map(Bound::exclusive),
+                None,
+                Order::Ascending,
+            )
+            .take(limit)
+            .map(|item| item.map_err(|err| err.into()))
+            .collect()
+    }
+
+    pub(crate) fn limit_order_ids(
+        &self,
+        storage: &dyn Storage,
+        start_after: Option<OrderId>,
+        limit: u32,
+    ) -> Result<Vec<OrderId>> {
+        let limit = usize::try_from(limit.min(QUERY_MAX_LIMIT))?;
+        LIMIT_ORDERS
+            .keys(
+                storage,
+                start_after.map(Bound::exclusive),
+                None,
+                Order::Ascending,
+            )
+            .take(limit)
+            .map(|item| item.map_err(|err| err.into()))
+            .collect()
+    }
+
+    pub(crate) fn force_cancel_limit_order(
+        &self,
+        ctx: &mut StateContext,
+        order_id: OrderId,
+    ) -> Result<()> {
+        CancelLimitOrderExec::new(ctx.storage, order_id)?.apply(self, ctx)
+    }
+
     /// Validates that the specified Addr is the owner of the [LimitOrder]
     pub(crate) fn limit_order_assert_owner(
         &self,

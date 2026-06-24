@@ -1,19 +1,16 @@
 mod perps_info;
 
-use crate::{
-    inject_failures_during_test,
-    state::{
-        config::{config_init, update_config},
-        crank::crank_init,
-        delta_neutrality_fee::DELTA_NEUTRALITY_FUND,
-        fees::fees_init,
-        liquidity::{liquidity_init, yield_init},
-        meta::meta_init,
-        order::backwards_compat_limit_order_take_profit,
-        position::{get_position, positions_init},
-        set_factory_addr,
-        token::token_init,
-    },
+use crate::state::{
+    config::{config_init, update_config},
+    crank::crank_init,
+    delta_neutrality_fee::DELTA_NEUTRALITY_FUND,
+    fees::fees_init,
+    liquidity::{liquidity_init, yield_init},
+    meta::meta_init,
+    order::backwards_compat_limit_order_take_profit,
+    position::{get_position, positions_init},
+    set_factory_addr,
+    token::token_init,
 };
 
 use crate::prelude::*;
@@ -23,7 +20,7 @@ use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Respon
 use cw2::{get_contract_version, set_contract_version};
 use perpswap::{
     contracts::market::{
-        deferred_execution::{DeferredExecId, DeferredExecItem},
+        deferred_execution::DeferredExecId,
         entry::{
             DeltaNeutralityFeeResp, InitialPrice, InstantiateMsg, MigrateMsg, OraclePriceResp,
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
@@ -42,6 +39,7 @@ use semver::Version;
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:market";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+const MARKET_NOT_OPERATIONAL: &str = "market is no longer operational";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -121,13 +119,13 @@ pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response> {
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
-    let (mut state, mut ctx) = StateContext::new(deps, env)?;
+    let (state, mut ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
 
     // Semi-parse the message to determine the inner message/sender (relevant
     // for CW20s) and any collateral sent into the contract
-    let mut info = state.parse_perps_message_info(ctx.storage, info, msg)?;
+    let info = state.parse_perps_message_info(ctx.storage, info, msg)?;
 
     // Ensure we're not shut down from this action
     if let Some(impact) = ShutdownImpact::for_market_execute_msg(&info.msg) {
@@ -141,24 +139,17 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
             match owner_msg {
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
-                    update_config(&mut state.config, state.api, ctx.storage, *update)?;
+                    let _ = update;
+                    anyhow::bail!(MARKET_NOT_OPERATIONAL);
                 }
             }
         }
 
-        ExecuteMsg::SetManualPrice { price, price_usd } => {
-            match &state.config.spot_price {
-                SpotPriceConfig::Manual { admin } => {
-                    state.assert_auth(&info.sender, AuthCheck::Addr(admin.clone()))?;
-                }
-                SpotPriceConfig::Oracle { .. } => {
-                    anyhow::bail!("Cannot set manual spot price on this market, it uses an oracle");
-                }
-            }
-            state.save_manual_spot_price(&mut ctx, price, price_usd)?;
-            // the price needed to be set first before doing this
-            // so info.requires_spot_price_append is false
-            state.spot_price_append(&mut ctx)?;
+        ExecuteMsg::SetManualPrice {
+            price: _,
+            price_usd: _,
+        } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         // cw20
@@ -169,296 +160,176 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         } => anyhow::bail!("Cannot nest a Receive inside another Receive"),
 
         ExecuteMsg::OpenPosition {
-            slippage_assert,
-            leverage,
-            direction,
-            stop_loss_override,
-            take_profit,
+            slippage_assert: _,
+            leverage: _,
+            direction: _,
+            stop_loss_override: _,
+            take_profit: _,
         } => {
-            inject_failures_during_test()?;
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::OpenPosition {
-                    slippage_assert,
-                    leverage,
-                    direction,
-                    max_gains: None,
-                    stop_loss_override,
-                    take_profit: Some(take_profit),
-                    amount: info.funds.take()?,
-                    crank_fee: Collateral::zero(),
-                    crank_fee_usd: Usd::zero(),
-                },
-                Err(anyhow::anyhow!("This value should never be evaluated")),
-            )?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionAddCollateralImpactLeverage {
-                    id,
-                    amount: info.funds.take()?,
-                },
-                Err(anyhow::anyhow!("This value should never be evaluated")),
-            )?;
+        ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id: _ } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
         ExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
-            state.get_token(ctx.storage)?.validate_collateral(amount)?;
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount },
-                info.funds.take(),
-            )?;
+            let _ = (id, amount);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::UpdatePositionAddCollateralImpactSize {
-            id,
-            slippage_assert,
+            id: _,
+            slippage_assert: _,
         } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionAddCollateralImpactSize {
-                    id,
-                    slippage_assert,
-                    amount: info.funds.take()?,
-                },
-                Err(anyhow::anyhow!("This value should never be evaluated")),
-            )?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
         ExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
             id,
             slippage_assert,
             amount,
         } => {
-            state.get_token(ctx.storage)?.validate_collateral(amount)?;
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
-                    id,
-                    amount,
-                    slippage_assert,
-                },
-                info.funds.take(),
-            )?;
+            let _ = (id, slippage_assert, amount);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::UpdatePositionLeverage {
-            id,
-            leverage,
-            slippage_assert,
+            id: _,
+            leverage: _,
+            slippage_assert: _,
         } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionLeverage {
-                    id,
-                    leverage,
-                    slippage_assert,
-                },
-                info.funds.take(),
-            )?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::UpdatePositionMaxGains { id, max_gains } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionMaxGains { id, max_gains },
-                info.funds.take(),
-            )?;
+        ExecuteMsg::UpdatePositionMaxGains {
+            id: _,
+            max_gains: _,
+        } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionTakeProfitPrice { id, price },
-                info.funds.take(),
-            )?;
+        ExecuteMsg::UpdatePositionTakeProfitPrice { id: _, price: _ } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::UpdatePositionStopLossPrice { id, stop_loss },
-                info.funds.take(),
-            )?;
+        ExecuteMsg::UpdatePositionStopLossPrice {
+            id: _,
+            stop_loss: _,
+        } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         #[allow(deprecated)]
         ExecuteMsg::SetTriggerOrder {
-            id,
-            stop_loss_override,
-            take_profit,
+            id: _,
+            stop_loss_override: _,
+            take_profit: _,
         } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::SetTriggerOrder {
-                    id,
-                    stop_loss_override,
-                    take_profit,
-                },
-                info.funds.take(),
-            )?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::PlaceLimitOrder {
-            trigger_price,
-            leverage,
-            direction,
-            stop_loss_override,
-            take_profit,
+            trigger_price: _,
+            leverage: _,
+            direction: _,
+            stop_loss_override: _,
+            take_profit: _,
         } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::PlaceLimitOrder {
-                    trigger_price,
-                    leverage,
-                    direction,
-                    max_gains: None,
-                    stop_loss_override,
-                    take_profit: Some(take_profit),
-                    amount: info.funds.take()?,
-                    crank_fee: Collateral::zero(),
-                    crank_fee_usd: Usd::zero(),
-                },
-                Err(anyhow::anyhow!("This value should never be evaluated")),
-            )?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::CancelLimitOrder { order_id } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::CancelLimitOrder { order_id },
-                // This should fail and be caught in defer_execution
-                info.funds.take(),
-            )?;
+            let _ = order_id;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::ClosePosition {
             id,
             slippage_assert,
         } => {
-            state.defer_execution(
-                &mut ctx,
-                info.sender,
-                DeferredExecItem::ClosePosition {
-                    id,
-                    slippage_assert,
-                },
-                info.funds.take(),
-            )?;
+            let _ = (id, slippage_assert);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::Crank { execs, rewards } => {
-            let rewards = match rewards {
-                None => info.sender,
-                Some(rewards) => rewards.validate(state.api)?,
-            };
-            state.spot_price_append(&mut ctx)?;
-            state.crank_exec_batch(
-                &mut ctx,
-                Some((execs.unwrap_or(state.config.crank_execs), rewards)),
-            )?;
+            let _ = (execs, rewards);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::DepositLiquidity { stake_to_xlp } => {
-            state.liquidity_deposit(&mut ctx, &info.sender, info.funds.take()?, stake_to_xlp)?;
+        ExecuteMsg::ForceWithdrawAll { limit } => {
+            state.force_withdraw_all(&mut ctx, limit.unwrap_or(state.config.crank_execs))?;
+        }
+
+        ExecuteMsg::DepositLiquidity { stake_to_xlp: _ } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::ReinvestYield {
-            stake_to_xlp,
-            amount,
+            stake_to_xlp: _,
+            amount: _,
         } => {
-            state.reinvest_yield(&mut ctx, &info.sender, amount, stake_to_xlp)?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::WithdrawLiquidity {
             lp_amount,
             claim_yield,
         } => {
-            if claim_yield {
-                state.liquidity_claim_yield(&mut ctx, &info.sender, true)?;
-            }
-            state.liquidity_withdraw(&mut ctx, &info.sender, lp_amount)?;
+            let _ = (lp_amount, claim_yield);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::ClaimYield {} => {
-            state.liquidity_claim_yield(&mut ctx, &info.sender, true)?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::StakeLp { amount } => {
-            state.liquidity_stake_lp(&mut ctx, &info.sender, amount)?;
+        ExecuteMsg::StakeLp { amount: _ } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::UnstakeXlp { amount } => {
-            state.liquidity_unstake_xlp(&mut ctx, &info.sender, amount)?
+            let _ = amount;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::StopUnstakingXlp {} => {
-            state.liquidity_stop_unstaking_xlp(&mut ctx, &info.sender, true, true)?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::CollectUnstakedLp {} => {
-            let collected = state.collect_unstaked_lp(&mut ctx, &info.sender)?;
-            if !collected {
-                bail!("There is no unstaked LP for {}", info.sender)
-            }
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::NftProxy { sender, msg } => {
-            let position_token_addr = state.position_token_addr(ctx.storage)?;
-            // executions *MUST* come only from the proxy contract
-            // otherwise anyone could spoof the sender
-            state.assert_auth(&info.sender, AuthCheck::Addr(position_token_addr))?;
-            // Do not allow any NFT-level actions while deferred executions are pending
-            if let Some(pos_id) = msg.get_position_id()? {
-                state.assert_no_pending_deferred(ctx.storage, pos_id)?;
-            }
-            state.nft_handle_exec(&mut ctx, sender.validate(state.api)?, msg)?;
+            let _ = (sender, msg);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
-        ExecuteMsg::LiquidityTokenProxy { sender, kind, msg } => {
-            let liquidity_token_addr = state.liquidity_token_addr(ctx.storage, kind)?;
-            // executions *MUST* come only from the proxy contract
-            // otherwise anyone could spoof the sender
-            state.assert_auth(&info.sender, AuthCheck::Addr(liquidity_token_addr))?;
-
-            state.liquidity_token_handle_exec(&mut ctx, sender.validate(state.api)?, kind, msg)?;
+        ExecuteMsg::LiquidityTokenProxy {
+            sender: _,
+            kind: _,
+            msg: _,
+        } => {
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::TransferDaoFees {} => {
-            state.transfer_fees_to_dao(&mut ctx)?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::CloseAllPositions {} => {
-            state.assert_auth(&info.sender, AuthCheck::WindDown)?;
-            state.set_close_all_positions(&mut ctx)?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::ProvideCrankFunds {} => {
-            state.provide_crank_funds(&mut ctx, info.funds.take()?)?;
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
 
         ExecuteMsg::PerformDeferredExec {
             id,
             price_point_timestamp,
         } => {
-            state.assert_auth(
-                &info.sender,
-                AuthCheck::Addr(state.env.contract.address.clone()),
-            )?;
-            state.perform_deferred_exec(&mut ctx, id, price_point_timestamp)?;
+            let _ = (id, price_point_timestamp);
+            anyhow::bail!(MARKET_NOT_OPERATIONAL);
         }
     }
 

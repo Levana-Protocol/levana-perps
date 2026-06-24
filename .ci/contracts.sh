@@ -14,6 +14,7 @@ CARGO_GIT_CACHE="$WASM_DIR/git"
 ARTIFACTS="$WASM_DIR/artifacts"
 
 COSMWASM_OPTIMIZER_IMAGE="0.16.1"
+OPTIMIZER_RUST_TOOLCHAIN="${OPTIMIZER_RUST_TOOLCHAIN:-1.81.0-x86_64-unknown-linux-musl}"
 
 if [[ -n "${OPTIMIZER_ARM64:-}" ]]; then
     OPTIMIZER_VERSION="cosmwasm/optimizer-arm64":"$COSMWASM_OPTIMIZER_IMAGE"
@@ -28,11 +29,12 @@ rm -f "$WASM_DIR/artifacts/gitrev"
 
 docker  run --rm --tty \
 -u "$(id -u)":"$(id -g)" \
--v "$(pwd)":/code \
--v "$TARGET_CACHE":/target \
--v "$ARTIFACTS":/code/artifacts \
--v "$REGISTRY_CACHE":/usr/local/cargo/registry \
--v "$CARGO_GIT_CACHE":/usr/local/cargo/git \
+-e RUSTUP_TOOLCHAIN="$OPTIMIZER_RUST_TOOLCHAIN" \
+-v "$(pwd)":/code:Z \
+-v "$TARGET_CACHE":/target:Z \
+-v "$ARTIFACTS":/code/artifacts:Z \
+-v "$REGISTRY_CACHE":/usr/local/cargo/registry:Z \
+-v "$CARGO_GIT_CACHE":/usr/local/cargo/git:Z \
 $OPTIMIZER_VERSION
 
 # not sure how this was created since we mapped the tool's /code/artifacts

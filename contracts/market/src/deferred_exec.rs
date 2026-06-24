@@ -6,27 +6,21 @@
 //
 // The execution branch then goes one step further - applying the changes to the state, using that same struct
 // In order to ensure that the struct is used, we annotate with `#[must_use]` and either `apply()` or `discard()` are called
-use perpswap::compat::BackwardsCompatTakeProfit;
 use perpswap::contracts::market::{
     deferred_execution::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
     },
     entry::SlippageAssert,
-    position::{events::PositionSaveReason, CollateralAndUsd},
+    position::events::PositionSaveReason,
 };
 
 use crate::inject_failures_during_test;
 use crate::state::{
-    order::{CancelLimitOrderExec, PlaceLimitOrderExec},
+    order::CancelLimitOrderExec,
     position::{
         close::ClosePositionExec,
         liquifund::PositionLiquifund,
-        update::{
-            TriggerOrderExec, UpdatePositionCollateralExec, UpdatePositionLeverageExec,
-            UpdatePositionMaxGainsExec, UpdatePositionSizeExec, UpdatePositionStopLossPriceExec,
-            UpdatePositionTakeProfitPriceExec,
-        },
-        OpenPositionExec, OpenPositionParams,
+        update::{UpdatePositionCollateralExec, UpdatePositionSizeExec},
     },
 };
 use crate::{prelude::*, state::position::get_position};
@@ -63,6 +57,8 @@ pub enum SlippageCheckStatus {
     NoSlippageCheck,
 }
 
+const MARKET_NOT_OPERATIONAL: &str = "market is no longer operational";
+
 fn helper_execute(
     state: &State,
     ctx: &mut StateContext,
@@ -73,100 +69,27 @@ fn helper_execute(
         // TODO: remove this once the deprecated fields are fully removed
         #[allow(deprecated)]
         DeferredExecItem::OpenPosition {
-            slippage_assert,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit,
-            amount,
-            crank_fee,
-            crank_fee_usd,
+            slippage_assert: _,
+            leverage: _,
+            direction: _,
+            max_gains: _,
+            stop_loss_override: _,
+            take_profit: _,
+            amount: _,
+            crank_fee: _,
+            crank_fee_usd: _,
         } => {
-            inject_failures_during_test()?;
-            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            let take_profit_trader = match (take_profit, max_gains) {
-                (None, None) => {
-                    bail!("must supply at least one of take_profit or max_gains");
-                }
-                (Some(take_profit_price), None) => take_profit_price,
-                (take_profit, Some(max_gains)) => {
-                    let take_profit = match take_profit {
-                        None => None,
-                        Some(take_profit) => match take_profit {
-                            TakeProfitTrader::PosInfinity => {
-                                bail!("cannot set infinite take profit price and max_gains")
-                            }
-                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
-                        },
-                    };
-                    BackwardsCompatTakeProfit {
-                        collateral: amount,
-                        market_type: state.market_id(ctx.storage)?.get_market_type(),
-                        direction,
-                        leverage,
-                        max_gains,
-                        take_profit,
-                        price_point: &price_point,
-                    }
-                    .calc()?
-                }
-            };
-
-            OpenPositionExec::new(
-                state,
-                ctx.storage,
-                OpenPositionParams {
-                    owner: item.owner,
-                    collateral: amount,
-                    leverage,
-                    direction,
-                    slippage_assert,
-                    stop_loss_override,
-                    take_profit_trader,
-                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
-                },
-                &price_point,
-            )?
-            .apply(state, ctx, PositionSaveReason::OpenMarket)
-            .map(DeferredExecCompleteTarget::Position)
+            bail!(MARKET_NOT_OPERATIONAL);
         }
-        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
-            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionCollateralExec::new(
-                state,
-                ctx.storage,
-                get_position(ctx.storage, id)?,
-                amount.into_signed(),
-                &price_point,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Position(id))
+        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id: _, amount: _ } => {
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
-            id,
-            slippage_assert,
-            amount,
+            id: _,
+            slippage_assert: _,
+            amount: _,
         } => {
-            let funds = amount.into_signed();
-            let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
-            execute_slippage_assert_and_liquifund(
-                state,
-                ctx,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                &price_point,
-            )?;
-            UpdatePositionSizeExec::new(
-                state,
-                ctx.storage,
-                get_position(ctx.storage, id)?,
-                funds,
-                &price_point,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Position(id))
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
@@ -207,76 +130,26 @@ fn helper_execute(
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionLeverage {
-            id,
-            leverage,
-            slippage_assert,
+            id: _,
+            leverage: _,
+            slippage_assert: _,
         } => {
-            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            let notional_size =
-                state.update_leverage_new_notional_size(ctx.storage, id, leverage, &price_point)?;
-            if let Some(slippage_assert) = slippage_assert {
-                let market_type = state.market_id(ctx.storage)?.get_market_type();
-                let pos = get_position(ctx.storage, id)?;
-                let delta_notional_size = (notional_size - pos.notional_size)?;
-                state.do_slippage_assert(
-                    ctx.storage,
-                    slippage_assert,
-                    delta_notional_size,
-                    market_type,
-                    Some(pos.liquidation_margin.delta_neutrality),
-                    &price_point,
-                )?;
-            }
-            UpdatePositionLeverageExec::new(
-                state,
-                ctx.storage,
-                get_position(ctx.storage, id)?,
-                notional_size,
-                &price_point,
-            )?
-            .apply(state, ctx)?;
-
-            Ok(DeferredExecCompleteTarget::Position(id))
+            bail!(MARKET_NOT_OPERATIONAL);
         }
-        DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
-            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionMaxGainsExec::new(
-                state,
-                ctx.storage,
-                get_position(ctx.storage, id)?,
-                max_gains,
-                &price_point,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Position(id))
-        }
-        DeferredExecItem::UpdatePositionTakeProfitPrice {
-            id,
-            price: take_profit_price,
+        DeferredExecItem::UpdatePositionMaxGains {
+            id: _,
+            max_gains: _,
         } => {
-            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionTakeProfitPriceExec::new(
-                state,
-                ctx.storage,
-                get_position(ctx.storage, id)?,
-                take_profit_price,
-                &price_point,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Position(id))
+            bail!(MARKET_NOT_OPERATIONAL);
         }
-        DeferredExecItem::UpdatePositionStopLossPrice { id, stop_loss } => {
-            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionStopLossPriceExec::new(
-                state,
-                ctx.storage,
-                id,
-                stop_loss,
-                price_point,
-                false,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Position(id))
+        DeferredExecItem::UpdatePositionTakeProfitPrice { id: _, price: _ } => {
+            bail!(MARKET_NOT_OPERATIONAL);
+        }
+        DeferredExecItem::UpdatePositionStopLossPrice {
+            id: _,
+            stop_loss: _,
+        } => {
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::ClosePosition {
             id,
@@ -287,81 +160,27 @@ fn helper_execute(
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::SetTriggerOrder {
-            id,
-            stop_loss_override,
-            take_profit,
+            id: _,
+            stop_loss_override: _,
+            take_profit: _,
         } => {
-            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            TriggerOrderExec::new(
-                state,
-                ctx.storage,
-                id,
-                stop_loss_override,
-                take_profit,
-                price_point,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Position(id))
+            bail!(MARKET_NOT_OPERATIONAL);
         }
 
         // TODO: remove this once the deprecated fields are fully removed
         #[allow(deprecated)]
         DeferredExecItem::PlaceLimitOrder {
-            trigger_price,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit,
-            amount,
-            crank_fee,
-            crank_fee_usd,
+            trigger_price: _,
+            leverage: _,
+            direction: _,
+            max_gains: _,
+            stop_loss_override: _,
+            take_profit: _,
+            amount: _,
+            crank_fee: _,
+            crank_fee_usd: _,
         } => {
-            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            let take_profit_price = match (take_profit, max_gains) {
-                (None, None) => {
-                    bail!("must supply at least one of take_profit or max_gains");
-                }
-                (Some(take_profit_price), None) => take_profit_price,
-                (take_profit, Some(max_gains)) => {
-                    let take_profit = match take_profit {
-                        None => None,
-                        Some(take_profit) => match take_profit {
-                            TakeProfitTrader::PosInfinity => {
-                                bail!("cannot set infinite take profit price and max_gains")
-                            }
-                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
-                        },
-                    };
-                    BackwardsCompatTakeProfit {
-                        collateral: amount,
-                        market_type: state.market_id(ctx.storage)?.get_market_type(),
-                        direction,
-                        leverage,
-                        max_gains,
-                        take_profit,
-                        price_point: &price_point,
-                    }
-                    .calc()?
-                }
-            };
-
-            let order_id = PlaceLimitOrderExec::new(
-                state,
-                ctx.storage,
-                item.owner,
-                trigger_price,
-                amount,
-                leverage,
-                direction.into_notional(state.market_type(ctx.storage)?),
-                stop_loss_override,
-                take_profit_price,
-                crank_fee,
-                crank_fee_usd,
-                price_point,
-            )?
-            .apply(state, ctx)?;
-            Ok(DeferredExecCompleteTarget::Order(order_id))
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::CancelLimitOrder { order_id } => {
             CancelLimitOrderExec::new(ctx.storage, order_id)?.apply(state, ctx)?;
@@ -417,114 +236,27 @@ fn helper_validate(
         // TODO: remove this once the deprecated fields are fully removed
         #[allow(deprecated)]
         DeferredExecItem::OpenPosition {
-            slippage_assert,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit,
-            amount,
-            crank_fee,
-            crank_fee_usd,
+            slippage_assert: _,
+            leverage: _,
+            direction: _,
+            max_gains: _,
+            stop_loss_override: _,
+            take_profit: _,
+            amount: _,
+            crank_fee: _,
+            crank_fee_usd: _,
         } => {
-            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
-            let slippage_assert = match slippage_check {
-                SlippageCheckStatus::SlippageCheck => slippage_assert,
-                SlippageCheckStatus::NoSlippageCheck => None,
-            };
-            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            let take_profit_trader = match (take_profit, max_gains) {
-                (None, None) => {
-                    bail!("must supply at least one of take_profit or max_gains");
-                }
-                (Some(take_profit_price), None) => take_profit_price,
-                (take_profit, Some(max_gains)) => {
-                    let take_profit = match take_profit {
-                        None => None,
-                        Some(take_profit) => match take_profit {
-                            TakeProfitTrader::PosInfinity => {
-                                bail!("cannot set infinite take profit price and max_gains")
-                            }
-                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
-                        },
-                    };
-                    BackwardsCompatTakeProfit {
-                        collateral: amount,
-                        market_type: state.market_id(store)?.get_market_type(),
-                        direction,
-                        leverage,
-                        max_gains,
-                        take_profit,
-                        price_point,
-                    }
-                    .calc()?
-                }
-            };
-
-            OpenPositionExec::new(
-                state,
-                store,
-                OpenPositionParams {
-                    owner: item.owner,
-                    collateral: amount,
-                    leverage,
-                    direction,
-                    slippage_assert,
-                    stop_loss_override,
-                    take_profit_trader,
-                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
-                },
-                price_point,
-            )?
-            .discard();
-
-            Ok(())
+            bail!(MARKET_NOT_OPERATIONAL);
         }
-        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
-            let liquifund =
-                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-
-            UpdatePositionCollateralExec::new(
-                state,
-                store,
-                liquifund.position.into(),
-                amount.into_signed(),
-                price_point,
-            )?
-            .discard();
-            Ok(())
+        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id: _, amount: _ } => {
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
-            id,
-            slippage_assert,
-            amount,
+            id: _,
+            slippage_assert: _,
+            amount: _,
         } => {
-            let funds = amount.into_signed();
-            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
-            let slippage_assert = match slippage_check {
-                SlippageCheckStatus::SlippageCheck => slippage_assert,
-                SlippageCheckStatus::NoSlippageCheck => None,
-            };
-
-            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
-            let liquifund = validate_slippage_assert_and_liquifund(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            UpdatePositionSizeExec::new(
-                state,
-                store,
-                liquifund.position.into(),
-                funds,
-                price_point,
-            )?
-            .discard();
-
-            Ok(())
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             let liquifund =
@@ -571,82 +303,26 @@ fn helper_validate(
             Ok(())
         }
         DeferredExecItem::UpdatePositionLeverage {
-            id,
-            leverage,
-            slippage_assert,
+            id: _,
+            leverage: _,
+            slippage_assert: _,
         } => {
-            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
-            let slippage_assert = match slippage_check {
-                SlippageCheckStatus::SlippageCheck => slippage_assert,
-                SlippageCheckStatus::NoSlippageCheck => None,
-            };
-
-            let liquifund = validate_slippage_assert_and_liquifund(
-                state,
-                store,
-                id,
-                None,
-                slippage_assert.clone(),
-                price_point,
-            )?;
-            let notional_size =
-                state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
-
-            let pos: Position = liquifund.position.into();
-
-            if let Some(slippage_assert) = slippage_assert {
-                let market_type = state.market_id(store)?.get_market_type();
-
-                let delta_notional_size = (notional_size - pos.notional_size)?;
-                state.do_slippage_assert(
-                    store,
-                    slippage_assert,
-                    delta_notional_size,
-                    market_type,
-                    Some(pos.liquidation_margin.delta_neutrality),
-                    price_point,
-                )?;
-            }
-
-            UpdatePositionLeverageExec::new(state, store, pos, notional_size, price_point)?
-                .discard();
-            Ok(())
+            bail!(MARKET_NOT_OPERATIONAL);
         }
-        DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
-            let liquifund =
-                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-            UpdatePositionMaxGainsExec::new(
-                state,
-                store,
-                liquifund.position.into(),
-                max_gains,
-                price_point,
-            )?
-            .discard();
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionTakeProfitPrice {
-            id,
-            price: take_profit_price,
+        DeferredExecItem::UpdatePositionMaxGains {
+            id: _,
+            max_gains: _,
         } => {
-            let liquifund =
-                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-            UpdatePositionTakeProfitPriceExec::new(
-                state,
-                store,
-                liquifund.position.into(),
-                take_profit_price,
-                price_point,
-            )?
-            .discard();
-            Ok(())
+            bail!(MARKET_NOT_OPERATIONAL);
         }
-        DeferredExecItem::UpdatePositionStopLossPrice { id, stop_loss } => {
-            validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?
-                .discard();
-            UpdatePositionStopLossPriceExec::new(state, store, id, stop_loss, *price_point, true)?
-                .discard();
-            Ok(())
+        DeferredExecItem::UpdatePositionTakeProfitPrice { id: _, price: _ } => {
+            bail!(MARKET_NOT_OPERATIONAL);
+        }
+        DeferredExecItem::UpdatePositionStopLossPrice {
+            id: _,
+            stop_loss: _,
+        } => {
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::ClosePosition {
             id,
@@ -662,81 +338,27 @@ fn helper_validate(
             Ok(())
         }
         DeferredExecItem::SetTriggerOrder {
-            id,
-            stop_loss_override,
-            take_profit,
+            id: _,
+            stop_loss_override: _,
+            take_profit: _,
         } => {
-            validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?
-                .discard();
-            TriggerOrderExec::new(
-                state,
-                store,
-                id,
-                stop_loss_override,
-                take_profit,
-                *price_point,
-            )?
-            .discard();
-            Ok(())
+            bail!(MARKET_NOT_OPERATIONAL);
         }
 
         // TODO: remove this once the deprecated fields are fully removed
         #[allow(deprecated)]
         DeferredExecItem::PlaceLimitOrder {
-            trigger_price,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit,
-            amount,
-            crank_fee,
-            crank_fee_usd,
+            trigger_price: _,
+            leverage: _,
+            direction: _,
+            max_gains: _,
+            stop_loss_override: _,
+            take_profit: _,
+            amount: _,
+            crank_fee: _,
+            crank_fee_usd: _,
         } => {
-            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            let take_profit_price = match (take_profit, max_gains) {
-                (None, None) => {
-                    bail!("must supply at least one of take_profit or max_gains");
-                }
-                (Some(take_profit_price), None) => take_profit_price,
-                (take_profit, Some(max_gains)) => {
-                    let take_profit = match take_profit {
-                        None => None,
-                        Some(take_profit) => match take_profit {
-                            TakeProfitTrader::PosInfinity => {
-                                bail!("cannot set infinite take profit price and max_gains")
-                            }
-                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
-                        },
-                    };
-                    BackwardsCompatTakeProfit {
-                        collateral: amount,
-                        market_type: state.market_id(store)?.get_market_type(),
-                        direction,
-                        leverage,
-                        max_gains,
-                        take_profit,
-                        price_point,
-                    }
-                    .calc()?
-                }
-            };
-            PlaceLimitOrderExec::new(
-                state,
-                store,
-                item.owner,
-                trigger_price,
-                amount,
-                leverage,
-                direction.into_notional(state.market_type(store)?),
-                stop_loss_override,
-                take_profit_price,
-                crank_fee,
-                crank_fee_usd,
-                *price_point,
-            )?
-            .discard();
-            Ok(())
+            bail!(MARKET_NOT_OPERATIONAL);
         }
         DeferredExecItem::CancelLimitOrder { order_id } => {
             CancelLimitOrderExec::new(store, order_id)?.discard();

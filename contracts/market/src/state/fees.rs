@@ -39,6 +39,36 @@ pub(crate) fn fees_init(store: &mut dyn Storage) -> Result<()> {
     Ok(())
 }
 
+fn register_lp_claimed_yield_inner(
+    store: &mut dyn Storage,
+    amount: NonZero<Collateral>,
+) -> Result<()> {
+    ALL_FEES.update(store, |mut fee| {
+        fee.wallets = fee.wallets.checked_sub(amount.raw())?;
+        anyhow::Ok(fee)
+    })?;
+
+    Ok(())
+}
+
+fn register_lp_claimed_yield_capped_inner(
+    store: &mut dyn Storage,
+    amount: NonZero<Collateral>,
+) -> Result<Collateral> {
+    let mut claimed = Collateral::zero();
+    ALL_FEES.update(store, |mut fee| {
+        claimed = if fee.wallets < amount.raw() {
+            fee.wallets
+        } else {
+            amount.raw()
+        };
+        fee.wallets = fee.wallets.checked_sub(claimed)?;
+        anyhow::Ok(fee)
+    })?;
+
+    Ok(claimed)
+}
+
 impl State<'_> {
     // only earmarks the fee, doesn't transfer anything
     pub(crate) fn collect_borrow_fee(
@@ -215,12 +245,15 @@ impl State<'_> {
         ctx: &mut StateContext,
         amount: NonZero<Collateral>,
     ) -> Result<()> {
-        ALL_FEES.update(ctx.storage, |mut fee| {
-            fee.wallets = fee.wallets.checked_sub(amount.raw())?;
-            anyhow::Ok(fee)
-        })?;
+        register_lp_claimed_yield_inner(ctx.storage, amount)
+    }
 
-        Ok(())
+    pub(crate) fn register_lp_claimed_yield_capped(
+        &self,
+        ctx: &mut StateContext,
+        amount: NonZero<Collateral>,
+    ) -> Result<Collateral> {
+        register_lp_claimed_yield_capped_inner(ctx.storage, amount)
     }
 
     pub(crate) fn transfer_fees_to_dao(&self, ctx: &mut StateContext) -> Result<()> {
@@ -314,6 +347,72 @@ impl State<'_> {
             amount_usd: price_point.collateral_to_usd_non_zero(amount),
         });
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::mock_dependencies;
+    use std::str::FromStr;
+
+    fn non_zero_collateral(src: &str) -> NonZero<Collateral> {
+        NonZero::new(Collateral::from_str(src).unwrap()).unwrap()
+    }
+
+    fn set_wallet_fees(store: &mut dyn Storage, wallets: &str) {
+        ALL_FEES
+            .save(
+                store,
+                &Fees {
+                    wallets: Collateral::from_str(wallets).unwrap(),
+                    protocol: Collateral::zero(),
+                    crank: Collateral::zero(),
+                    referral: Collateral::zero(),
+                },
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn strict_claimed_yield_errors_on_shortfall() {
+        let mut deps = mock_dependencies();
+        fees_init(&mut deps.storage).unwrap();
+        set_wallet_fees(&mut deps.storage, "1");
+
+        register_lp_claimed_yield_inner(&mut deps.storage, non_zero_collateral("1.1")).unwrap_err();
+
+        let fees = ALL_FEES.load(&deps.storage).unwrap();
+        assert_eq!(fees.wallets, Collateral::from_str("1").unwrap());
+    }
+
+    #[test]
+    fn capped_claimed_yield_consumes_available_wallet_fees() {
+        let mut deps = mock_dependencies();
+        fees_init(&mut deps.storage).unwrap();
+        set_wallet_fees(&mut deps.storage, "1");
+
+        let claimed =
+            register_lp_claimed_yield_capped_inner(&mut deps.storage, non_zero_collateral("1.1"))
+                .unwrap();
+
+        assert_eq!(claimed, Collateral::from_str("1").unwrap());
+        let fees = ALL_FEES.load(&deps.storage).unwrap();
+        assert_eq!(fees.wallets, Collateral::zero());
+    }
+
+    #[test]
+    fn capped_claimed_yield_allows_empty_wallet_fees() {
+        let mut deps = mock_dependencies();
+        fees_init(&mut deps.storage).unwrap();
+
+        let claimed =
+            register_lp_claimed_yield_capped_inner(&mut deps.storage, non_zero_collateral("1"))
+                .unwrap();
+
+        assert_eq!(claimed, Collateral::zero());
+        let fees = ALL_FEES.load(&deps.storage).unwrap();
+        assert_eq!(fees.wallets, Collateral::zero());
     }
 }
 
